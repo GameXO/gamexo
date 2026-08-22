@@ -9,10 +9,12 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.engine import make_url
 
 from app.auth import platform_router
 from app.auth import router as auth_router
+from app.core import storage
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.timing import DbTimingMiddleware
@@ -24,8 +26,10 @@ from app.modules.booking import router as booking_router
 from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
 from app.modules.gateway import router as gateway_router
+from app.modules.onboarding import router as onboarding_router
 from app.modules.payments import router as payments_router
 from app.modules.reporting import router as reporting_router
+from app.modules.uploads import router as uploads_router
 from app.tenancy.deps import TenantCtx
 
 # Importing the model registry populates Base.metadata. Without it, Alembic's
@@ -161,6 +165,7 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=settings.api_v1_prefix)
     api.include_router(auth_router.router)
     api.include_router(platform_router.router)
+    api.include_router(onboarding_router.router)
     api.include_router(booking_router.router)
     api.include_router(academy_router.router)
     api.include_router(advertising_router.router)
@@ -170,10 +175,29 @@ def create_app() -> FastAPI:
     api.include_router(gateway_router.router)
     api.include_router(gateway_admin_router.router)
     api.include_router(payments_router.router)
+    api.include_router(uploads_router.router)
     api.include_router(_health_router())
     app.include_router(api)
 
+    _mount_local_media(app)
+
     return app
+
+
+def _mount_local_media(app: FastAPI) -> None:
+    """Serve uploaded images from disk when R2 is not configured.
+
+    Development and test only in practice — see core/storage.py on why the local
+    backend exists. Mounted rather than routed because these are static bytes with
+    no tenancy to resolve: the key already contains the tenant id, and the URL is
+    the capability, exactly as it would be coming from a bucket.
+    """
+    if settings.r2_bucket:
+        return
+
+    directory = storage.local_upload_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=directory), name="media")
 
 
 def _health_router() -> APIRouter:

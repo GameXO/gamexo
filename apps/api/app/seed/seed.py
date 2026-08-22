@@ -16,11 +16,11 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 
-from app.auth.service import initials, provision_tenant
+from app.auth.service import initials, provision_tenant, register_email
 from app.core.config import settings
 from app.core.security import Role, hash_password
 from app.db.session import dispose_engine, tenant_session, untenanted_session
@@ -143,6 +143,9 @@ async def _seed_tenant(identity: SeedIdentity) -> uuid.UUID:
             admin_full_name="XCourt Administrator",
             business_name=BUSINESS_PROFILE["business_name"],
         )
+        # The demo academy arrives fully configured, so it must not be sent through
+        # the first-run wizard. Only a self-serve signup leaves this NULL.
+        tenant.onboarding_completed_at = datetime.now(UTC)
         print(f"  created tenant #1 '{tenant.slug}' with admin {admin.email}")
         return tenant.id
 
@@ -185,6 +188,9 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
                     avatar_initials=initials(name),
                 )
             )
+            # Every login needs a directory row, or this person authenticates on a
+            # subdomain and is invisible on the shared origin. See AccountDirectory.
+            await register_email(session, email=email, tenant_id=tenant_id)
             created += 1
 
         # The counter tablet's shared login. Not part of STAFF because it is not a
@@ -202,6 +208,7 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
                     avatar_initials="POS",
                 )
             )
+            await register_email(session, email=identity.kiosk_email, tenant_id=tenant_id)
             created += 1
 
         print(f"  updated academy profile, created {created} staff user(s)")

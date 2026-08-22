@@ -8,7 +8,7 @@ from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, Iterable, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError
@@ -467,16 +467,31 @@ async def ensure_slot_free(
 ) -> None:
     """Reject an overlapping slot with a message that names the conflict.
 
-    This check is for the *message*, not for the guarantee. Two reception staff
-    hitting Confirm at the same instant can both pass this SELECT — that race is
-    closed by the `booking_no_overlap` exclusion constraint, which is why the
-    constraint exists rather than this function being trusted on its own. If the
-    constraint does fire, the IntegrityError handler in core/errors.py still turns
-    it into a 409; the caller just gets a blunter message.
+    On an ordinary court this check is for the *message*, not for the guarantee.
+    Two reception staff hitting Confirm at the same instant can both pass this
+    SELECT — that race is closed by the `booking_no_overlap` exclusion constraint,
+    which is why the constraint exists rather than this function being trusted on
+    its own. If the constraint does fire, the IntegrityError handler in
+    core/errors.py still turns it into a 409; the caller just gets a blunter message.
+
+    On an **open-slot** court there is no constraint standing behind this, because
+    overlapping bookings are the feature. See `ensure_open_slot_available`, which
+    takes a lock precisely because it *is* the guarantee.
 
     Half-open comparison (`starts < other_end AND ends > other_start`) mirrors the
     constraint's '[)' bounds, so back-to-back bookings are not reported as clashing.
     """
+    court = await session.get(Court, court_id)
+    if court is not None and court.open_slots_enabled:
+        await ensure_open_slot_available(
+            session,
+            court=court,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            exclude_booking_id=exclude_booking_id,
+        )
+        return
+
     stmt = select(Booking.id, Booking.customer_name, Booking.starts_at, Booking.ends_at).where(
         Booking.court_id == court_id,
         Booking.status != BookingStatus.CANCELLED,
@@ -495,6 +510,51 @@ async def ensure_slot_free(
                 "conflicting_from": row.starts_at.isoformat(),
                 "conflicting_to": row.ends_at.isoformat(),
             },
+        )
+
+
+async def ensure_open_slot_available(
+    session: AsyncSession,
+    *,
+    court: Court,
+    starts_at: datetime,
+    ends_at: datetime,
+    exclude_booking_id: uuid.UUID | None = None,
+) -> None:
+    """Refuse a join when an open session is already full.
+
+    Unlike the ordinary path, this function *is* the guarantee — `booking_no_overlap`
+    skips open-slot bookings entirely, so nothing in the database is counting behind
+    it. That is what the `SELECT ... FOR UPDATE` on the court row is for: without it
+    two people taking the last place both count `capacity - 1` and both succeed. The
+    lock serialises them on a row every booking for this court must pass through, and
+    is held until the transaction commits — which is the same transaction that
+    inserts the booking, so the count cannot go stale between check and write.
+
+    Locking the *court* rather than the overlapping bookings is deliberate: there may
+    be no overlapping bookings yet (nothing to lock), and the first two joiners of an
+    empty session are exactly the pair that would race.
+    """
+    capacity = court.slot_capacity or 1
+
+    # The CHECK constraint keeps capacity >= 1 whenever open slots are on, so a
+    # locked row is all this needs — no re-read of the flag.
+    await session.execute(select(Court.id).where(Court.id == court.id).with_for_update())
+
+    stmt = select(func.count(Booking.id)).where(
+        Booking.court_id == court.id,
+        Booking.status != BookingStatus.CANCELLED,
+        Booking.starts_at < ends_at,
+        Booking.ends_at > starts_at,
+    )
+    if exclude_booking_id is not None:
+        stmt = stmt.where(Booking.id != exclude_booking_id)
+
+    taken = (await session.execute(stmt)).scalar_one()
+    if taken >= capacity:
+        raise ConflictError(
+            f"This session is full — all {capacity} slots on {court.name} are taken.",
+            details={"court_id": str(court.id), "capacity": capacity, "taken": taken},
         )
 
 

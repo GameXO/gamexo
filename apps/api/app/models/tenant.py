@@ -7,7 +7,9 @@ import uuid
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text
+from datetime import datetime
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
@@ -51,6 +53,15 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     plan_tier: Mapped[str] = mapped_column(String(50), default="starter", nullable=False)
 
+    # NULL until the owner finishes the onboarding wizard, which is what routes a
+    # freshly signed-up account into the wizard instead of an empty dashboard.
+    #
+    # A timestamp rather than a boolean, and on `tenant` rather than
+    # `tenant_settings`: "when did this turf go live" is a question worth being able
+    # to answer, and the tenant row is already loaded on the /auth/me path, so
+    # surfacing it there costs no extra query.
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # EXTENSION POINT — peeling one enterprise tenant onto its own database is a
     # nullable `database_url` column here plus db.session.engine_for_tenant(). Not
     # built now: pooled only until a paying customer demands otherwise.
@@ -58,6 +69,10 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     settings: Mapped[TenantSettings] = relationship(
         back_populates="tenant", uselist=False, cascade="all, delete-orphan"
     )
+
+    @property
+    def onboarding_completed(self) -> bool:
+        return self.onboarding_completed_at is not None
 
     @validates("slug")
     def _validate_slug(self, _key: str, value: str) -> str:
@@ -98,6 +113,47 @@ def _default_booking_rules() -> dict[str, Any]:
 def _default_tax_config() -> dict[str, Any]:
     """Defaults from Settings.tsx → Taxes & GST."""
     return {"gst_rate": 18, "cgst": 9, "sgst": 9}
+
+
+#: Every product surface a turf can switch on, in the order the onboarding wizard
+#: and the Settings → Services tab list them. The keys are the contract with the
+#: frontend's navigation gate, so adding one here is what makes it appear there.
+SERVICE_KEYS = (
+    "booking",
+    "checkin",
+    "membership",
+    "shop",
+    "inventory",
+    "academy",
+    "events",
+    "advertising",
+)
+
+
+def _default_services() -> dict[str, Any]:
+    """What a brand-new turf gets before onboarding asks.
+
+    The four a turf cannot really operate without are on; the rest are off, because
+    an empty Academy or Advertising section in the sidebar reads as a broken product
+    rather than an available one.
+
+    NOTE — this gates the UI only. The endpoints behind a disabled service stay
+    reachable, so this is a "don't show me what I don't use" preference, not an
+    authorization boundary. Enforcing it server-side wants a `require_service(...)`
+    dependency alongside the role guards in auth/deps.py; deliberately not built yet,
+    because turning a service off must never strand data the owner can no longer
+    reach, and that needs the read paths thought through separately from the writes.
+    """
+    return {
+        "booking": True,
+        "checkin": True,
+        "inventory": True,
+        "shop": True,
+        "membership": False,
+        "academy": False,
+        "events": False,
+        "advertising": False,
+    }
 
 
 def _default_security_flags() -> dict[str, Any]:
@@ -172,6 +228,11 @@ class TenantSettings(TenantScoped):
     )
     security_flags: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=_default_security_flags, nullable=False
+    )
+    #: Which product surfaces this turf has switched on — see _default_services.
+    #: Set by onboarding, toggled afterwards in Settings → Services.
+    enabled_services: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=_default_services, nullable=False
     )
 
     # ── Notification sender identity ─────────────────────────────────────────

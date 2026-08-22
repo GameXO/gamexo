@@ -162,6 +162,13 @@ type Ok<P extends keyof paths, M extends keyof paths[P], S extends number = 200>
   : never
 
 export const api = {
+  signup: (body: { email: string; password: string; full_name: string }) =>
+    request<import('./auth').TokenPair>('/api/v1/auth/signup', {
+      method: 'POST',
+      body,
+      anonymous: true,
+    }),
+
   login: (email: string, password: string) =>
     request<Ok<'/api/v1/auth/login', 'post'>>('/api/v1/auth/login', {
       method: 'POST',
@@ -170,6 +177,37 @@ export const api = {
     }),
 
   me: () => request<Ok<'/api/v1/auth/me', 'get'>>('/api/v1/auth/me'),
+
+  getSettings: () => request<Record<string, unknown>>('/api/v1/settings'),
+  updateSettings: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/api/v1/settings', { method: 'PATCH', body }),
+
+  listSportCatalogue: () => request<Record<string, unknown>[]>('/api/v1/sports/catalogue'),
+  createSport: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/api/v1/sports', { method: 'POST', body }),
+  updateSport: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/api/v1/sports/${id}`, { method: 'PATCH', body }),
+  deleteSport: (id: string) => request<void>(`/api/v1/sports/${id}`, { method: 'DELETE' }),
+
+  createCourt: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/api/v1/courts', { method: 'POST', body }),
+  updateCourt: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/api/v1/courts/${id}`, { method: 'PATCH', body }),
+  deleteCourt: (id: string) => request<void>(`/api/v1/courts/${id}`, { method: 'DELETE' }),
+
+  completeOnboarding: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/api/v1/onboarding/complete', { method: 'POST', body }),
+
+  uploadImage: async (file: File): Promise<{ url: string; content_type: string; size: number }> => {
+    const headers: Record<string, string> = { 'X-Tenant-ID': TENANT }
+    const token = getTokens()?.access_token
+    if (token) headers.Authorization = `Bearer ${token}`
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${BASE_URL}/api/v1/uploads`, { method: 'POST', headers, body: form })
+    if (!res.ok) throw await toApiError(res)
+    return (await res.json()) as { url: string; content_type: string; size: number }
+  },
 
   /** Returns a plain array, not a page. */
   listSports: (query?: { include_inactive?: boolean }) =>
@@ -459,6 +497,10 @@ export const api = {
   /** 409 while any booking still references the partner — revoke instead. */
   deletePartner: (partnerId: string) =>
     request<void>(`/api/v1/partners/${partnerId}`, { method: 'DELETE' }),
+}
+
+export function mediaUrl(url: string) {
+  return url.startsWith('http://') || url.startsWith('https://') ? url : `${BASE_URL}${url}`
 }
 
 export { request, BASE_URL, TENANT }

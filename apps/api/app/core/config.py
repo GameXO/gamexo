@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     tenant_base_domain: str = "gamexo.app"
     allow_tenant_header: bool = False
 
+    # Resolve the tenant from the JWT's `tid` claim when the host names no
+    # subdomain. This is what lets every academy share one origin — which is how
+    # the product is actually deployed today: one Cloudflare Worker serving the
+    # dashboard at `/` and the POS at `/pos/`, with no wildcard DNS.
+    #
+    # Deliberately NOT guarded in _guard_production the way ALLOW_TENANT_HEADER is.
+    # The header is a bare string the caller types, so honouring it in production
+    # would let anyone name any tenant. `tid` is a signed claim inside a token we
+    # minted: a caller can only ever present a tid we already issued to them.
+    allow_token_tenant: bool = True
+
     # ── Auth ────────────────────────────────────────────────────────────────
     jwt_secret_key: SecretStr
     jwt_algorithm: str = "HS256"
@@ -46,6 +57,26 @@ class Settings(BaseSettings):
 
     # ── HTTP ────────────────────────────────────────────────────────────────
     cors_origins: list[str] = Field(default_factory=list)
+
+    # ── Uploads ─────────────────────────────────────────────────────────────
+    #
+    # Turf logos and court photos. Cloudflare R2 when configured (S3-compatible, so
+    # boto3 talks to it unchanged and these same four settings point at real S3 by
+    # swapping the endpoint); otherwise the local disk, served at /media.
+    #
+    # The local backend is not a production fallback — it is what makes onboarding
+    # runnable without a Cloudflare account, and what lets the tests upload without
+    # a network. A deployment on more than one instance must set R2, or two workers
+    # will disagree about which images exist.
+    r2_account_id: str | None = None
+    r2_bucket: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: SecretStr | None = None
+    #: The public hostname the bucket is served from — an r2.dev subdomain, or a
+    #: custom domain. Uploads are unreachable without it: R2's API endpoint is not
+    #: a read endpoint.
+    r2_public_base_url: str | None = None
+    local_upload_dir: str = "var/uploads"
 
     # ── Secrets at rest ─────────────────────────────────────────────────────
     #

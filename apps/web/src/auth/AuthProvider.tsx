@@ -14,6 +14,8 @@ type AuthState = {
   me: Me | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  signup: (email: string, password: string, fullName: string) => Promise<void>
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -78,7 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('anonymous')
   }, [])
 
-  return <AuthContext value={{ status, me, login, logout }}>{children}</AuthContext>
+  const signup = useCallback(async (email: string, password: string, fullName: string) => {
+    setTokens(await api.signup({ email, password, full_name: fullName }))
+    await loadMe()
+  }, [loadMe])
+
+  return <AuthContext value={{ status, me, login, logout, signup, refresh: loadMe }}>{children}</AuthContext>
 }
 
 export function useAuth() {

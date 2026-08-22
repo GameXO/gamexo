@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, Date, DateTime, Index, String, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, text
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.security import Role
@@ -112,3 +114,45 @@ class PlatformAdmin(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<PlatformAdmin {self.email}>"
+
+
+class AccountDirectory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """email -> tenant, so a login can find its academy before one is resolved.
+
+    Deliberately NOT TenantScoped and carrying no RLS policy — the same exception
+    PlatformAdmin is, for the same reason: it has to be readable from a session with
+    nothing bound. On a shared origin (one hostname for every academy) there is no
+    subdomain to resolve from, and `app_user` is invisible to an unbound session
+    because RLS evaluates `tenant_id = NULL`. Something outside the policy has to
+    answer "which academy owns this email", and this is the smallest such thing:
+    two columns, no credentials, no profile.
+
+    Nothing here is secret — an email and an opaque tenant id — so a leak of this
+    table discloses which addresses have accounts, not what they can reach.
+
+    THE TRADE-OFF, stated plainly: a login email is now globally unique across the
+    platform. `app_user` keeps its per-tenant uniqueness, so the same person can
+    still be *employed* by two academies, but they cannot sign in to both with one
+    address. Relaxing that is the same migration described on User: this table grows
+    to (email, tenant_id) unique-together, and login gains an academy picker when an
+    email matches more than one row.
+    """
+
+    __tablename__ = "account_directory"
+    __table_args__ = (
+        Index("uq_account_directory_email", text("lower(email)"), unique=True),
+    )
+
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True),
+        # CASCADE, unlike the RESTRICT everywhere else: this row is a lookup index,
+        # not a record. A deleted tenant's directory entries are noise that would
+        # otherwise block the delete and squat on the email.
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    def __repr__(self) -> str:
+        return f"<AccountDirectory {self.email} -> {self.tenant_id}>"

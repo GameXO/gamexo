@@ -5,6 +5,22 @@ export const FACILITY_PROFILE = {
   gstin: '36AABCN1234K1Z9',
 }
 
+export type FacilityProfile = typeof FACILITY_PROFILE
+
+export function facilityFromSettings(settings?: {
+  business_name?: string | null
+  address?: string | null
+  city?: string | null
+  gst_number?: string | null
+}) {
+  return {
+    name: settings?.business_name || FACILITY_PROFILE.name,
+    addressLine: settings?.address || FACILITY_PROFILE.addressLine,
+    pincode: settings?.city || FACILITY_PROFILE.pincode,
+    gstin: settings?.gst_number || FACILITY_PROFILE.gstin,
+  }
+}
+
 export type FacilitySport = {
   id: string
   label: string

@@ -17,6 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     text,
@@ -161,6 +162,14 @@ class Court(TenantScoped):
     __table_args__ = (
         Index("uq_court_tenant_code", "tenant_id", "code", unique=True),
         Index("ix_court_tenant_sport", "tenant_id", "sport_id"),
+        CheckConstraint(
+            "rating IS NULL OR (rating >= 0 AND rating <= 5)", name="rating_within_range"
+        ),
+        # An open-slot court without a capacity has no way to decide when it is
+        # full, so the two fields are only meaningful together.
+        CheckConstraint(
+            "NOT open_slots_enabled OR slot_capacity >= 1", name="open_slots_needs_capacity"
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -170,11 +179,32 @@ class Court(TenantScoped):
     )
     hourly_rate: Mapped[Decimal] = mapped_column(money(), nullable=False)
     peak_rate: Mapped[Decimal] = mapped_column(money(), nullable=False)
+    #: Up to five, capped in the Pydantic schema rather than here — "how many photos
+    #: does the form allow" is interface policy that will change, not an invariant.
     images: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     operating_hours: Mapped[dict[str, str]] = mapped_column(
         JSONB, default=lambda: {"open": "06:00", "close": "22:00"}, nullable=False
     )
+    #: The facility chips: floodlights, washroom, parking, seating…
     amenities: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    #: Entered by the venue, not computed from customer reviews — there is no review
+    #: model, and inventing an average from nothing would be a lie with a decimal point.
+    rating: Mapped[Decimal | None] = mapped_column(Numeric(2, 1))
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # ── Open slots ───────────────────────────────────────────────────────────
+    #
+    # A court where strangers join the same session — five-a-side looking for a
+    # sixth — rather than one booking taking the whole surface. `slot_capacity` is
+    # how many can join before it is full.
+    #
+    # This is why `Booking.open_slot` exists: the exclusion constraint that stops
+    # double-booking cannot read this column (an exclusion constraint sees only its
+    # own table), so the flag is stamped onto each booking at creation and the
+    # constraint skips the ones carrying it. Capacity is then enforced in
+    # service.ensure_slot_free, under a row lock on this court.
+    open_slots_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    slot_capacity: Mapped[int | None] = mapped_column(Integer)
 
     is_bookable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     maintenance_note: Mapped[str | None] = mapped_column(Text)
@@ -376,13 +406,20 @@ class Booking(TenantScoped):
         #   WHERE status <> 'cancelled'
         #                     — a cancelled booking must not keep blocking the slot
         #                       it released.
+        #   AND NOT open_slot — an open-slot court is *meant* to hold overlapping
+        #                       bookings: that is what "join this session" is. Those
+        #                       are capacity-limited instead, in
+        #                       service.ensure_slot_free, under a row lock on the
+        #                       court. The constraint cannot do it itself because it
+        #                       can only see this table, and the capacity lives on
+        #                       `court` — hence the denormalised flag.
         ExcludeConstraint(
             ("tenant_id", "="),
             ("court_id", "="),
             ("time_range", "&&"),
             name="booking_no_overlap",
             using="gist",
-            where=text("status <> 'cancelled'"),
+            where=text("status <> 'cancelled' AND NOT open_slot"),
         ),
         # Idempotency for the partner gateway. A platform that retries a create —
         # after a timeout, say — must not end up selling the court twice under two
@@ -460,6 +497,14 @@ class Booking(TenantScoped):
     booking_type: Mapped[BookingType] = mapped_column(
         enum_type(BookingType, name="booking_type"), default=BookingType.WALKIN, nullable=False
     )
+
+    #: Stamped from `court.open_slots_enabled` when the booking is created, and
+    #: never updated afterwards. Denormalised on purpose: `booking_no_overlap` is an
+    #: exclusion constraint, which can only reference columns on its own table, and
+    #: this is the flag that tells it to stand aside. Snapshotting it also means
+    #: turning open slots off on a court tomorrow cannot retroactively make today's
+    #: legitimately overlapping bookings violate the constraint.
+    open_slot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # ── Where this booking came from ─────────────────────────────────────────
     #

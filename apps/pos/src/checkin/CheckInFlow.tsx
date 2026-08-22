@@ -29,6 +29,7 @@ export default function CheckInFlow({
   const [submittedCode, setSubmittedCode] = useState<string | null>(null)
 
   const bookingQuery = useFindBookingByCode(submittedCode)
+  const booking = bookingQuery.data
 
   const goCode = () => setStep('code')
 
@@ -60,7 +61,7 @@ export default function CheckInFlow({
 
         {step === 'result' && (
           <CheckInResult
-            status={booking ? 'found' : 'not-found'}
+            status={bookingQuery.isPending ? 'loading' : booking ? 'found' : 'not-found'}
             booking={booking ?? undefined}
             onRentEquipment={onStore}
             onHome={onHome}

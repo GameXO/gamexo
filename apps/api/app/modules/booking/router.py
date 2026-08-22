@@ -7,12 +7,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api_utils import Page, Params, get_or_404, paginate
 from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
 from app.core.errors import ConflictError, NotFoundError
-from app.modules.booking import service
+from app.modules.booking import catalogue, service
 from app.modules.booking.models import (
     Booking,
     BookingEvent,
@@ -31,6 +31,7 @@ from app.modules.booking.pricing import money
 from app.modules.finance.service import refresh_booking_payment_status
 from app.modules.booking.schemas import (
     BookingCancel,
+    CatalogueSportOut,
     BookingCreate,
     BookingDetail,
     BookingEquipmentSet,
@@ -75,6 +76,20 @@ async def list_sports(db: Db, _: RequireKiosk, include_inactive: bool = False) -
     return [SportOut.model_validate(row) for row in rows]
 
 
+@router.get(
+    "/sports/catalogue",
+    response_model=list[CatalogueSportOut],
+    summary="Sports a turf can choose from",
+    description=(
+        "The fixed menu the onboarding wizard and the Sports & Courts screen pick "
+        "from. Not this academy's sports — `GET /sports` is that. Selecting one here "
+        "is what creates the row."
+    ),
+)
+async def sport_catalogue(_: RequireManager) -> list[CatalogueSportOut]:
+    return [CatalogueSportOut(**entry) for entry in catalogue.as_dicts()]
+
+
 @router.post("/sports", response_model=SportOut, status_code=status.HTTP_201_CREATED, summary="Add a sport")
 async def create_sport(payload: SportCreate, db: Db, _: RequireManager) -> SportOut:
     data = payload.model_dump(exclude={"slug"})
@@ -93,6 +108,34 @@ async def update_sport(
         setattr(sport, field, value)
     await db.flush()
     return SportOut.model_validate(sport)
+
+
+@router.delete(
+    "/sports/{sport_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a sport",
+    description=(
+        "Only a sport with no courts can be deleted. A sport that has been played "
+        "has bookings hanging off its courts, and those are records — deactivate it "
+        "with `PATCH /sports/{id}` `{is_active: false}` instead, which hides it "
+        "everywhere without rewriting history."
+    ),
+)
+async def delete_sport(sport_id: uuid.UUID, db: Db, _: RequireManager) -> None:
+    sport = await get_or_404(db, Sport, sport_id, label="Sport")
+
+    courts = (
+        await db.execute(select(func.count(Court.id)).where(Court.sport_id == sport.id))
+    ).scalar_one()
+    if courts:
+        raise ConflictError(
+            f"{sport.name} still has {courts} court(s). Delete those first, or "
+            f"deactivate the sport instead.",
+            details={"court_count": courts},
+        )
+
+    await db.delete(sport)
+    await db.flush()
 
 
 # ── Courts ──────────────────────────────────────────────────────────────────
@@ -161,6 +204,37 @@ async def update_court(
         setattr(court, field, value)
     await db.flush()
     return CourtOut.model_validate(court)
+
+
+@router.delete(
+    "/courts/{court_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a court",
+    description=(
+        "Only a court with no bookings can be deleted — a booking is a financial "
+        "record and the FK is RESTRICT. A court that has been played on should be "
+        "marked unavailable (`is_bookable: false`) instead, which takes it out of "
+        "availability without detaching it from its history."
+    ),
+)
+async def delete_court(court_id: uuid.UUID, db: Db, _: RequireManager) -> None:
+    court = await get_or_404(db, Court, court_id, label="Court")
+
+    # Checked rather than caught: the FK would raise an IntegrityError at COMMIT,
+    # by which point the message names a constraint instead of telling the owner
+    # what to do about it.
+    bookings = (
+        await db.execute(select(func.count(Booking.id)).where(Booking.court_id == court.id))
+    ).scalar_one()
+    if bookings:
+        raise ConflictError(
+            f"{court.name} has {bookings} booking(s) and cannot be deleted. "
+            f"Mark it unavailable instead.",
+            details={"booking_count": bookings},
+        )
+
+    await db.delete(court)
+    await db.flush()
 
 
 @router.get(
@@ -634,6 +708,9 @@ async def create_booking(payload: BookingCreate, db: Db, principal: RequireKiosk
         duration_min=payload.duration_min,
         booking_type=payload.booking_type,
         status=BookingStatus.ACTIVE if auto_checked_in else BookingStatus.UPCOMING,
+        # Snapshot, so the exclusion constraint treats this booking the way the court
+        # was configured when it was taken — see Booking.open_slot.
+        open_slot=court.open_slots_enabled,
         notes=payload.notes,
         created_by_user_id=principal.id,
     )

@@ -21,10 +21,12 @@ import Academy from './academy/Academy'
 import Inventory from './inventory/Inventory'
 import PublishedEquipmentBridge from './inventory/PublishedEquipmentBridge'
 import SportCourtBridge from './booking/SportCourtBridge'
+import SettingsPage from './settings/SettingsPage'
 import { demoBookings } from './data/booking'
 import * as db from './lib/db'
 import { useAuth } from './auth/AuthProvider'
-import LoginPage from './auth/LoginPage'
+import AuthGate from './auth/AuthGate'
+import OnboardingWizard from './onboarding/OnboardingWizard'
 import dashboardSquareHeader from './assets/figma/dashboard-square-header.svg'
 import bolt from './assets/figma/bolt.svg'
 import calendar from './assets/figma/calendar.svg'
@@ -63,7 +65,7 @@ export type View =
   | 'manageStaff'
 
 function App() {
-  const { status } = useAuth()
+  const { status, me } = useAuth()
 
   if (status === 'checking') {
     return (
@@ -72,7 +74,10 @@ function App() {
       </div>
     )
   }
-  if (status === 'anonymous') return <LoginPage />
+  if (status === 'anonymous') return <AuthGate />
+
+  const tenant = me?.tenant as { onboarding_completed?: boolean } | undefined
+  if (tenant?.onboarding_completed === false) return <OnboardingWizard />
 
   return <Shell />
 }
@@ -226,7 +231,7 @@ function Shell() {
         {view === 'settings' && (
           <>
             <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Settings" icon={settings} />
-            <ComingSoon label="Settings" />
+            <SettingsPage />
           </>
         )}
         {view === 'helpCenter' && (

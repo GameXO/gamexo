@@ -48,6 +48,7 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
   const [settleError, setSettleError] = useState<string | null>(null)
 
   const sessionQuery = useActiveSessionByCode(searchCode)
+  const booking = sessionQuery.data ?? null
   const recordPayment = useRecordPayment()
   const invoiceBooking = useInvoiceBooking()
 
@@ -132,11 +133,7 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
     setInvoice(undefined)
   }
 
-  const resultStatus = findSessionMutation.isPending
-    ? 'loading'
-    : booking && !lookupFailed
-      ? 'found'
-      : 'not-found'
+  const resultStatus = sessionQuery.isPending ? 'loading' : booking ? 'found' : 'not-found'
 
   const backHandlers: Record<Step, () => void> = {
     code: onHome,

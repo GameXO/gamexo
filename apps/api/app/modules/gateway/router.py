@@ -202,6 +202,7 @@ async def create_booking(
         # desk still confirms.
         booking_type=BookingType.ONLINE,
         status=BookingStatus.UPCOMING,
+        open_slot=court.open_slots_enabled,
         created_by_partner_id=partner.id,
         # Taken from the authenticated partner, never from the request body — a
         # platform must not be able to file a booking under a competitor's name.

@@ -33,6 +33,15 @@ dependencies = [
     # the OS's own IANA copy) — without this, ZoneInfo("Asia/Kolkata") raises
     # ZoneInfoNotFoundError the first time anything prices a booking by local time.
     "tzdata>=2024.1; sys_platform == 'win32'",
+    # Multipart form parsing. FastAPI needs it for UploadFile and does not pull it
+    # in itself — without it, POST /uploads fails at import with a runtime hint
+    # rather than at install.
+    "python-multipart>=0.0.20",
+    # S3 client, talking to Cloudflare R2 through its S3-compatible API. Optional at
+    # runtime — app/core/storage.py imports it lazily and falls back to local disk —
+    # but declared, because a deployment that sets R2_* and then discovers boto3 is
+    # missing finds out when someone uploads a logo.
+    "boto3>=1.35.0",
 ]
 
 [dependency-groups]

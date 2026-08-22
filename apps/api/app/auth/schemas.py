@@ -31,6 +31,13 @@ class LoginRequest(_Password):
     email: EmailStr
 
 
+class SignupRequest(_Password):
+    """Self-serve registration. The turf's own details come later, in onboarding."""
+
+    email: EmailStr
+    full_name: str = Field(min_length=1, max_length=200)
+
+
 class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
@@ -65,6 +72,10 @@ class TenantOut(BaseModel):
     slug: str
     name: str
     status: str
+    #: False until the owner finishes the onboarding wizard. The frontend gates the
+    #: whole dashboard on this, so it rides along on /auth/me rather than costing a
+    #: second request on every boot. Reads Tenant.onboarding_completed.
+    onboarding_completed: bool = False
 
 
 class MeOut(BaseModel):

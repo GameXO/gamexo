@@ -3,14 +3,16 @@ export const STEPS = ['Select Sports & Court', 'Date & Time', 'Player Details', 
 export default function Stepper({
   current,
   onSelect,
+  steps = STEPS,
 }: {
   current: number
   onSelect: (step: number) => void
+  steps?: readonly string[]
 }) {
   return (
     <div className="flex w-full justify-center">
       <div className="flex max-w-full items-center gap-[clamp(0.75rem,2.5vw,2rem)] overflow-x-auto rounded-xl bg-white px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vw,0.75rem)]">
-        {STEPS.map((label, i) => {
+        {steps.map((label, i) => {
           const step = i + 1
           const active = step === current
           const done = step < current

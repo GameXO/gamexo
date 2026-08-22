@@ -4,23 +4,6 @@ import type { components } from '../api/schema'
 
 export type CheckinBooking = components['schemas']['BookingDetail']
 
-/**
- * Resolve a typed Booking ID to the booking.
- *
- * A mutation rather than a query, because this fires on a button press and its
- * result is a screen transition — not state that should refetch, cache, or re-run
- * when the component happens to remount.
- *
- * Replaced `useFindBookingByPhone`, which searched every booking for a phone number
- * and then guessed which one the customer meant by ranking active over upcoming.
- * A reference identifies exactly one booking, so there is nothing left to guess.
- */
-export function useLookupBooking() {
-  return useMutation({
-    mutationFn: (reference: string) => api.lookupBooking(reference),
-  })
-}
-
 /** What to put on screen when a lookup fails.
  *
  *  A 404 is the ordinary case here — mistyped code, wrong academy's ticket, phone
@@ -35,7 +18,11 @@ export function lookupErrorMessage(error: unknown): string {
 
 /** Looks a booking up by the id typed on the check-in keyboard. The backend already
  *  scopes this to bookings starting within 30 minutes either side of now and 404s
- *  otherwise — that 404 is a normal "not found" result here, not a query error. */
+ *  otherwise — that 404 is a normal "not found" result here, not a query error.
+ *
+ *  Replaced `useFindBookingByPhone`, which searched every booking for a phone number
+ *  and then guessed which one the customer meant by ranking active over upcoming.
+ *  A reference identifies exactly one booking, so there is nothing left to guess. */
 export function useFindBookingByCode(code: string | null) {
   return useQuery({
     queryKey: ['checkin-booking-by-code', code],
