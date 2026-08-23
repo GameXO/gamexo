@@ -64,6 +64,12 @@ class SportOut(SportBase):
     slug: str
 
 
+class CatalogueSportOut(SportBase):
+    """A sport the turf *could* offer. Not a row — see booking/catalogue.py."""
+
+    slug: str
+
+
 # ── Court ───────────────────────────────────────────────────────────────────
 
 
@@ -72,16 +78,38 @@ class OperatingHours(BaseModel):
     close: str = "22:00"
 
 
+#: How many photos the court form accepts. Interface policy, not a schema
+#: invariant — the column is a JSONB array and does not care.
+MAX_COURT_IMAGES = 5
+
+
 class CourtBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     sport_id: uuid.UUID
     hourly_rate: Decimal = Field(ge=0)
     peak_rate: Decimal = Field(ge=0)
-    images: list[str] = Field(default_factory=list)
+    images: list[str] = Field(default_factory=list, max_length=MAX_COURT_IMAGES)
     operating_hours: OperatingHours = Field(default_factory=OperatingHours)
     amenities: list[str] = Field(default_factory=list)
+    rating: Decimal | None = Field(default=None, ge=0, le=5)
+    display_order: int = 0
+    open_slots_enabled: bool = False
+    slot_capacity: int | None = Field(
+        default=None,
+        ge=1,
+        description="How many people may join one session. Required when open_slots_enabled.",
+    )
     is_bookable: bool = True
     maintenance_note: str | None = None
+
+    @model_validator(mode="after")
+    def _capacity_required_for_open_slots(self) -> CourtBase:
+        # Mirrors the open_slots_needs_capacity CHECK. Duplicated deliberately: the
+        # constraint is the invariant, this is the interface — the caller gets a 422
+        # naming the field instead of an IntegrityError from COMMIT.
+        if self.open_slots_enabled and not self.slot_capacity:
+            raise ValueError("slot_capacity is required when open slots are enabled")
+        return self
 
 
 class CourtCreate(CourtBase):
@@ -93,11 +121,24 @@ class CourtUpdate(BaseModel):
     sport_id: uuid.UUID | None = None
     hourly_rate: Decimal | None = Field(default=None, ge=0)
     peak_rate: Decimal | None = Field(default=None, ge=0)
-    images: list[str] | None = None
+    images: list[str] | None = Field(default=None, max_length=MAX_COURT_IMAGES)
     operating_hours: OperatingHours | None = None
     amenities: list[str] | None = None
+    rating: Decimal | None = Field(default=None, ge=0, le=5)
+    display_order: int | None = None
+    open_slots_enabled: bool | None = None
+    slot_capacity: int | None = Field(default=None, ge=1)
     is_bookable: bool | None = None
     maintenance_note: str | None = None
+
+    @model_validator(mode="after")
+    def _capacity_required_for_open_slots(self) -> CourtUpdate:
+        # Only when the patch is *turning open slots on*. A patch that leaves the
+        # flag alone says nothing about capacity, and the CHECK still catches the
+        # combination that would be invalid on the stored row.
+        if self.open_slots_enabled and not self.slot_capacity:
+            raise ValueError("slot_capacity is required when open slots are enabled")
+        return self
 
 
 class CourtOut(CourtBase):

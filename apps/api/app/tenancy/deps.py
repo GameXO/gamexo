@@ -8,6 +8,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import TenantResolutionError
 from app.core.security import Audience, TokenError, decode_token
 from app.db.session import tenant_session, untenanted_session
 from app.tenancy.context import TenantContext
@@ -45,6 +46,27 @@ def _looks_like_platform_token(credentials: HTTPAuthorizationCredentials | None)
     return True
 
 
+def _tenant_from_token(credentials: HTTPAuthorizationCredentials | None) -> str | None:
+    """The `tid` of a *valid* tenant access token, or None.
+
+    Full verification, like _looks_like_platform_token above and for the same
+    reason: this decides which academy the request reads, so an unverified peek at
+    the claims would hand tenant selection to anyone who can base64 a JSON blob.
+
+    Returns None rather than raising on a bad token — a caller with no token, or an
+    expired one, simply has no tenant to contribute here, and the authentication
+    error belongs to auth/deps.py where it can be reported properly.
+    """
+    if credentials is None:
+        return None
+    try:
+        payload = decode_token(credentials.credentials, audience=Audience.TENANT)
+    except TokenError:
+        return None
+    tid = payload.get("tid")
+    return str(tid) if tid else None
+
+
 async def get_tenant_context(
     request: Request, credentials: BearerToken = None
 ) -> TenantContext:
@@ -64,6 +86,7 @@ async def get_tenant_context(
         "tenant_header": request.headers.get(TENANT_HEADER),
         "impersonate_header": request.headers.get(IMPERSONATE_HEADER),
         "is_platform_admin": _looks_like_platform_token(credentials),
+        "token_tenant": _tenant_from_token(credentials),
     }
 
     context = resolve_tenant_cached(**args)
@@ -77,6 +100,30 @@ async def get_tenant_context(
 
 
 TenantCtx = Annotated[TenantContext, Depends(get_tenant_context)]
+
+
+async def get_optional_tenant_context(
+    request: Request, credentials: BearerToken = None
+) -> TenantContext | None:
+    """The tenant, or None when the request names none.
+
+    For the endpoints that must work *before* a tenant is known: signup, and login
+    on a shared origin, where there is no subdomain and no token yet. Those resolve
+    their academy from the request body instead.
+
+    Only TenantResolutionError is swallowed. A suspended academy raises
+    PermissionDeniedError and must keep doing so — "we could not tell which academy
+    you meant" and "we know exactly which one and it is suspended" are different
+    answers, and quietly turning the second into the first would let suspended staff
+    log in through the directory.
+    """
+    try:
+        return await get_tenant_context(request, credentials)
+    except TenantResolutionError:
+        return None
+
+
+OptionalTenantCtx = Annotated[TenantContext | None, Depends(get_optional_tenant_context)]
 
 
 async def get_db(tenant: TenantCtx) -> AsyncIterator[AsyncSession]:

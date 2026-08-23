@@ -8,16 +8,22 @@ from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 
 from app.api_utils import Page, Params, get_or_404, paginate
-from app.auth.deps import RequireAdmin, RequireManager, RequireStaff, revoke_identity
+from app.auth.deps import (
+    RequireAdmin,
+    RequireKiosk,
+    RequireManager,
+    RequireStaff,
+    revoke_identity,
+)
 from app.auth.schemas import UserOut
-from app.auth.service import initials
+from app.auth.service import initials, register_email
 from app.core.errors import ConflictError
 from app.core.security import Role, hash_password
-from app.models.tenant import TenantSettings
+from app.models.tenant import SERVICE_KEYS, TenantSettings
 from app.models.user import User, UserStatus
 from app.modules.admin.models import (
     Channel,
@@ -28,7 +34,7 @@ from app.modules.admin.models import (
     NotificationDelivery,
     NotificationKind,
 )
-from app.tenancy.deps import Db
+from app.tenancy.deps import Db, TenantCtx
 
 router = APIRouter(tags=["admin"])
 
@@ -74,6 +80,7 @@ class SettingsOut(BaseModel):
     booking_rules: dict[str, Any]
     tax_config: dict[str, Any]
     security_flags: dict[str, Any]
+    enabled_services: dict[str, Any]
     notification_sender_name: str | None
     notification_sender_email: str | None
 
@@ -96,8 +103,18 @@ class SettingsUpdate(BaseModel):
     booking_rules: dict[str, Any] | None = None
     tax_config: dict[str, Any] | None = None
     security_flags: dict[str, Any] | None = None
+    enabled_services: dict[str, bool] | None = None
     notification_sender_name: str | None = None
     notification_sender_email: EmailStr | None = None
+
+    @field_validator("enabled_services")
+    @classmethod
+    def _known_services(cls, v: dict[str, bool] | None) -> dict[str, bool] | None:
+        # Same rule as onboarding: unknown keys are dropped, not rejected, so a
+        # frontend one deploy ahead of the API cannot fail a settings save.
+        if v is None:
+            return None
+        return {key: bool(value) for key, value in v.items() if key in SERVICE_KEYS}
 
 
 @router.get(
@@ -135,9 +152,43 @@ async def update_settings(payload: SettingsUpdate, db: Db, _: RequireAdmin) -> S
             value = str(value)
         if field == "currency" and value is not None:
             value = value.upper()
+        if field == "enabled_services" and value is not None:
+            # Merged, so a client that renders only the services it knows about
+            # cannot silently clear the ones it has never heard of.
+            value = {**settings.enabled_services, **value}
         setattr(settings, field, value)
     await db.flush()
     return SettingsOut.model_validate(settings)
+
+
+class PublicSettingsOut(BaseModel):
+    """What the counter tablet is allowed to know about the academy it belongs to.
+
+    `GET /settings` is RequireStaff and the kiosk role sits below reception, so the
+    POS cannot read it — deliberately, since the tablet login is the most exposed
+    credential in the academy and that payload carries GST numbers, invoice identity
+    and notification addresses. This is the branding subset, and nothing else.
+    """
+
+    model_config = ORM
+
+    business_name: str
+    logo_url: str | None
+    brand_primary: str
+    brand_accent: str
+    brand_background: str
+    currency: str
+    enabled_services: dict[str, Any]
+
+
+@router.get(
+    "/settings/public",
+    response_model=PublicSettingsOut,
+    summary="Branding and enabled services, for the counter tablet",
+)
+async def get_public_settings(db: Db, _: RequireKiosk) -> PublicSettingsOut:
+    settings = (await db.execute(select(TenantSettings))).scalar_one()
+    return PublicSettingsOut.model_validate(settings)
 
 
 # ── Staff ───────────────────────────────────────────────────────────────────
@@ -180,7 +231,9 @@ async def list_staff(
 @router.post(
     "/staff", response_model=UserOut, status_code=status.HTTP_201_CREATED, summary="Add a staff member"
 )
-async def create_staff(payload: StaffCreate, db: Db, _: RequireAdmin) -> UserOut:
+async def create_staff(
+    payload: StaffCreate, db: Db, tenant: TenantCtx, _: RequireAdmin
+) -> UserOut:
     existing = await db.scalar(
         select(User.id).where(func.lower(User.email) == payload.email.lower())
     )
@@ -188,6 +241,12 @@ async def create_staff(payload: StaffCreate, db: Db, _: RequireAdmin) -> UserOut
         raise ConflictError(
             "Someone at this academy already uses that email.", details={"field": "email"}
         )
+
+    # Claims the email platform-wide, so this person can sign in on the shared
+    # origin where there is no subdomain to say which academy they belong to.
+    # Raises ConflictError if it is taken at another academy — see AccountDirectory
+    # on why login emails are globally unique.
+    await register_email(db, email=payload.email, tenant_id=tenant.id)
 
     user = User(
         email=payload.email.lower(),

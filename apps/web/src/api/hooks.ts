@@ -776,3 +776,129 @@ export function useMovementHistory(equipmentId: string | null) {
     enabled: !!equipmentId,
   })
 }
+
+export type CatalogueSport = {
+  slug: string
+  name: string
+  icon?: string | null
+  color?: string | null
+  bg_color?: string | null
+  default_duration_min?: number
+  price_base: string | number
+  price_peak: string | number
+  price_weekend: string | number
+}
+
+export type FacilityCourtOut = CourtWithStatus & {
+  rating?: number | string | null
+  open_slots_enabled?: boolean
+  slot_capacity?: number | null
+}
+
+export function useSettings() {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.getSettings(),
+  })
+}
+
+export function useUpdateSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.updateSettings(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+}
+
+export function useSportCatalogue() {
+  return useQuery({
+    queryKey: ['sport-catalogue'],
+    queryFn: () => api.listSportCatalogue() as Promise<CatalogueSport[]>,
+  })
+}
+
+export function useCreateSport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.createSport(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sports })
+      qc.invalidateQueries({ queryKey: ['raw-sports'] })
+    },
+  })
+}
+
+export function useUpdateSport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; body: Record<string, unknown> }) => api.updateSport(vars.id, vars.body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sports })
+      qc.invalidateQueries({ queryKey: ['raw-sports'] })
+    },
+  })
+}
+
+export function useDeleteSport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteSport(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['raw-sports'] }),
+  })
+}
+
+export function useRawSports() {
+  return useQuery({
+    queryKey: ['raw-sports'],
+    queryFn: () => api.listSports(),
+  })
+}
+
+export function useRawCourts() {
+  return useQuery({
+    queryKey: ['raw-courts'],
+    queryFn: async () => (await api.listCourts()) as unknown as FacilityCourtOut[],
+  })
+}
+
+export function useCreateCourt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.createCourt(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['raw-courts'] })
+      qc.invalidateQueries({ queryKey: ['courts'] })
+    },
+  })
+}
+
+export function useUpdateCourt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; body: Record<string, unknown> }) => api.updateCourt(vars.id, vars.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['raw-courts'] }),
+  })
+}
+
+export function useDeleteCourt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteCourt(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['raw-courts'] }),
+  })
+}
+
+export function useUploadImage() {
+  return useMutation({ mutationFn: (file: File) => api.uploadImage(file) })
+}
+
+export function useCompleteOnboarding() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.completeOnboarding(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: queryKeys.sports })
+    },
+  })
+}

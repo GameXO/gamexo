@@ -4,7 +4,7 @@ import { TENANT } from '../api/client'
 import { useAuth } from './AuthProvider'
 import brandLogo from '../assets/figma/brand-logo.svg'
 
-export default function LoginPage() {
+export default function LoginPage({ onCreateAccount }: { onCreateAccount?: () => void }) {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -78,6 +78,16 @@ export default function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {onCreateAccount && (
+          <button
+            type="button"
+            onClick={onCreateAccount}
+            className="mt-5 w-full text-center text-sm font-medium text-ink underline"
+          >
+            Create an account
+          </button>
+        )}
       </div>
     </div>
   )

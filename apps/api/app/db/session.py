@@ -263,5 +263,35 @@ async def untenanted_session() -> AsyncIterator[AsyncSession]:
                 yield session
 
 
+@asynccontextmanager
+async def bind_session_to(
+    session: AsyncSession, tenant_id: uuid.UUID
+) -> AsyncIterator[AsyncSession]:
+    """Bind an already-open untenanted session to a tenant, mid-transaction.
+
+    For the flows that cannot know their tenant until they have read something:
+    provisioning (the tenant is the row being created) and shared-origin login (the
+    academy is looked up from the email). Both start untenanted by necessity and
+    must become tenant-bound before they touch a table under RLS.
+
+    All three bindings, because they are read by three different things:
+
+      * the database GUC   — what the RLS policies evaluate
+      * ``session.info``   — what the flush listeners read, *including* the autoflush
+                             at COMMIT, which happens after this block has exited
+      * the ContextVar     — what code inside the block reads via the ambient context
+
+    Only the ContextVar unwinds on exit. That is deliberate: the GUC and
+    ``session.info`` persist for the rest of the transaction, so a caller can still
+    write tenant-scoped rows (an audit entry, say) after the block closes. The
+    transaction itself is what bounds them — see `tenant_session` on why the GUC
+    must never outlive one.
+    """
+    await set_current_tenant(session, tenant_id)
+    session.info[SESSION_TENANT_KEY] = tenant_id
+    with bind_tenant(tenant_id):
+        yield session
+
+
 async def dispose_engine() -> None:
     await engine.dispose()

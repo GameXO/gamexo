@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import PermissionDeniedError, TenantResolutionError
-from app.models.tenant import Tenant, TenantStatus
+from app.models.tenant import RESERVED_SLUGS, Tenant, TenantStatus
 from app.tenancy.context import TenantContext
 
 TENANT_HEADER = "X-Tenant-ID"
@@ -95,7 +95,12 @@ def extract_slug_from_host(host: str | None, base_domain: str) -> str | None:
     locally rather than only ever testing the header path — the header path is the
     one that does not exist in production.
 
-    Returns None for the apex domain, `www`, bare `localhost` and bare IPs.
+    Returns None for the apex domain, bare `localhost`, bare IPs, and any label in
+    RESERVED_SLUGS — which is what makes `app.gamexo.app` usable as the shared
+    origin every academy answers on. Those labels can never be a tenant (the slug
+    validator refuses them at provisioning), so a request arriving on one names no
+    academy and falls through to the token, rather than failing as "unknown
+    academy: 'app'".
     """
     if not host:
         return None
@@ -107,14 +112,16 @@ def extract_slug_from_host(host: str | None, base_domain: str) -> str | None:
     for base in (base_domain.strip().lower(), "localhost"):
         if not base:
             continue
-        if hostname in (base, f"www.{base}"):
+        if hostname == base:
             return None
         suffix = f".{base}"
         if hostname.endswith(suffix):
             # Take the left-most label so deeper nesting resolves to the tenant,
             # not to an intermediate label.
             label = hostname[: -len(suffix)].split(".")[0]
-            return label or None
+            if not label or label in RESERVED_SLUGS:
+                return None
+            return label
 
     return None
 
@@ -162,6 +169,7 @@ def _plan_resolution(
     tenant_header: str | None,
     impersonate_header: str | None,
     is_platform_admin: bool,
+    token_tenant: str | None = None,
 ) -> _Plan:
     """Apply the resolution priority. Pure — no I/O, so cache and database paths
     cannot drift apart on which header wins.
@@ -172,13 +180,22 @@ def _plan_resolution(
     2. `X-Tenant-ID` — development and API testing. Gated on ALLOW_TENANT_HEADER,
        which core/config.py refuses to let be true in production. Without that gate
        this header is a complete isolation bypass for anyone who can reach the API.
-    3. Host subdomain — the production path.
+    3. Host subdomain — the per-academy-hostname path.
+    4. The JWT's `tid` claim — the shared-origin path, gated on ALLOW_TOKEN_TENANT.
 
-    The JWT's tenant claim is deliberately NOT a resolution source. If it were, a
-    token minted for tenant A would resolve to tenant A no matter which academy's
-    hostname it was presented to, and cross-tenant replay would look like ordinary
-    traffic. The claim is instead *verified against* the independently resolved
-    tenant in auth/deps.py.
+    Why (4) is safe where (2) is not, since the two look superficially alike. The
+    header is a bare string the caller types, so trusting it means trusting the
+    caller to name their own tenant. `tid` is a claim inside a token *we* signed and
+    whose signature is verified before it is read — a caller can only present a tid
+    we already issued to them.
+
+    What (4) gives up, stated plainly: on a shared origin the token really is the
+    tenant selector, so the cross-check in auth/deps.py becomes a tautology and
+    stops catching replay. It has nothing left to catch. Replay is a token from
+    academy A being presented to academy B's *hostname*, and on a shared origin
+    there is no such hostname — every academy answers on the same one. Where a
+    subdomain does exist it still wins here, at priority 3, and that check still
+    bites exactly as before.
     """
     if impersonate_header:
         if not is_platform_admin:
@@ -196,11 +213,14 @@ def _plan_resolution(
     if slug:
         return _Plan(slug, "host", True, f"Unknown academy: {slug!r}")
 
+    if token_tenant and settings.allow_token_tenant:
+        return _Plan(token_tenant, "token", True, "This token's academy no longer exists.")
+
     hint = (
         f" Send {TENANT_HEADER} with a tenant slug, or use a subdomain "
         f"(e.g. acme.{settings.tenant_base_domain})."
         if settings.allow_tenant_header
-        else ""
+        else " Sign in first, or use your academy's subdomain."
     )
     raise TenantResolutionError(f"Could not determine the academy from host {host!r}.{hint}")
 
@@ -219,6 +239,7 @@ def resolve_tenant_cached(
     tenant_header: str | None,
     impersonate_header: str | None = None,
     is_platform_admin: bool = False,
+    token_tenant: str | None = None,
 ) -> TenantContext | None:
     """Resolve without touching the database, or return None if it cannot.
 
@@ -231,6 +252,7 @@ def resolve_tenant_cached(
         tenant_header=tenant_header,
         impersonate_header=impersonate_header,
         is_platform_admin=is_platform_admin,
+        token_tenant=token_tenant,
     )
     snapshot = _cache_get(plan.reference)
     return None if snapshot is None else _context_from(plan, snapshot)
@@ -243,6 +265,7 @@ async def resolve_tenant(
     tenant_header: str | None,
     impersonate_header: str | None = None,
     is_platform_admin: bool = False,
+    token_tenant: str | None = None,
 ) -> TenantContext:
     """Resolve the tenant for a request, reading the database on a cache miss."""
     plan = _plan_resolution(
@@ -250,6 +273,7 @@ async def resolve_tenant(
         tenant_header=tenant_header,
         impersonate_header=impersonate_header,
         is_platform_admin=is_platform_admin,
+        token_tenant=token_tenant,
     )
 
     snapshot = _cache_get(plan.reference)

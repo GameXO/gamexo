@@ -21,11 +21,13 @@ from app.db.session import tenant_session, untenanted_session
 from app.models.user import User
 from tests.conftest import TenantFixture
 
-# The two tables that legitimately have no tenant_id.
-#   tenant         — reading it is how a hostname becomes a tenant, which must work
-#                    before any tenant is bound
-#   platform_admin — platform operators belong to no academy
-UNSCOPED_TABLES = {"tenant", "platform_admin"}
+# The three tables that legitimately have no tenant_id.
+#   tenant            — reading it is how a hostname becomes a tenant, which must
+#                       work before any tenant is bound
+#   platform_admin    — platform operators belong to no academy
+#   account_directory — email -> tenant, read by login before a tenant exists to
+#                       bind. Holds no credentials: an email and a tenant id.
+UNSCOPED_TABLES = {"tenant", "platform_admin", "account_directory"}
 
 
 async def test_raw_select_cannot_see_another_tenant(
@@ -237,7 +239,11 @@ async def test_rls_is_enabled_and_forced_on_every_tenant_table() -> None:
     flags = {row.relname: (row.relrowsecurity, row.relforcerowsecurity) for row in rows}
 
     for table_name, table in Base.metadata.tables.items():
-        if "tenant_id" not in table.columns:
+        # Keyed on the column, not on TenantScoped, so a table that grows a
+        # tenant_id without inheriting the base is still caught. account_directory
+        # is the one table that legitimately has the column and no policy — it is
+        # read by an unbound session, before a tenant is known.
+        if "tenant_id" not in table.columns or table_name in UNSCOPED_TABLES:
             continue
         enabled, forced = flags[table_name]
         assert enabled, f"{table_name} has no row-level security"

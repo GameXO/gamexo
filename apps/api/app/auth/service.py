@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import UTC, datetime
 
@@ -18,11 +19,9 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.db.rls import set_current_tenant
-from app.db.session import SESSION_TENANT_KEY
+from app.db.session import bind_session_to
 from app.models.tenant import Tenant, TenantSettings, TenantStatus
-from app.models.user import PlatformAdmin, User, UserStatus
-from app.tenancy.context import bind_tenant
+from app.models.user import AccountDirectory, PlatformAdmin, User, UserStatus
 
 # A real bcrypt hash of a value nobody will guess. Verifying against it when the
 # email is unknown keeps the failure path the same cost as a wrong password, so
@@ -144,18 +143,18 @@ async def provision_tenant(
             f"The subdomain '{slug}' is already taken.", details={"field": "slug"}
         )
 
+    email = admin_email.strip().lower()
+    # Checked before anything is inserted, so a taken email fails as a clean 409
+    # rather than as a unique-violation at COMMIT that has already written a tenant.
+    await assert_email_available(session, email)
+
     tenant = Tenant(id=uuid.uuid4(), slug=slug, name=name, status=TenantStatus.ACTIVE)
     session.add(tenant)
     await session.flush()
 
-    # Bind the rest of the transaction to the new tenant, in all three places:
-    # the database GUC (what RLS reads), the session (what the flush listeners read,
-    # including the one that runs at COMMIT after this function has returned), and
-    # the ambient context.
-    await set_current_tenant(session, tenant.id)
-    session.info[SESSION_TENANT_KEY] = tenant.id
-
-    with bind_tenant(tenant.id):
+    # Bind the rest of the transaction to the new tenant, in all three places — see
+    # db/session.py::bind_session_to for what each one is read by.
+    async with bind_session_to(session, tenant.id):
         session.add(
             TenantSettings(
                 tenant_id=tenant.id,
@@ -167,7 +166,7 @@ async def provision_tenant(
 
         admin = User(
             tenant_id=tenant.id,
-            email=admin_email.strip().lower(),
+            email=email,
             password_hash=hash_password(admin_password),
             full_name=admin_full_name,
             role=Role.ADMIN,
@@ -176,9 +175,98 @@ async def provision_tenant(
             joined_on=datetime.now(UTC).date(),
         )
         session.add(admin)
+        session.add(AccountDirectory(email=email, tenant_id=tenant.id))
         await session.flush()
 
     return tenant, admin
+
+
+async def signup_tenant(
+    session: AsyncSession, *, email: str, password: str, full_name: str
+) -> tuple[Tenant, User]:
+    """Self-serve registration: an owner, and the empty academy they own.
+
+    The turf has no name yet — that is the first thing onboarding asks for — so the
+    tenant is created under a placeholder slug and renamed when onboarding completes
+    (see modules/onboarding). A random slug rather than one derived from the email:
+    the slug is a DNS label that may become a public subdomain, and deriving it from
+    a personal address would publish one.
+
+    `onboarding_completed_at` is left NULL, which is what routes the new owner into
+    the wizard instead of the dashboard.
+    """
+    placeholder = f"turf-{secrets.token_hex(4)}"
+    return await provision_tenant(
+        session,
+        slug=placeholder,
+        # Shown nowhere before onboarding overwrites it, but the column is NOT NULL
+        # and a blank name in an audit row is worse than a dull one.
+        name=full_name.strip() or email.split("@")[0],
+        admin_email=email,
+        admin_password=password,
+        admin_full_name=full_name,
+    )
+
+
+# ── The login directory ─────────────────────────────────────────────────────
+#
+# See models/user.py::AccountDirectory for why this table exists. These three
+# helpers are the whole of its maintenance: every path that creates or renames a
+# User must go through them, or that user will authenticate on a subdomain and be
+# invisible on the shared origin.
+
+
+async def assert_email_available(session: AsyncSession, email: str) -> None:
+    """Raise if this email already signs in somewhere on the platform."""
+    taken = await session.execute(
+        select(AccountDirectory.id).where(
+            func.lower(AccountDirectory.email) == email.strip().lower()
+        )
+    )
+    if taken.scalar_one_or_none() is not None:
+        raise ConflictError(
+            "That email is already registered.", details={"field": "email"}
+        )
+
+
+async def register_email(
+    session: AsyncSession, *, email: str, tenant_id: uuid.UUID
+) -> AccountDirectory:
+    """Claim an email for a tenant. Call whenever a User is created."""
+    email = email.strip().lower()
+    await assert_email_available(session, email)
+    entry = AccountDirectory(email=email, tenant_id=tenant_id)
+    session.add(entry)
+    return entry
+
+
+async def tenant_id_for_email(session: AsyncSession, email: str) -> uuid.UUID | None:
+    """Which academy this login belongs to, or None if the email is unknown.
+
+    Returns None rather than raising so the caller can fall through to the same
+    "incorrect email or password" it gives for a wrong password — an endpoint that
+    404s on unknown emails is an account-enumeration oracle.
+    """
+    result = await session.execute(
+        select(AccountDirectory.tenant_id).where(
+            func.lower(AccountDirectory.email) == email.strip().lower()
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def resolve_login_tenant(session: AsyncSession, *, email: str) -> uuid.UUID:
+    """The academy a login belongs to, when the request named none.
+
+    Raises the ordinary credentials error for an unknown email, having first burned
+    the same bcrypt round a real verification would — so "no such account" and
+    "wrong password" cost the same and the endpoint discloses nothing by timing.
+    """
+    tenant_id = await tenant_id_for_email(session, email)
+    if tenant_id is None:
+        verify_password("", _DUMMY_HASH)
+        raise AuthenticationError(_CREDENTIALS_REJECTED)
+    return tenant_id
 
 
 def initials(full_name: str) -> str:
