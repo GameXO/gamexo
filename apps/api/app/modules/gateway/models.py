@@ -60,6 +60,25 @@ class IntegrationPartner(TenantScoped):
     key_prefix: Mapped[str] = mapped_column(String(32), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
+    #: Which wire format this partner speaks — a key in `gateway.dialects.DIALECTS`.
+    #: `native` is our own contract and the answer for anyone without a spec of
+    #: their own; `playo` is theirs, which they dictate.
+    #:
+    #: A plain string rather than an enum: the set of dialects is a code-level
+    #: registry, and adding a partner should never need a migration. Validated
+    #: against the registry when a partner is created.
+    dialect: Mapped[str] = mapped_column(String(50), default="native", nullable=False)
+
+    #: The id the partner knows this venue by, echoed back in every Playo request as
+    #: `venueId`. Optional: it only exists once an integration has been set up on
+    #: their side, and our own gateway does not use it at all.
+    #:
+    #: Checked rather than trusted. The API key already establishes which academy is
+    #: being addressed, so this is a second, independent assertion of the same fact —
+    #: and a mismatch means someone has pointed a venue's configuration at the wrong
+    #: key, which would otherwise write one academy's bookings into another's diary.
+    external_venue_id: Mapped[str | None] = mapped_column(String(120))
+
     #: Revocation. Deactivating is preferred over deleting: the bookings a partner
     #: made outlive the integration, and their `created_by_partner_id` must still
     #: resolve to a name months later when someone asks where a booking came from.

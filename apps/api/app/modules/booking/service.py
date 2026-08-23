@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError
 from app.modules.booking.models import (
+    LIVE_STATUSES,
     Booking,
     BookingEvent,
     BookingEventKind,
@@ -326,7 +327,12 @@ async def find_adjoining_booking(
     stmt = select(Booking).where(
         Booking.court_id == court_id,
         Booking.ends_at == starts_at,
-        Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.COMPLETED]),
+        # HELD excluded: an unconfirmed Playo order is not a session anyone is
+        # playing, and absorbing a walk-in into one would put a counter customer's
+        # hour onto a booking that may be about to expire.
+        Booking.status.notin_(
+            [BookingStatus.CANCELLED, BookingStatus.COMPLETED, BookingStatus.HELD]
+        ),
     )
 
     if customer_id is not None:
@@ -405,7 +411,12 @@ CHECKIN_LOOKUP_WINDOW = timedelta(minutes=30)
 CHECKOUT_LOOKUP_LOOKBACK = timedelta(hours=12)
 
 
-def matches_booking_code(booking_id: uuid.UUID, external_ref: str | None, code: str) -> bool:
+def matches_booking_code(
+    booking_id: uuid.UUID,
+    external_ref: str | None,
+    code: str,
+    reference: str | None = None,
+) -> bool:
     """Does `code`, typed on the check-in keyboard, identify this booking?
 
     There is no single booking-id format: our own bookings are UUIDs, a customer
@@ -419,10 +430,19 @@ def matches_booking_code(booking_id: uuid.UUID, external_ref: str | None, code: 
     a substring one — `external_ref` is opaque to us, so a partial hit proves
     nothing). Our own booking id matches on any long-enough compacted substring,
     since the code on a ticket is deliberately only a piece of the full UUID.
+
+    `reference` is `XC-B-0042`, and it is the string the customer is most likely to
+    be holding: it is what the ticket prints, what the invoice shows and what the
+    confirmation email calls the Booking ID. Matched in full once compacted, like a
+    partner reference — a four-character substring of a counter would collide with
+    every hundredth booking.
     """
     compact = re.sub(r"[^0-9a-zA-Z]", "", code).upper()
     if not compact:
         return False
+    if reference:
+        if re.sub(r"[^0-9a-zA-Z]", "", reference).upper() == compact:
+            return True
     if external_ref:
         ref_compact = re.sub(r"[^0-9a-zA-Z]", "", external_ref).upper()
         if ref_compact and ref_compact == compact:
@@ -457,6 +477,42 @@ def should_auto_check_in(
     return starts_at <= now + AUTO_CHECKIN_LEAD
 
 
+async def release_expired_holds(session: AsyncSession) -> int:
+    """Cancel holds whose TTL has passed. Returns how many were released.
+
+    A hold (`BookingStatus.HELD`) is a court blocked while a customer pays on a
+    partner platform. It has to block — `booking_no_overlap` excludes only cancelled
+    rows, so a hold competes for the court against the counter exactly as a real
+    booking does. That is the point.
+
+    But the constraint knows nothing about `hold_expires_at`. Nothing in Postgres
+    will ever notice a hold has gone stale, so an abandoned checkout blocks a court
+    until something actively changes its status. This is that something.
+
+    Called from the availability read and from the slot check rather than left to a
+    background job: a sweeper that has not run in the last minute is invisible right
+    up until a customer is refused a court that is plainly free, and the cost here is
+    one UPDATE against a partial index over a handful of rows.
+    """
+    from sqlalchemy import update
+
+    result = await session.execute(
+        update(Booking)
+        .where(
+            Booking.status == BookingStatus.HELD,
+            Booking.hold_expires_at.is_not(None),
+            Booking.hold_expires_at < datetime.now(UTC),
+        )
+        .values(
+            status=BookingStatus.CANCELLED,
+            cancelled_at=datetime.now(UTC),
+            cancellation_reason="Hold expired before the order was confirmed.",
+            hold_expires_at=None,
+        )
+    )
+    return result.rowcount or 0
+
+
 async def ensure_slot_free(
     session: AsyncSession,
     *,
@@ -466,6 +522,10 @@ async def ensure_slot_free(
     exclude_booking_id: uuid.UUID | None = None,
 ) -> None:
     """Reject an overlapping slot with a message that names the conflict.
+
+    Releases expired holds first. Without it the counter is refused a court that an
+    abandoned partner checkout stopped blocking twenty minutes ago — a 409 naming a
+    booking nobody can find.
 
     On an ordinary court this check is for the *message*, not for the guarantee.
     Two reception staff hitting Confirm at the same instant can both pass this
@@ -481,6 +541,8 @@ async def ensure_slot_free(
     Half-open comparison (`starts < other_end AND ends > other_start`) mirrors the
     constraint's '[)' bounds, so back-to-back bookings are not reported as clashing.
     """
+    await release_expired_holds(session)
+
     court = await session.get(Court, court_id)
     if court is not None and court.open_slots_enabled:
         await ensure_open_slot_available(
@@ -789,6 +851,8 @@ async def court_availability(
     issuing a query per slot: a 16-hour day at 60-minute granularity across 8 courts
     is 128 slots, and 128 round trips is a slow endpoint for no benefit.
     """
+    await release_expired_holds(session)
+
     settings = await load_settings(session)
     tz = tenant_zone(settings.timezone)
 
@@ -895,7 +959,13 @@ async def court_status_at(
     active = (
         await session.execute(
             select(Booking.court_id, Booking.id).where(
-                Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.COMPLETED]),
+                # HELD excluded: this answers "which game is on this court right
+                # now", and nobody is playing an unconfirmed checkout. Slot
+                # selection uses court_availability, which *does* count holds — so
+                # the desk still cannot book over one.
+                Booking.status.notin_(
+                    [BookingStatus.CANCELLED, BookingStatus.COMPLETED, BookingStatus.HELD]
+                ),
                 Booking.starts_at <= at,
                 Booking.ends_at > at,
             )
@@ -955,7 +1025,10 @@ async def customer_rollups(
                 func.coalesce(func.sum(Booking.total - Booking.amount_paid), 0),
             ).where(
                 Booking.customer_id == customer_id,
-                Booking.status != BookingStatus.CANCELLED,
+                # LIVE_STATUSES, not `!= CANCELLED`: a held slot is money nobody has
+                # agreed to pay yet, and counting it here would show a customer
+                # owing a balance for a checkout they abandoned.
+                Booking.status.in_(LIVE_STATUSES),
             )
         )
     ).one()

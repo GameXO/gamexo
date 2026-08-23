@@ -31,11 +31,38 @@ from app.db.types import enum_type, money
 
 
 class BookingStatus(StrEnum):
+    #: A slot reserved but not yet paid for — Playo's two-phase order flow, where
+    #: `/order/create` blocks the court while the customer is still in checkout and
+    #: `/order/confirm` turns it into a real booking once payment clears.
+    #:
+    #: A held row is a booking as far as *Postgres* is concerned: `booking_no_overlap`
+    #: excludes only cancelled rows, so a hold blocks the court against the counter,
+    #: the dashboard and every other platform. That is the whole point — a slot being
+    #: sold on Playo must not be sellable here at the same moment.
+    #:
+    #: It is NOT a booking as far as the *business* is concerned: it has no revenue,
+    #: nobody is going to turn up for it, and it must never reach a report, the POS
+    #: board or the day's takings. Every read that means "real bookings" filters it
+    #: out — see `LIVE_STATUSES`.
+    HELD = "held"
     UPCOMING = "upcoming"
     ACTIVE = "active"
     COMPLETED = "completed"
     OVERDUE = "overdue"
     CANCELLED = "cancelled"
+
+
+#: Statuses that represent a booking someone actually made. Excludes HELD (an
+#: unconfirmed checkout on a partner platform) and CANCELLED (released).
+#:
+#: The default for any query about the business rather than about the calendar.
+#: Availability deliberately does not use it — a hold has to block a slot.
+LIVE_STATUSES: tuple[BookingStatus, ...] = (
+    BookingStatus.UPCOMING,
+    BookingStatus.ACTIVE,
+    BookingStatus.OVERDUE,
+    BookingStatus.COMPLETED,
+)
 
 
 class PaymentStatus(StrEnum):
@@ -531,6 +558,23 @@ class Booking(TenantScoped):
     #: recognised as the same booking rather than double-selling the court — see
     #: the unique index in __table_args__.
     external_ref: Mapped[str | None] = mapped_column(String(120))
+
+    #: The partner's id for the *booking*, as opposed to the order. Playo issues both
+    #: and they are different values: `playoOrderId` arrives with the order and lands
+    #: in `external_ref`; `playoBookingId` arrives later, via `/booking/map`, once
+    #: their side has settled. Kept apart because reconciliation matches on whichever
+    #: one the other system is quoting, and conflating them silently mismatches rows.
+    partner_booking_ref: Mapped[str | None] = mapped_column(String(120))
+
+    #: When an unconfirmed hold stops blocking the court. NULL for every real
+    #: booking; set only while `status` is HELD.
+    #:
+    #: Load-bearing for the counter. `booking_no_overlap` is a plain Postgres
+    #: exclusion constraint — it has no notion of time-to-live, so an abandoned Playo
+    #: checkout would block a court forever unless something actively releases it.
+    #: `service.release_expired_holds` is that something, and it runs before every
+    #: availability read and every create.
+    hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     court_charge: Mapped[Decimal] = mapped_column(money(), default=0, nullable=False)
     equipment_charge: Mapped[Decimal] = mapped_column(money(), default=0, nullable=False)

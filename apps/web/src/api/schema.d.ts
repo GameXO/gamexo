@@ -839,7 +839,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
         parameters: {
             query?: never;
             header?: never;
@@ -848,9 +848,11 @@ export interface paths {
         };
         /**
          * Free slots for a day
-         * @description Reflects **every** booking — walk-ins at the counter, the dashboard, and other platforms — so a slot sold here is immediately unavailable to you.
+         * @description Reflects **every** booking — walk-ins at the counter, the dashboard, other platforms, and unconfirmed holds still in checkout — so a slot sold here is immediately unavailable to you.
          *
-         *     A slot marked `available` is not a reservation. Between this call and your `POST /gateway/bookings`, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out — it is the database refusing to double-book the court, not a transient error to retry.
+         *     A slot marked `available` is not a reservation. Between this call and your create, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out — it is the database refusing to double-book the court, not a transient error to retry.
+         *
+         *     Use `POST /gateway/bookings/hold` if you need the slot held while a customer pays.
          */
         get: operations["gateway_availability"];
         put?: never;
@@ -861,7 +863,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
         parameters: {
             query?: never;
             header?: never;
@@ -870,24 +872,94 @@ export interface paths {
         };
         /**
          * Your bookings
-         * @description Only bookings made through your own integration. Never walk-ins, and never another platform's.
+         * @description Only bookings made through your own integration. Never walk-ins, and never another platform's. Holds are included, with `status: held`.
          */
         get: operations["gateway_listBookings"];
         put?: never;
         /**
-         * Claim a slot
-         * @description Returns **409** if the court is already taken for any part of the window — by another platform or by a walk-in. That check is a Postgres exclusion constraint, so it holds under concurrency: two platforms claiming the same slot at the same instant, one wins.
+         * Claim one or more slots
+         * @description Creates confirmed bookings immediately — for when you take payment before calling us. Use `/bookings/hold` if the customer is still paying.
          *
-         *     Send `external_ref` (your own booking id). Repeating a create with the same `external_ref` returns the booking you already made instead of a second one, so a timeout on your side is safe to retry.
+         *     **All or nothing.** If any slot in the request is unavailable, none are created and the response is **409**. A half-applied booking request is never what anyone meant.
+         *
+         *     Send `external_ref` (your own booking id). Repeating a create with the same one returns the booking you already made instead of a second, so a timeout on your side is safe to retry.
          */
-        post: operations["gateway_createBooking"];
+        post: operations["gateway_createBookings"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{booking_id}": {
+    "/api/v1/gateway/native/bookings/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm held slots once payment clears
+         * @description Turns holds into real bookings. Only after this do they reach the venue's reports, its counter board and the day's takings.
+         *
+         *     **All or nothing**, and idempotent — confirming an already-confirmed booking succeeds and returns it, so a dropped response is safe to retry.
+         *
+         *     A hold that lapsed still confirms **if the court is free**: your customer paid, and our timer is not their problem. It is refused with **409** only when the slot has since been taken — at which point refund them.
+         */
+        post: operations["gateway_confirmBookings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/native/bookings/hold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hold slots while a customer pays
+         * @description Blocks the courts without creating bookings. The hold competes for the slot against the counter exactly as a real booking does, so nobody can sell it underneath your customer — and it is **not** a booking: no revenue, no entry on the venue's board, nobody expected to arrive.
+         *
+         *     Holds expire after 15 minutes if `/bookings/confirm` never comes, so an abandoned checkout costs the venue at most one slot rotation. Bookings come back with `status: held`.
+         *
+         *     All-or-nothing and idempotent, exactly as `POST /bookings`.
+         */
+        post: operations["gateway_holdSlots"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/native/bookings/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record your own booking ids against ours
+         * @description For platforms that issue two identifiers — an order id at checkout and a booking id once your side settles. `external_ref` holds the first; this records the second, so reconciliation can match on whichever one you quote.
+         */
+        post: operations["gateway_mapBookings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/native/bookings/{reference}": {
         parameters: {
             query?: never;
             header?: never;
@@ -896,7 +968,9 @@ export interface paths {
         };
         /**
          * One of your bookings
-         * @description **404** for a booking your integration did not create, including walk-ins and other platforms' bookings.
+         * @description By our reference (`XC-B-0042`) or your own `external_ref`.
+         *
+         *     **404** for a booking your integration did not create, including walk-ins and other platforms' bookings — a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.
          */
         get: operations["gateway_getBooking"];
         put?: never;
@@ -907,7 +981,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{booking_id}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -918,9 +992,219 @@ export interface paths {
         put?: never;
         /**
          * Release one of your bookings
-         * @description Frees the slot for everyone — it becomes available to the counter and to other platforms immediately. Idempotent: cancelling twice is not an error.
+         * @description Frees the slot for everyone — the counter and every other platform — immediately. Works on holds as well as confirmed bookings.
+         *
+         *     Idempotent: cancelling twice is not an error.
          */
         post: operations["gateway_cancelBooking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Playo: fetch availability
+         * @description Reflects **every** booking — the counter, the dashboard, other platforms, and unconfirmed Playo orders still in checkout. A slot Playo cannot see as taken is a slot Playo will sell twice.
+         *
+         *     Expired holds are released before the read, so a checkout abandoned twenty minutes ago is not still showing a court as busy.
+         */
+        get: operations["gateway_playoAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/booking/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: cancel booking
+         * @description Frees the courts for everyone immediately.
+         *
+         *     **All or nothing**, per their spec: *either all bookings should be cancelled or none of the requested bookings*.
+         *
+         *     `price` and `refundAtPlayo` are recorded on the timeline, not acted on — the refund has already been made on their side.
+         */
+        post: operations["gateway_playoBookingCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/booking/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: create booking (non-order flow)
+         * @description The single-phase flow: a confirmed booking straight away, for venues integrated without the order/confirm handshake.
+         *
+         *     Same guarantees as `/order/create` — all-or-nothing, idempotent on `playoOrderId`, same exclusion constraint.
+         */
+        post: operations["gateway_playoBookingCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/booking/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: map their booking ids to ours
+         * @description Optional in their spec. Records Playo's own `playoBookingId`, a different value from the `playoOrderId` we already hold — so reconciliation can match on whichever id the other side happens to be quoting.
+         */
+        post: operations["gateway_playoBookingMap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/order/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: cancel order
+         * @description Releases held slots, and confirmed bookings too — their spec requires this endpoint to cancel a confirmed booking if one exists, so no order is left open on their side with no counterpart here.
+         *
+         *     Idempotent: cancelling an already-cancelled order is a success.
+         */
+        post: operations["gateway_playoOrderCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/order/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: confirm order
+         * @description Turns held slots into real bookings once payment has cleared. Only after this do they appear in reports, on the counter board and in the takings.
+         *
+         *     **All or nothing**, and idempotent — confirming twice is a success, so a dropped response is safe to retry.
+         *
+         *     A lapsed hold still confirms if the court is free; it is refused only once somebody else has taken the slot.
+         */
+        post: operations["gateway_playoOrderConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/playo/order/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Playo: create order (hold slots)
+         * @description Blocks the courts while the customer is still paying on Playo. The hold is a real row against the same exclusion constraint as every other booking, so the counter cannot sell the slot underneath them — and it is **not** a booking: no revenue, no counter entry, nobody expected to arrive.
+         *
+         *     Holds expire after 15 minutes if `/order/confirm` never comes.
+         *
+         *     **All or nothing**, per their spec: if any slot fails, none are created and `requestStatus` is 0.
+         */
+        post: operations["gateway_playoOrderCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/sandbox/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sandbox: drive the gateway as if we were a partner
+         * @description Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.
+         *
+         *     The scenarios are dialect-independent — the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.
+         *
+         *     Every driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.
+         *
+         *     **This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.
+         *
+         *     Pass `keep=true` to leave them behind for inspection — the transcript returns every request and response either way, so diagnosing a failure rarely needs it.
+         *
+         *     Still a dev tool: the routes are not registered when `ENVIRONMENT=production`.
+         */
+        post: operations["gateway_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gateway/sandbox/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sandbox: what can be simulated
+         * @description Names accepted by `POST /gateway/sandbox/run`. Dev and staging only.
+         */
+        get: operations["gateway_listScenarios"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1300,6 +1584,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/partners/dialects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Wire formats the gateway speaks
+         * @description What to choose when adding an integration.
+         *
+         *     `base_path` is the same for every one of them — that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.
+         *
+         *     `is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.
+         *
+         *     Every dialect is returned, including the ones not offered — a partner onboarded before a dialect was retired still needs its label to render.
+         *
+         *     Declared above `/partners/{partner_id}` deliberately — routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.
+         */
+        get: operations["gateway_listDialects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/partners/{partner_id}": {
         parameters: {
             query?: never;
@@ -1318,8 +1630,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename or revoke an integration
+         * Rename, re-point or revoke an integration
          * @description Setting `is_active: false` revokes access immediately — the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.
+         *
+         *     Changing `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.
          */
         patch: operations["gateway_updatePartner"];
         trace?: never;
@@ -2267,6 +2581,15 @@ export interface components {
          * @enum {string}
          */
         AttendanceStatus: "present" | "absent" | "late" | "not-started";
+        /** AvailabilityResponse */
+        AvailabilityResponse: {
+            /** Courts */
+            courts?: components["schemas"]["PlayoCourt"][];
+            /** Message */
+            message: string;
+            /** Requeststatus */
+            requestStatus: number;
+        };
         /** BatchCreate */
         BatchCreate: {
             /**
@@ -2384,6 +2707,28 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** BookingCancelItem */
+        BookingCancelItem: {
+            /** Externalbookingid */
+            externalBookingId: string;
+            /** Playoorderid */
+            playoOrderId?: string | null;
+            /**
+             * Price
+             * @default 0
+             */
+            price?: number | string;
+            /**
+             * Refundatplayo
+             * @default 0
+             */
+            refundAtPlayo?: number | string;
+        };
+        /** BookingCancelRequest */
+        BookingCancelRequest: {
+            /** Bookingids */
+            bookingIds?: components["schemas"]["BookingCancelItem"][];
+        };
         /** BookingCreate */
         BookingCreate: {
             /** @default walkin */
@@ -2415,6 +2760,35 @@ export interface components {
              * Format: date-time
              */
             starts_at: string;
+        };
+        /** BookingCreateRequest */
+        BookingCreateRequest: {
+            /** Bookings */
+            bookings?: components["schemas"]["PlayoSlotRequest"][];
+            /** Useremail */
+            userEmail?: string | null;
+            /** Usermobile */
+            userMobile?: string | null;
+            /**
+             * Username
+             * @default Playo Customer
+             */
+            userName?: string;
+            /** Venueid */
+            venueId?: string | null;
+        };
+        /**
+         * BookingCreateResponse
+         * @description Also the shape of `/order/confirm` — their spec names the field `bookingIds`
+         *     in both, even though the confirm *request* is keyed by `orderIds`.
+         */
+        BookingCreateResponse: {
+            /** Bookingids */
+            bookingIds?: components["schemas"]["BookingIdPair"][];
+            /** Message */
+            message: string;
+            /** Requeststatus */
+            requestStatus: number;
         };
         /** BookingDetail */
         BookingDetail: {
@@ -2535,6 +2909,25 @@ export interface components {
              */
             additional_minutes: number;
         };
+        /** BookingIdPair */
+        BookingIdPair: {
+            /** Externalbookingid */
+            externalBookingId: string;
+            /** Playoorderid */
+            playoOrderId: string;
+        };
+        /** BookingMapItem */
+        BookingMapItem: {
+            /** Externalbookingid */
+            externalBookingId: string;
+            /** Playobookingid */
+            playoBookingId: string;
+        };
+        /** BookingMapRequest */
+        BookingMapRequest: {
+            /** Bookingids */
+            bookingIds?: components["schemas"]["BookingMapItem"][];
+        };
         /** BookingOut */
         BookingOut: {
             /** Amount Paid */
@@ -2609,7 +3002,7 @@ export interface components {
          * BookingStatus
          * @enum {string}
          */
-        BookingStatus: "upcoming" | "active" | "completed" | "overdue" | "cancelled";
+        BookingStatus: "held" | "upcoming" | "active" | "completed" | "overdue" | "cancelled";
         /**
          * BookingType
          * @enum {string}
@@ -2857,6 +3250,11 @@ export interface components {
             sport_ids?: string[] | null;
             status?: components["schemas"]["CoachStatus"] | null;
             type?: components["schemas"]["CoachType"] | null;
+        };
+        /** ConfirmRequest */
+        ConfirmRequest: {
+            /** References */
+            references: string[];
         };
         /** ContractPayment */
         ContractPayment: {
@@ -3212,6 +3610,28 @@ export interface components {
             notes?: string | null;
             /** Phone */
             phone?: string | null;
+        };
+        /**
+         * DialectOut
+         * @description A wire format the gateway speaks. From `gateway.dialects.DIALECTS`.
+         */
+        DialectOut: {
+            /** Base Path */
+            base_path: string;
+            /** Canonical Path */
+            canonical_path: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Is Platform */
+            is_platform: boolean;
+            /** Is Ready */
+            is_ready: boolean;
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
+            /** Summary */
+            summary: string;
         };
         /** EnrollmentCreate */
         EnrollmentCreate: {
@@ -3806,6 +4226,22 @@ export interface components {
             password: string;
         };
         /**
+         * MapRequest
+         * @description Record your own second identifier against bookings we already hold.
+         */
+        MapRequest: {
+            /**
+             * Pairs
+             * @description Our reference → your booking id
+             * @example {
+             *       "XC-B-0042": "YOUR-BOOKING-991"
+             *     }
+             */
+            pairs: {
+                [key: string]: string;
+            };
+        };
+        /**
          * MeOut
          * @description Everything the frontend shell needs on boot: who you are and whose app this is.
          */
@@ -4017,6 +4453,37 @@ export interface components {
             /** Qty */
             qty: number;
         };
+        /**
+         * NativeSlot
+         * @description One slot in a create or hold request.
+         */
+        NativeSlot: {
+            /**
+             * Amount Paid
+             * @default 0
+             */
+            amount_paid?: number | string;
+            /**
+             * Court Id
+             * Format: uuid
+             */
+            court_id: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Customer Phone */
+            customer_phone?: string | null;
+            /** Duration Min */
+            duration_min: number;
+            /** External Ref */
+            external_ref?: string | null;
+            /** Price */
+            price?: number | string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
         /** NotificationCreate */
         NotificationCreate: {
             /** Body */
@@ -4077,6 +4544,43 @@ export interface components {
              * @default 06:00
              */
             open?: string;
+        };
+        /** OrderCreateRequest */
+        OrderCreateRequest: {
+            /** Orders */
+            orders?: components["schemas"]["PlayoSlotRequest"][];
+            /** Useremail */
+            userEmail?: string | null;
+            /** Usermobile */
+            userMobile?: string | null;
+            /**
+             * Username
+             * @default Playo Customer
+             */
+            userName?: string;
+            /** Venueid */
+            venueId?: string | null;
+        };
+        /** OrderCreateResponse */
+        OrderCreateResponse: {
+            /** Message */
+            message: string;
+            /** Orderids */
+            orderIds?: components["schemas"]["OrderIdPair"][];
+            /** Requeststatus */
+            requestStatus: number;
+        };
+        /** OrderIdPair */
+        OrderIdPair: {
+            /** Externalorderid */
+            externalOrderId: string;
+            /** Playoorderid */
+            playoOrderId: string;
+        };
+        /** OrderIdsRequest */
+        OrderIdsRequest: {
+            /** Orderids */
+            orderIds?: string[];
         };
         /** Page[AdContractOut] */
         Page_AdContractOut_: {
@@ -4252,27 +4756,6 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
-        /** PartnerBookingCreate */
-        PartnerBookingCreate: {
-            /**
-             * Court Id
-             * Format: uuid
-             */
-            court_id: string;
-            /** Customer Name */
-            customer_name: string;
-            /** Customer Phone */
-            customer_phone?: string | null;
-            /** Duration Min */
-            duration_min: number;
-            /** External Ref */
-            external_ref?: string | null;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-        };
         /**
          * PartnerBookingOut
          * @description What a partner gets back about their own booking.
@@ -4355,6 +4838,13 @@ export interface components {
         };
         /** PartnerCreate */
         PartnerCreate: {
+            /**
+             * Dialect
+             * @default native
+             */
+            dialect?: string;
+            /** External Venue Id */
+            external_venue_id?: string | null;
             /** Name */
             name: string;
             /** Slug */
@@ -4367,6 +4857,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Dialect */
+            dialect: string;
+            /** External Venue Id */
+            external_venue_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -4411,6 +4905,10 @@ export interface components {
         };
         /** PartnerUpdate */
         PartnerUpdate: {
+            /** Dialect */
+            dialect?: string | null;
+            /** External Venue Id */
+            external_venue_id?: string | null;
             /** Is Active */
             is_active?: boolean | null;
             /** Name */
@@ -4435,6 +4933,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Dialect */
+            dialect: string;
+            /** External Venue Id */
+            external_venue_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -4567,6 +5069,69 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+        };
+        /** PlayoCourt */
+        PlayoCourt: {
+            /** Courtid */
+            courtId: string;
+            /** Courtname */
+            courtName: string;
+            /** Slots */
+            slots: components["schemas"]["PlayoSlot"][];
+        };
+        /** PlayoEnvelope */
+        PlayoEnvelope: {
+            /** Message */
+            message: string;
+            /** Requeststatus */
+            requestStatus: number;
+        };
+        /** PlayoSlot */
+        PlayoSlot: {
+            /** Available */
+            available: boolean;
+            /** Endtime */
+            endTime: string;
+            /** Starttime */
+            startTime: string;
+            /** Ticketsavailable */
+            ticketsAvailable: number;
+        };
+        /**
+         * PlayoSlotRequest
+         * @description One slot. Shared by `/order/create` and `/booking/create` — their spec sends
+         *     the same object under different names (`orders` vs `bookings`), and the only real
+         *     difference is whether the result is a hold or a confirmed booking.
+         */
+        PlayoSlotRequest: {
+            /** Courtid */
+            courtId: string;
+            /**
+             * Date
+             * @description YYYY-MM-DD, venue local
+             */
+            date: string;
+            /** Endtime */
+            endTime?: string | null;
+            /** Numtickets */
+            numTickets?: number | null;
+            /**
+             * Paidatplayo
+             * @default 0
+             */
+            paidAtPlayo?: number | string;
+            /** Playoorderid */
+            playoOrderId: string;
+            /**
+             * Price
+             * @default 0
+             */
+            price?: number | string;
+            /**
+             * Starttime
+             * @description HH:MM:SS, venue local
+             */
+            startTime: string;
         };
         /** ProgramCreate */
         ProgramCreate: {
@@ -4914,6 +5479,38 @@ export interface components {
             /** Collect On Web */
             collect_on_web?: boolean | null;
         };
+        /** SandboxRun */
+        SandboxRun: {
+            /** Court Id */
+            court_id: string;
+            /** Dialect */
+            dialect: string;
+            /** Partner */
+            partner: string;
+            /** Passed */
+            passed: boolean;
+            /** Purged */
+            purged?: {
+                [key: string]: number;
+            };
+            /** Results */
+            results: components["schemas"]["ScenarioResult"][];
+            /** Tenant */
+            tenant: string;
+        };
+        /** ScenarioResult */
+        ScenarioResult: {
+            /** Description */
+            description: string;
+            /** Passed */
+            passed: boolean;
+            /** References */
+            references?: string[];
+            /** Scenario */
+            scenario: string;
+            /** Steps */
+            steps: components["schemas"]["Step"][];
+        };
         /** SessionCreate */
         SessionCreate: {
             /**
@@ -5131,6 +5728,14 @@ export interface components {
              */
             starts_at: string;
         };
+        /**
+         * SlotBatch
+         * @description One or more slots, taken together or not at all.
+         */
+        SlotBatch: {
+            /** Slots */
+            slots: components["schemas"]["NativeSlot"][];
+        };
         /** SportCreate */
         SportCreate: {
             /** Bg Color */
@@ -5285,6 +5890,25 @@ export interface components {
             /** Shift */
             shift?: string | null;
             status?: components["schemas"]["UserStatus"] | null;
+        };
+        /** Step */
+        Step: {
+            /** Expected */
+            expected: string;
+            /** Ok */
+            ok: boolean;
+            /** Request */
+            request?: {
+                [key: string]: unknown;
+            } | null;
+            /** Response */
+            response: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: number;
+            /** Step */
+            step: string;
         };
         /** StudentCreate */
         StudentCreate: {
@@ -7752,7 +8376,7 @@ export interface operations {
             };
         };
     };
-    gateway_createBooking: {
+    gateway_createBookings: {
         parameters: {
             query?: never;
             header?: {
@@ -7763,7 +8387,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PartnerBookingCreate"];
+                "application/json": components["schemas"]["SlotBatch"];
             };
         };
         responses: {
@@ -7773,8 +8397,111 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PartnerBookingOut"];
+                    "application/json": components["schemas"]["PartnerBookingOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_confirmBookings: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerBookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_holdSlots: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlotBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerBookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_mapBookings: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -7794,7 +8521,7 @@ export interface operations {
                 "X-API-Key"?: string | null;
             };
             path: {
-                booking_id: string;
+                reference: string;
             };
             cookie?: never;
         };
@@ -7827,7 +8554,7 @@ export interface operations {
                 "X-API-Key"?: string | null;
             };
             path: {
-                booking_id: string;
+                reference: string;
             };
             cookie?: never;
         };
@@ -7853,6 +8580,313 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoAvailability: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM-DD, venue local time */
+                date: string;
+                venue_id?: string | null;
+                sport_id?: string | null;
+            };
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoBookingCancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayoEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoBookingCreate: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoBookingMap: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingMapRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayoEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoOrderCancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayoEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoOrderConfirm: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_playoOrderCreate: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_run: {
+        parameters: {
+            query?: {
+                /** @description Must match the key's own dialect, which is the default */
+                dialect?: string | null;
+                /** @description Defaults to all */
+                scenarios?: string[] | null;
+                days_ahead?: number;
+                /** @description Defaults to the first bookable court */
+                court_id?: string | null;
+                /** @description Leave the bookings behind for inspection */
+                keep?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_listScenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
         };
@@ -8648,6 +9682,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gateway_listDialects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DialectOut"][];
                 };
             };
         };

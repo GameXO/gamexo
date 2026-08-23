@@ -115,14 +115,50 @@ class PartnerBookingCancel(BaseModel):
 # ── Staff-facing: managing the integrations ─────────────────────────────────
 
 
+class DialectOut(BaseModel):
+    """A wire format the gateway speaks. From `gateway.dialects.DIALECTS`."""
+
+    slug: str
+    label: str
+    summary: str
+
+    #: Where to point this partner. Relative — the dashboard prefixes the API origin.
+    #: The **same for every dialect**, deliberately: the API key says which contract a
+    #: partner speaks, so there is one URL to hand out and no wrong one to choose.
+    base_path: str
+
+    #: Where `base_path` routes to for this dialect. For reading the API reference and
+    #: for debugging a call; a partner never needs it.
+    canonical_path: str
+
+    is_default: bool
+
+    #: True for a named third-party platform. The dashboard offers these and only
+    #: these — the question it asks is "who is this integration for?".
+    is_platform: bool
+
+    #: False for a platform whose spec we do not have yet: shown, but not selectable,
+    #: and refused by the API as well as by the form.
+    is_ready: bool
+
+
 class PartnerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str = Field(min_length=2, max_length=50, pattern=r"^[a-z0-9][a-z0-9_-]*$")
+
+    #: Which contract they speak. `native` is ours and the answer for anyone without
+    #: a spec of their own; a partner that dictates one gets its own dialect.
+    dialect: str = Field(default="native", max_length=50)
+
+    #: The id the partner knows this venue by, if they have assigned one.
+    external_venue_id: str | None = Field(default=None, max_length=120)
 
 
 class PartnerUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     is_active: bool | None = None
+    dialect: str | None = Field(default=None, max_length=50)
+    external_venue_id: str | None = Field(default=None, max_length=120)
 
 
 class PartnerOut(BaseModel):
@@ -131,6 +167,8 @@ class PartnerOut(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
+    dialect: str
+    external_venue_id: str | None
     key_prefix: str
     is_active: bool
     last_used_at: datetime | None
