@@ -14,6 +14,7 @@ from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
 from app.core.errors import ConflictError, NotFoundError
 from app.modules.booking import service
 from app.modules.booking.models import (
+    LIVE_STATUSES,
     Booking,
     BookingEvent,
     BookingEventKind,
@@ -463,6 +464,11 @@ async def list_bookings(
     stmt = select(Booking).order_by(Booking.starts_at.desc())
     if booking_status is not None:
         stmt = stmt.where(Booking.status == booking_status)
+    else:
+        # Unfiltered means "the bookings this academy has", which a partner's
+        # unconfirmed checkout is not. Still reachable deliberately with
+        # `?status=held`, for anyone diagnosing a court that will not free up.
+        stmt = stmt.where(Booking.status != BookingStatus.HELD)
     if court_id is not None:
         stmt = stmt.where(Booking.court_id == court_id)
     if customer_id is not None:
@@ -715,13 +721,16 @@ async def checkin_lookup(db: Db, _: RequireKiosk, code: Annotated[str, Query(min
     window_start = now - service.CHECKIN_LOOKUP_WINDOW
     window_end = now + service.CHECKIN_LOOKUP_WINDOW
     stmt = select(Booking).where(
-        Booking.status != BookingStatus.CANCELLED,
+        # LIVE_STATUSES excludes HELD: an unconfirmed Playo checkout has no
+        # customer to check in, and letting one through would mark a court in-play
+        # for a booking that is still about to expire.
+        Booking.status.in_(LIVE_STATUSES),
         Booking.starts_at >= window_start,
         Booking.starts_at <= window_end,
     )
     candidates = (await db.execute(stmt)).scalars().all()
     booking = next(
-        (b for b in candidates if service.matches_booking_code(b.id, b.external_ref, code)), None
+        (b for b in candidates if service.matches_booking_code(b.id, b.external_ref, code, b.reference)), None
     )
     if booking is None:
         raise NotFoundError("Booking not found.")
@@ -745,7 +754,9 @@ async def checkout_lookup(db: Db, _: RequireKiosk, code: Annotated[str, Query(mi
     stmt = (
         select(Booking)
         .where(
-            Booking.status != BookingStatus.CANCELLED,
+            # HELD excluded for the same reason as check-in: there is no bill to
+            # settle against a slot nobody has confirmed or turned up for.
+            Booking.status.in_(LIVE_STATUSES),
             Booking.starts_at >= now - service.CHECKOUT_LOOKUP_LOOKBACK,
             Booking.starts_at <= now,
         )
@@ -753,7 +764,7 @@ async def checkout_lookup(db: Db, _: RequireKiosk, code: Annotated[str, Query(mi
     )
     candidates = (await db.execute(stmt)).scalars().all()
     booking = next(
-        (b for b in candidates if service.matches_booking_code(b.id, b.external_ref, code)), None
+        (b for b in candidates if service.matches_booking_code(b.id, b.external_ref, code, b.reference)), None
     )
     if booking is None:
         raise NotFoundError("Booking not found.")

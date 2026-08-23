@@ -1457,6 +1457,31 @@
         "title": "AttendanceStatus",
         "type": "string"
       },
+      "AvailabilityResponse": {
+        "properties": {
+          "courts": {
+            "items": {
+              "$ref": "#/components/schemas/PlayoCourt"
+            },
+            "title": "Courts",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestStatus": {
+            "title": "Requeststatus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requestStatus",
+          "message"
+        ],
+        "title": "AvailabilityResponse",
+        "type": "object"
+      },
       "BatchCreate": {
         "properties": {
           "capacity": {
@@ -1896,6 +1921,69 @@
         "title": "BookingCancel",
         "type": "object"
       },
+      "BookingCancelItem": {
+        "properties": {
+          "externalBookingId": {
+            "title": "Externalbookingid",
+            "type": "string"
+          },
+          "playoOrderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Playoorderid"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Price"
+          },
+          "refundAtPlayo": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Refundatplayo"
+          }
+        },
+        "required": [
+          "externalBookingId"
+        ],
+        "title": "BookingCancelItem",
+        "type": "object"
+      },
+      "BookingCancelRequest": {
+        "properties": {
+          "bookingIds": {
+            "items": {
+              "$ref": "#/components/schemas/BookingCancelItem"
+            },
+            "title": "Bookingids",
+            "type": "array"
+          }
+        },
+        "title": "BookingCancelRequest",
+        "type": "object"
+      },
       "BookingCreate": {
         "properties": {
           "booking_type": {
@@ -1993,6 +2081,83 @@
           "duration_min"
         ],
         "title": "BookingCreate",
+        "type": "object"
+      },
+      "BookingCreateRequest": {
+        "properties": {
+          "bookings": {
+            "items": {
+              "$ref": "#/components/schemas/PlayoSlotRequest"
+            },
+            "title": "Bookings",
+            "type": "array"
+          },
+          "userEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Useremail"
+          },
+          "userMobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usermobile"
+          },
+          "userName": {
+            "default": "Playo Customer",
+            "title": "Username",
+            "type": "string"
+          },
+          "venueId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venueid"
+          }
+        },
+        "title": "BookingCreateRequest",
+        "type": "object"
+      },
+      "BookingCreateResponse": {
+        "description": "Also the shape of `/order/confirm` \u2014 their spec names the field `bookingIds`\nin both, even though the confirm *request* is keyed by `orderIds`.",
+        "properties": {
+          "bookingIds": {
+            "items": {
+              "$ref": "#/components/schemas/BookingIdPair"
+            },
+            "title": "Bookingids",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestStatus": {
+            "title": "Requeststatus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requestStatus",
+          "message"
+        ],
+        "title": "BookingCreateResponse",
         "type": "object"
       },
       "BookingDetail": {
@@ -2299,6 +2464,55 @@
         "title": "BookingExtend",
         "type": "object"
       },
+      "BookingIdPair": {
+        "properties": {
+          "externalBookingId": {
+            "title": "Externalbookingid",
+            "type": "string"
+          },
+          "playoOrderId": {
+            "title": "Playoorderid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalBookingId",
+          "playoOrderId"
+        ],
+        "title": "BookingIdPair",
+        "type": "object"
+      },
+      "BookingMapItem": {
+        "properties": {
+          "externalBookingId": {
+            "title": "Externalbookingid",
+            "type": "string"
+          },
+          "playoBookingId": {
+            "title": "Playobookingid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalBookingId",
+          "playoBookingId"
+        ],
+        "title": "BookingMapItem",
+        "type": "object"
+      },
+      "BookingMapRequest": {
+        "properties": {
+          "bookingIds": {
+            "items": {
+              "$ref": "#/components/schemas/BookingMapItem"
+            },
+            "title": "Bookingids",
+            "type": "array"
+          }
+        },
+        "title": "BookingMapRequest",
+        "type": "object"
+      },
       "BookingOut": {
         "properties": {
           "amount_paid": {
@@ -2493,6 +2707,7 @@
       },
       "BookingStatus": {
         "enum": [
+          "held",
           "upcoming",
           "active",
           "completed",
@@ -3327,6 +3542,24 @@
           }
         },
         "title": "CoachUpdate",
+        "type": "object"
+      },
+      "ConfirmRequest": {
+        "properties": {
+          "references": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "References",
+            "type": "array"
+          }
+        },
+        "required": [
+          "references"
+        ],
+        "title": "ConfirmRequest",
         "type": "object"
       },
       "ContractPayment": {
@@ -4538,6 +4771,55 @@
           }
         },
         "title": "CustomerUpdate",
+        "type": "object"
+      },
+      "DialectOut": {
+        "description": "A wire format the gateway speaks. From `gateway.dialects.DIALECTS`.",
+        "properties": {
+          "base_path": {
+            "title": "Base Path",
+            "type": "string"
+          },
+          "canonical_path": {
+            "title": "Canonical Path",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "is_platform": {
+            "title": "Is Platform",
+            "type": "boolean"
+          },
+          "is_ready": {
+            "title": "Is Ready",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "label",
+          "summary",
+          "base_path",
+          "canonical_path",
+          "is_default",
+          "is_platform",
+          "is_ready"
+        ],
+        "title": "DialectOut",
         "type": "object"
       },
       "EnrollmentCreate": {
@@ -6091,6 +6373,27 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "MapRequest": {
+        "description": "Record your own second identifier against bookings we already hold.",
+        "properties": {
+          "pairs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Our reference \u2192 your booking id",
+            "example": {
+              "XC-B-0042": "YOUR-BOOKING-991"
+            },
+            "title": "Pairs",
+            "type": "object"
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "title": "MapRequest",
+        "type": "object"
+      },
       "MeOut": {
         "description": "Everything the frontend shell needs on boot: who you are and whose app this is.",
         "properties": {
@@ -6747,6 +7050,93 @@
         "title": "MovementOut",
         "type": "object"
       },
+      "NativeSlot": {
+        "description": "One slot in a create or hold request.",
+        "properties": {
+          "amount_paid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Amount Paid"
+          },
+          "court_id": {
+            "format": "uuid",
+            "title": "Court Id",
+            "type": "string"
+          },
+          "customer_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Customer Name",
+            "type": "string"
+          },
+          "customer_phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Phone"
+          },
+          "duration_min": {
+            "maximum": 1440.0,
+            "minimum": 15.0,
+            "title": "Duration Min",
+            "type": "integer"
+          },
+          "external_ref": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Ref"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "court_id",
+          "starts_at",
+          "duration_min",
+          "customer_name"
+        ],
+        "title": "NativeSlot",
+        "type": "object"
+      },
       "NotificationCreate": {
         "properties": {
           "body": {
@@ -6943,6 +7333,113 @@
           }
         },
         "title": "OperatingHours",
+        "type": "object"
+      },
+      "OrderCreateRequest": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/PlayoSlotRequest"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "userEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Useremail"
+          },
+          "userMobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usermobile"
+          },
+          "userName": {
+            "default": "Playo Customer",
+            "title": "Username",
+            "type": "string"
+          },
+          "venueId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venueid"
+          }
+        },
+        "title": "OrderCreateRequest",
+        "type": "object"
+      },
+      "OrderCreateResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "orderIds": {
+            "items": {
+              "$ref": "#/components/schemas/OrderIdPair"
+            },
+            "title": "Orderids",
+            "type": "array"
+          },
+          "requestStatus": {
+            "title": "Requeststatus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requestStatus",
+          "message"
+        ],
+        "title": "OrderCreateResponse",
+        "type": "object"
+      },
+      "OrderIdPair": {
+        "properties": {
+          "externalOrderId": {
+            "title": "Externalorderid",
+            "type": "string"
+          },
+          "playoOrderId": {
+            "title": "Playoorderid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalOrderId",
+          "playoOrderId"
+        ],
+        "title": "OrderIdPair",
+        "type": "object"
+      },
+      "OrderIdsRequest": {
+        "properties": {
+          "orderIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Orderids",
+            "type": "array"
+          }
+        },
+        "title": "OrderIdsRequest",
         "type": "object"
       },
       "Page_AdContractOut_": {
@@ -7431,64 +7928,6 @@
         "title": "PartnerBookingCancel",
         "type": "object"
       },
-      "PartnerBookingCreate": {
-        "properties": {
-          "court_id": {
-            "format": "uuid",
-            "title": "Court Id",
-            "type": "string"
-          },
-          "customer_name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Customer Name",
-            "type": "string"
-          },
-          "customer_phone": {
-            "anyOf": [
-              {
-                "maxLength": 32,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Phone"
-          },
-          "duration_min": {
-            "maximum": 1440.0,
-            "minimum": 15.0,
-            "title": "Duration Min",
-            "type": "integer"
-          },
-          "external_ref": {
-            "anyOf": [
-              {
-                "maxLength": 120,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "External Ref"
-          },
-          "starts_at": {
-            "format": "date-time",
-            "title": "Starts At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "court_id",
-          "starts_at",
-          "duration_min",
-          "customer_name"
-        ],
-        "title": "PartnerBookingCreate",
-        "type": "object"
-      },
       "PartnerBookingOut": {
         "description": "What a partner gets back about their own booking.\n\nThe money fields are included because the partner sold the slot and needs to\nreconcile what it costs. The customer's phone is echoed back because they\nsupplied it. Nothing here reveals anything about anyone else's booking.",
         "properties": {
@@ -7658,6 +8097,24 @@
       },
       "PartnerCreate": {
         "properties": {
+          "dialect": {
+            "default": "native",
+            "maxLength": 50,
+            "title": "Dialect",
+            "type": "string"
+          },
+          "external_venue_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Venue Id"
+          },
           "name": {
             "maxLength": 120,
             "minLength": 1,
@@ -7685,6 +8142,21 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "external_venue_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Venue Id"
           },
           "id": {
             "format": "uuid",
@@ -7724,6 +8196,8 @@
           "id",
           "name",
           "slug",
+          "dialect",
+          "external_venue_id",
           "key_prefix",
           "is_active",
           "last_used_at",
@@ -7771,6 +8245,30 @@
       },
       "PartnerUpdate": {
         "properties": {
+          "dialect": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dialect"
+          },
+          "external_venue_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Venue Id"
+          },
           "is_active": {
             "anyOf": [
               {
@@ -7812,6 +8310,21 @@
             "title": "Created At",
             "type": "string"
           },
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "external_venue_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Venue Id"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -7850,6 +8363,8 @@
           "id",
           "name",
           "slug",
+          "dialect",
+          "external_venue_id",
           "key_prefix",
           "is_active",
           "last_used_at",
@@ -8203,6 +8718,157 @@
           "is_active"
         ],
         "title": "PlatformAdminOut",
+        "type": "object"
+      },
+      "PlayoCourt": {
+        "properties": {
+          "courtId": {
+            "title": "Courtid",
+            "type": "string"
+          },
+          "courtName": {
+            "title": "Courtname",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/PlayoSlot"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "courtId",
+          "courtName",
+          "slots"
+        ],
+        "title": "PlayoCourt",
+        "type": "object"
+      },
+      "PlayoEnvelope": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestStatus": {
+            "title": "Requeststatus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requestStatus",
+          "message"
+        ],
+        "title": "PlayoEnvelope",
+        "type": "object"
+      },
+      "PlayoSlot": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "endTime": {
+            "title": "Endtime",
+            "type": "string"
+          },
+          "startTime": {
+            "title": "Starttime",
+            "type": "string"
+          },
+          "ticketsAvailable": {
+            "title": "Ticketsavailable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "startTime",
+          "endTime",
+          "available",
+          "ticketsAvailable"
+        ],
+        "title": "PlayoSlot",
+        "type": "object"
+      },
+      "PlayoSlotRequest": {
+        "description": "One slot. Shared by `/order/create` and `/booking/create` \u2014 their spec sends\nthe same object under different names (`orders` vs `bookings`), and the only real\ndifference is whether the result is a hold or a confirmed booking.",
+        "properties": {
+          "courtId": {
+            "title": "Courtid",
+            "type": "string"
+          },
+          "date": {
+            "description": "YYYY-MM-DD, venue local",
+            "title": "Date",
+            "type": "string"
+          },
+          "endTime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endtime"
+          },
+          "numTickets": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numtickets"
+          },
+          "paidAtPlayo": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Paidatplayo"
+          },
+          "playoOrderId": {
+            "title": "Playoorderid",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Price"
+          },
+          "startTime": {
+            "description": "HH:MM:SS, venue local",
+            "title": "Starttime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "courtId",
+          "startTime",
+          "playoOrderId"
+        ],
+        "title": "PlayoSlotRequest",
         "type": "object"
       },
       "ProgramCreate": {
@@ -9225,6 +9891,92 @@
         "title": "RoutingUpdate",
         "type": "object"
       },
+      "SandboxRun": {
+        "properties": {
+          "court_id": {
+            "title": "Court Id",
+            "type": "string"
+          },
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "partner": {
+            "title": "Partner",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "purged": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Purged",
+            "type": "object"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "tenant": {
+            "title": "Tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "partner",
+          "dialect",
+          "court_id",
+          "passed",
+          "results"
+        ],
+        "title": "SandboxRun",
+        "type": "object"
+      },
+      "ScenarioResult": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "references": {
+            "items": {
+              "type": "string"
+            },
+            "title": "References",
+            "type": "array"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scenario",
+          "description",
+          "passed",
+          "steps"
+        ],
+        "title": "ScenarioResult",
+        "type": "object"
+      },
       "SessionCreate": {
         "properties": {
           "batch_id": {
@@ -9904,6 +10656,25 @@
         "title": "Slot",
         "type": "object"
       },
+      "SlotBatch": {
+        "description": "One or more slots, taken together or not at all.",
+        "properties": {
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/NativeSlot"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slots"
+        ],
+        "title": "SlotBatch",
+        "type": "object"
+      },
       "SportCreate": {
         "properties": {
           "bg_color": {
@@ -10424,6 +11195,52 @@
           }
         },
         "title": "StaffUpdate",
+        "type": "object"
+      },
+      "Step": {
+        "properties": {
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "request": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request"
+          },
+          "response": {
+            "additionalProperties": true,
+            "title": "Response",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "status",
+          "response",
+          "expected",
+          "ok"
+        ],
+        "title": "Step",
         "type": "object"
       },
       "StudentCreate": {
@@ -15323,9 +16140,9 @@
         ]
       }
     },
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
       "get": {
-        "description": "Reflects **every** booking \u2014 walk-ins at the counter, the dashboard, and other platforms \u2014 so a slot sold here is immediately unavailable to you.\n\nA slot marked `available` is not a reservation. Between this call and your `POST /gateway/bookings`, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out \u2014 it is the database refusing to double-book the court, not a transient error to retry.",
+        "description": "Reflects **every** booking \u2014 walk-ins at the counter, the dashboard, other platforms, and unconfirmed holds still in checkout \u2014 so a slot sold here is immediately unavailable to you.\n\nA slot marked `available` is not a reservation. Between this call and your create, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out \u2014 it is the database refusing to double-book the court, not a transient error to retry.\n\nUse `POST /gateway/bookings/hold` if you need the slot held while a customer pays.",
         "operationId": "gateway_availability",
         "parameters": [
           {
@@ -15452,9 +16269,9 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
       "get": {
-        "description": "Only bookings made through your own integration. Never walk-ins, and never another platform's.",
+        "description": "Only bookings made through your own integration. Never walk-ins, and never another platform's. Holds are included, with `status: held`.",
         "operationId": "gateway_listBookings",
         "parameters": [
           {
@@ -15561,8 +16378,8 @@
         ]
       },
       "post": {
-        "description": "Returns **409** if the court is already taken for any part of the window \u2014 by another platform or by a walk-in. That check is a Postgres exclusion constraint, so it holds under concurrency: two platforms claiming the same slot at the same instant, one wins.\n\nSend `external_ref` (your own booking id). Repeating a create with the same `external_ref` returns the booking you already made instead of a second one, so a timeout on your side is safe to retry.",
-        "operationId": "gateway_createBooking",
+        "description": "Creates confirmed bookings immediately \u2014 for when you take payment before calling us. Use `/bookings/hold` if the customer is still paying.\n\n**All or nothing.** If any slot in the request is unavailable, none are created and the response is **409**. A half-applied booking request is never what anyone meant.\n\nSend `external_ref` (your own booking id). Repeating a create with the same one returns the booking you already made instead of a second, so a timeout on your side is safe to retry.",
+        "operationId": "gateway_createBookings",
         "parameters": [
           {
             "in": "header",
@@ -15585,7 +16402,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PartnerBookingCreate"
+                "$ref": "#/components/schemas/SlotBatch"
               }
             }
           },
@@ -15596,7 +16413,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PartnerBookingOut"
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerBookingOut"
+                  },
+                  "title": "Response Gateway Createbookings",
+                  "type": "array"
                 }
               }
             },
@@ -15618,24 +16439,219 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Claim a slot",
+        "summary": "Claim one or more slots",
         "tags": [
           "gateway"
         ]
       }
     },
-    "/api/v1/gateway/bookings/{booking_id}": {
+    "/api/v1/gateway/native/bookings/confirm": {
+      "post": {
+        "description": "Turns holds into real bookings. Only after this do they reach the venue's reports, its counter board and the day's takings.\n\n**All or nothing**, and idempotent \u2014 confirming an already-confirmed booking succeeds and returns it, so a dropped response is safe to retry.\n\nA hold that lapsed still confirms **if the court is free**: your customer paid, and our timer is not their problem. It is refused with **409** only when the slot has since been taken \u2014 at which point refund them.",
+        "operationId": "gateway_confirmBookings",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerBookingOut"
+                  },
+                  "title": "Response Gateway Confirmbookings",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Confirm held slots once payment clears",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/native/bookings/hold": {
+      "post": {
+        "description": "Blocks the courts without creating bookings. The hold competes for the slot against the counter exactly as a real booking does, so nobody can sell it underneath your customer \u2014 and it is **not** a booking: no revenue, no entry on the venue's board, nobody expected to arrive.\n\nHolds expire after 15 minutes if `/bookings/confirm` never comes, so an abandoned checkout costs the venue at most one slot rotation. Bookings come back with `status: held`.\n\nAll-or-nothing and idempotent, exactly as `POST /bookings`.",
+        "operationId": "gateway_holdSlots",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlotBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerBookingOut"
+                  },
+                  "title": "Response Gateway Holdslots",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Hold slots while a customer pays",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/native/bookings/map": {
+      "post": {
+        "description": "For platforms that issue two identifiers \u2014 an order id at checkout and a booking id once your side settles. `external_ref` holds the first; this records the second, so reconciliation can match on whichever one you quote.",
+        "operationId": "gateway_mapBookings",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Record your own booking ids against ours",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/native/bookings/{reference}": {
       "get": {
-        "description": "**404** for a booking your integration did not create, including walk-ins and other platforms' bookings.",
+        "description": "By our reference (`XC-B-0042`) or your own `external_ref`.\n\n**404** for a booking your integration did not create, including walk-ins and other platforms' bookings \u2014 a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.",
         "operationId": "gateway_getBooking",
         "parameters": [
           {
             "in": "path",
-            "name": "booking_id",
+            "name": "reference",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Booking Id",
+              "title": "Reference",
               "type": "string"
             }
           },
@@ -15689,18 +16705,17 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/{booking_id}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
       "post": {
-        "description": "Frees the slot for everyone \u2014 it becomes available to the counter and to other platforms immediately. Idempotent: cancelling twice is not an error.",
+        "description": "Frees the slot for everyone \u2014 the counter and every other platform \u2014 immediately. Works on holds as well as confirmed bookings.\n\nIdempotent: cancelling twice is not an error.",
         "operationId": "gateway_cancelBooking",
         "parameters": [
           {
             "in": "path",
-            "name": "booking_id",
+            "name": "reference",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Booking Id",
+              "title": "Reference",
               "type": "string"
             }
           },
@@ -15759,6 +16774,640 @@
           }
         ],
         "summary": "Release one of your bookings",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/availability": {
+      "get": {
+        "description": "Reflects **every** booking \u2014 the counter, the dashboard, other platforms, and unconfirmed Playo orders still in checkout. A slot Playo cannot see as taken is a slot Playo will sell twice.\n\nExpired holds are released before the read, so a checkout abandoned twenty minutes ago is not still showing a court as busy.",
+        "operationId": "gateway_playoAvailability",
+        "parameters": [
+          {
+            "description": "YYYY-MM-DD, venue local time",
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "description": "YYYY-MM-DD, venue local time",
+              "title": "Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "venue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Venue Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sport_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sport Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: fetch availability",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/booking/cancel": {
+      "post": {
+        "description": "Frees the courts for everyone immediately.\n\n**All or nothing**, per their spec: *either all bookings should be cancelled or none of the requested bookings*.\n\n`price` and `refundAtPlayo` are recorded on the timeline, not acted on \u2014 the refund has already been made on their side.",
+        "operationId": "gateway_playoBookingCancel",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayoEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: cancel booking",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/booking/create": {
+      "post": {
+        "description": "The single-phase flow: a confirmed booking straight away, for venues integrated without the order/confirm handshake.\n\nSame guarantees as `/order/create` \u2014 all-or-nothing, idempotent on `playoOrderId`, same exclusion constraint.",
+        "operationId": "gateway_playoBookingCreate",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: create booking (non-order flow)",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/booking/map": {
+      "post": {
+        "description": "Optional in their spec. Records Playo's own `playoBookingId`, a different value from the `playoOrderId` we already hold \u2014 so reconciliation can match on whichever id the other side happens to be quoting.",
+        "operationId": "gateway_playoBookingMap",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingMapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayoEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: map their booking ids to ours",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/order/cancel": {
+      "post": {
+        "description": "Releases held slots, and confirmed bookings too \u2014 their spec requires this endpoint to cancel a confirmed booking if one exists, so no order is left open on their side with no counterpart here.\n\nIdempotent: cancelling an already-cancelled order is a success.",
+        "operationId": "gateway_playoOrderCancel",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIdsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayoEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: cancel order",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/order/confirm": {
+      "post": {
+        "description": "Turns held slots into real bookings once payment has cleared. Only after this do they appear in reports, on the counter board and in the takings.\n\n**All or nothing**, and idempotent \u2014 confirming twice is a success, so a dropped response is safe to retry.\n\nA lapsed hold still confirms if the court is free; it is refused only once somebody else has taken the slot.",
+        "operationId": "gateway_playoOrderConfirm",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIdsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: confirm order",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/playo/order/create": {
+      "post": {
+        "description": "Blocks the courts while the customer is still paying on Playo. The hold is a real row against the same exclusion constraint as every other booking, so the counter cannot sell the slot underneath them \u2014 and it is **not** a booking: no revenue, no counter entry, nobody expected to arrive.\n\nHolds expire after 15 minutes if `/order/confirm` never comes.\n\n**All or nothing**, per their spec: if any slot fails, none are created and `requestStatus` is 0.",
+        "operationId": "gateway_playoOrderCreate",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Playo: create order (hold slots)",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/sandbox/run": {
+      "post": {
+        "description": "Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.\n\nThe scenarios are dialect-independent \u2014 the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.\n\nEvery driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.\n\n**This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.\n\nPass `keep=true` to leave them behind for inspection \u2014 the transcript returns every request and response either way, so diagnosing a failure rarely needs it.\n\nStill a dev tool: the routes are not registered when `ENVIRONMENT=production`.",
+        "operationId": "gateway_run",
+        "parameters": [
+          {
+            "description": "Must match the key's own dialect, which is the default",
+            "in": "query",
+            "name": "dialect",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Must match the key's own dialect, which is the default",
+              "title": "Dialect"
+            }
+          },
+          {
+            "description": "Defaults to all",
+            "in": "query",
+            "name": "scenarios",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to all",
+              "title": "Scenarios"
+            }
+          },
+          {
+            "in": "query",
+            "name": "days_ahead",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days Ahead",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Defaults to the first bookable court",
+            "in": "query",
+            "name": "court_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to the first bookable court",
+              "title": "Court Id"
+            }
+          },
+          {
+            "description": "Leave the bookings behind for inspection",
+            "in": "query",
+            "name": "keep",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Leave the bookings behind for inspection",
+              "title": "Keep",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Sandbox: drive the gateway as if we were a partner",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/v1/gateway/sandbox/scenarios": {
+      "get": {
+        "description": "Names accepted by `POST /gateway/sandbox/run`. Dev and staging only.",
+        "operationId": "gateway_listScenarios",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Gateway Listscenarios",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sandbox: what can be simulated",
         "tags": [
           "gateway"
         ]
@@ -17133,6 +18782,37 @@
         ]
       }
     },
+    "/api/v1/partners/dialects": {
+      "get": {
+        "description": "What to choose when adding an integration.\n\n`base_path` is the same for every one of them \u2014 that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.\n\n`is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.\n\nEvery dialect is returned, including the ones not offered \u2014 a partner onboarded before a dialect was retired still needs its label to render.\n\nDeclared above `/partners/{partner_id}` deliberately \u2014 routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.",
+        "operationId": "gateway_listDialects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DialectOut"
+                  },
+                  "title": "Response Gateway Listdialects",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Wire formats the gateway speaks",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
     "/api/v1/partners/{partner_id}": {
       "delete": {
         "description": "Refused with **409** while any booking still references it \u2014 the FK is RESTRICT on purpose. A booking has to keep answering 'where did this come from?' long after the integration ends, so revoke with `is_active: false` rather than deleting.",
@@ -17175,7 +18855,7 @@
         ]
       },
       "patch": {
-        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.",
+        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.\n\nChanging `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.",
         "operationId": "gateway_updatePartner",
         "parameters": [
           {
@@ -17226,7 +18906,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Rename or revoke an integration",
+        "summary": "Rename, re-point or revoke an integration",
         "tags": [
           "gateway"
         ]
@@ -18906,7 +20586,7 @@
       "name": "reporting"
     },
     {
-      "description": "Externalisation gateway. Third-party platforms (Playo, Hudle) read availability and claim slots under a revocable API key, so a court is never sold twice. Availability reflects every booking; a partner can only read or cancel bookings it created itself.",
+      "description": "Externalisation gateway. Any third-party platform reads availability and claims slots under a revocable API key, so a court is never sold twice.\n\nOne core owns the behaviour \u2014 all-or-nothing writes, idempotency on your own booking id, two-phase holds that expire, and strict per-partner scoping. A **dialect** is only a wire format on top of it.\n\n**Every platform is given the same base URL: `/api/v1/gateway`.** The API key identifies the platform, so the gateway routes each request to that platform's contract on its own. The per-platform paths documented below (`/gateway/native/\u2026`, `/gateway/playo/\u2026`) are where it routes *to* \u2014 callable directly, but nobody needs to.",
       "name": "gateway"
     },
     {

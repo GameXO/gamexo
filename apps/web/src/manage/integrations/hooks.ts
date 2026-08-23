@@ -15,12 +15,24 @@ export type ProviderFieldOut = components['schemas']['ProviderFieldOut']
 export type VerificationOut = components['schemas']['VerificationOut']
 export type PartnerOut = components['schemas']['PartnerOut']
 export type PartnerWithKey = components['schemas']['PartnerWithKey']
+export type DialectOut = components['schemas']['DialectOut']
 
 export type Surface = 'web' | 'pos'
 
 export const integrationKeys = {
   gateways: ['payment-providers'] as const,
   partners: ['integration-partners'] as const,
+  dialects: ['gateway-dialects'] as const,
+}
+
+/** What the gateway can speak. Rarely changes — it only moves when the API ships a
+ *  new dialect — so it is cached for the session rather than refetched per render. */
+export function useDialects() {
+  return useQuery({
+    queryKey: integrationKeys.dialects,
+    queryFn: () => api.listDialects(),
+    staleTime: Infinity,
+  })
 }
 
 /**
@@ -113,16 +125,26 @@ export function usePartners() {
 export function useCreatePartner() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { name: string; slug: string }) => api.createPartner(vars),
+    mutationFn: (vars: { name: string; slug: string; dialect: string }) =>
+      api.createPartner(vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: integrationKeys.partners }),
   })
 }
 
+/** Rename, revoke, or re-point at another API.
+ *
+ *  `dialect` is the repair for a platform set up against the wrong contract, and the
+ *  only one available: the booking foreign key is RESTRICT, so a platform that has
+ *  booked anything cannot be deleted and re-added. */
 export function useUpdatePartner() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { id: string; name?: string; is_active?: boolean }) =>
-      api.updatePartner(vars.id, { name: vars.name, is_active: vars.is_active }),
+    mutationFn: (vars: { id: string; name?: string; is_active?: boolean; dialect?: string }) =>
+      api.updatePartner(vars.id, {
+        name: vars.name,
+        is_active: vars.is_active,
+        dialect: vars.dialect,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: integrationKeys.partners }),
   })
 }

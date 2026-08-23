@@ -70,6 +70,30 @@ async def get_current_partner(
 CurrentPartner = Annotated[IntegrationPartner, Depends(get_current_partner)]
 
 
+def speaking(dialect: str):
+    """Refuse a key issued for a different dialect.
+
+    A partner driving the wrong contract produces results that look almost right —
+    a create that succeeds but prices differently, a cancel that 404s for a reason
+    nobody can see — which is far worse to diagnose than a flat refusal. The key
+    already says which contract they were onboarded onto, so this is free to check.
+
+    Not a security boundary: both dialects reach the same core and are scoped to the
+    same partner. It is a misconfiguration alarm.
+    """
+
+    async def dependency(partner: CurrentPartner) -> IntegrationPartner:
+        if partner.dialect != dialect:
+            raise AuthenticationError(
+                f"This API key is registered for the {partner.dialect!r} integration, "
+                f"not {dialect!r}. Use the matching base URL, or change the "
+                "integration's dialect in the dashboard."
+            )
+        return partner
+
+    return dependency
+
+
 async def partner_by_slug(db: Db, slug: str) -> IntegrationPartner | None:
     """Case-insensitive lookup, matching the functional unique index on the table."""
     result = await db.execute(

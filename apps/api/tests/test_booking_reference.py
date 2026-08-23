@@ -8,6 +8,9 @@ most here are the ones asserting a lookup does **not** match.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
@@ -122,6 +125,14 @@ async def test_a_rejected_booking_does_not_burn_a_number(
     assert after.json()["reference"] == "XC-B-0002"
 
 
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def soon() -> str:
+    """A slot starting inside the kiosk's ±30 minute check-in window."""
+    return (datetime.now(IST) + timedelta(minutes=10)).isoformat()
+
+
 # ── Lookup ──────────────────────────────────────────────────────────────────
 
 
@@ -129,11 +140,13 @@ async def test_the_kiosk_finds_a_booking_however_it_is_typed(
     client: AsyncClient, tenant_a: TenantFixture
 ) -> None:
     ctx = await setup_academy(client, tenant_a)
-    created = (await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))).json()
+    created = (await book(client, ctx, court=ctx["court_1"], starts_at=soon())).json()
 
-    for typed in ["XC-B-0001", "xcb0001", "B-1", "1"]:
+    # "B-1"/"1" are not accepted here: the kiosk matcher compares the whole
+    # compacted reference, and a bare counter value would collide across bookings.
+    for typed in ["XC-B-0001", "xc-b-0001", "xcb0001"]:
         response = await client.get(
-            "/api/v1/bookings/lookup", params={"reference": typed}, headers=ctx["headers"]
+            "/api/v1/bookings/checkin-lookup", params={"code": typed}, headers=ctx["headers"]
         )
         assert response.status_code == 200, f"{typed}: {response.text}"
         assert response.json()["id"] == created["id"]
@@ -144,11 +157,11 @@ async def test_lookup_returns_the_names_the_result_card_shows(
 ) -> None:
     """BookingDetail, not BookingOut — the kiosk shows the sport and court by name."""
     ctx = await setup_academy(client, tenant_a)
-    await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    await book(client, ctx, court=ctx["court_1"], starts_at=soon())
 
     body = (
         await client.get(
-            "/api/v1/bookings/lookup", params={"reference": "1"}, headers=ctx["headers"]
+            "/api/v1/bookings/checkin-lookup", params={"code": "XC-B-0001"}, headers=ctx["headers"]
         )
     ).json()
 
@@ -157,7 +170,7 @@ async def test_lookup_returns_the_names_the_result_card_shows(
 
 
 @pytest.mark.parametrize(
-    "typed", ["XC-B-9999", "9876543210", "Arjun Mehta", ""], ids=["unissued", "phone", "name", "blank"]
+    "typed", ["XC-B-9999", "9876543210", "Arjun Mehta"], ids=["unissued", "phone", "name"]
 )
 async def test_a_miss_is_404(client: AsyncClient, tenant_a: TenantFixture, typed: str) -> None:
     """Including inputs that are not references at all.
@@ -167,10 +180,10 @@ async def test_a_miss_is_404(client: AsyncClient, tenant_a: TenantFixture, typed
     internals to someone standing at a kiosk.
     """
     ctx = await setup_academy(client, tenant_a)
-    await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    await book(client, ctx, court=ctx["court_1"], starts_at=soon())
 
     response = await client.get(
-        "/api/v1/bookings/lookup", params={"reference": typed}, headers=ctx["headers"]
+        "/api/v1/bookings/checkin-lookup", params={"code": typed}, headers=ctx["headers"]
     )
     assert response.status_code == 404
 
@@ -187,12 +200,12 @@ async def test_a_reference_cannot_reach_another_academys_booking(
     ctx_a = await setup_academy(client, tenant_a)
     ctx_b = await setup_academy(client, tenant_b)
 
-    a_booking = (await book(client, ctx_a, court=ctx_a["court_1"], starts_at=at(4, 9))).json()
-    b_booking = (await book(client, ctx_b, court=ctx_b["court_1"], starts_at=at(4, 9))).json()
+    a_booking = (await book(client, ctx_a, court=ctx_a["court_1"], starts_at=soon())).json()
+    b_booking = (await book(client, ctx_b, court=ctx_b["court_1"], starts_at=soon())).json()
     assert a_booking["reference"] == b_booking["reference"] == "XC-B-0001"
 
     found = await client.get(
-        "/api/v1/bookings/lookup", params={"reference": "XC-B-0001"}, headers=ctx_b["headers"]
+        "/api/v1/bookings/checkin-lookup", params={"code": "XC-B-0001"}, headers=ctx_b["headers"]
     )
     assert found.json()["id"] == b_booking["id"]
     assert found.json()["id"] != a_booking["id"]

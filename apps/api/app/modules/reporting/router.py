@@ -21,7 +21,7 @@ from sqlalchemy import Numeric, cast, func, select, text
 
 from app.auth.deps import RequireStaff
 from app.modules.academy.models import StudentEnrollment
-from app.modules.booking.models import Booking, BookingStatus, Court, Sport
+from app.modules.booking.models import LIVE_STATUSES, Booking, BookingStatus, Court, Sport
 from app.modules.booking.pricing import money, percent
 from app.modules.booking.service import load_settings
 from app.modules.finance.models import Invoice, InvoiceStatus, Payment
@@ -113,7 +113,7 @@ async def revenue(
                 .where(
                     Booking.starts_at >= start,
                     Booking.starts_at < end,
-                    Booking.status != BookingStatus.CANCELLED,
+                    Booking.status.in_(LIVE_STATUSES),
                 )
                 .group_by(booking_bucket)
             )
@@ -151,7 +151,7 @@ async def sport_popularity(
             .where(
                 Booking.starts_at >= start,
                 Booking.starts_at < end,
-                Booking.status != BookingStatus.CANCELLED,
+                Booking.status.in_(LIVE_STATUSES),
             )
             .group_by(Sport.name)
             .order_by(func.count(Booking.id).desc())
@@ -194,7 +194,7 @@ async def peak_hours(
             .where(
                 Booking.starts_at >= start,
                 Booking.starts_at < end,
-                Booking.status != BookingStatus.CANCELLED,
+                Booking.status.in_(LIVE_STATUSES),
             )
             .group_by(hour)
             .order_by(hour)
@@ -236,7 +236,7 @@ async def court_utilization(
                 .where(
                     Booking.starts_at >= start,
                     Booking.starts_at < end,
-                    Booking.status != BookingStatus.CANCELLED,
+                    Booking.status.in_(LIVE_STATUSES),
                 )
                 .group_by(Booking.court_id)
             )
@@ -337,7 +337,7 @@ async def kpis(
             select(func.count(Booking.id)).where(
                 Booking.starts_at >= start,
                 Booking.starts_at < end,
-                Booking.status != BookingStatus.CANCELLED,
+                Booking.status.in_(LIVE_STATUSES),
             )
         )
         or 0
