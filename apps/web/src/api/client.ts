@@ -14,6 +14,10 @@ import { getTokens, setTokens, clearTokens } from './auth'
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 const TENANT = import.meta.env.VITE_TENANT_SLUG ?? 'xcourt'
 
+/** The API's own origin, for the one place a URL is shown rather than called:
+ *  Manage → Integrations, where it is copied and handed to a booking platform. */
+export const apiOrigin = BASE_URL
+
 /** The shared error envelope from the API — see app/core/errors.py::_envelope. */
 type ErrorEnvelope = {
   error: { code: string; message: string; details?: Record<string, unknown> }

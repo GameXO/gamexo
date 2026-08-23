@@ -839,7 +839,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
         parameters: {
             query?: never;
             header?: never;
@@ -863,7 +863,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
         parameters: {
             query?: never;
             header?: never;
@@ -891,7 +891,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/confirm": {
+    "/api/v1/gateway/native/bookings/confirm": {
         parameters: {
             query?: never;
             header?: never;
@@ -915,7 +915,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/hold": {
+    "/api/v1/gateway/native/bookings/hold": {
         parameters: {
             query?: never;
             header?: never;
@@ -939,7 +939,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/map": {
+    "/api/v1/gateway/native/bookings/map": {
         parameters: {
             query?: never;
             header?: never;
@@ -959,7 +959,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{reference}": {
+    "/api/v1/gateway/native/bookings/{reference}": {
         parameters: {
             query?: never;
             header?: never;
@@ -981,7 +981,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{reference}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -1174,9 +1174,15 @@ export interface paths {
          * Sandbox: drive the gateway as if we were a partner
          * @description Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.
          *
-         *     The scenarios are dialect-independent — the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. `dialect` defaults to whatever the API key was issued for.
+         *     The scenarios are dialect-independent — the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.
          *
-         *     **This writes to the database.** Bookings are created and cancelled on the academy the key belongs to. Each scenario cleans up after itself and runs on its own future date, but it is a dev tool — the routes are not registered when `ENVIRONMENT=production`.
+         *     Every driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.
+         *
+         *     **This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.
+         *
+         *     Pass `keep=true` to leave them behind for inspection — the transcript returns every request and response either way, so diagnosing a failure rarely needs it.
+         *
+         *     Still a dev tool: the routes are not registered when `ENVIRONMENT=production`.
          */
         post: operations["gateway_run"];
         delete?: never;
@@ -1587,7 +1593,13 @@ export interface paths {
         };
         /**
          * Wire formats the gateway speaks
-         * @description What to choose when adding an integration, and the base path to hand the partner.
+         * @description What to choose when adding an integration.
+         *
+         *     `base_path` is the same for every one of them — that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.
+         *
+         *     `is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.
+         *
+         *     Every dialect is returned, including the ones not offered — a partner onboarded before a dialect was retired still needs its label to render.
          *
          *     Declared above `/partners/{partner_id}` deliberately — routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.
          */
@@ -1618,8 +1630,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename or revoke an integration
+         * Rename, re-point or revoke an integration
          * @description Setting `is_active: false` revokes access immediately — the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.
+         *
+         *     Changing `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.
          */
         patch: operations["gateway_updatePartner"];
         trace?: never;
@@ -3604,8 +3618,14 @@ export interface components {
         DialectOut: {
             /** Base Path */
             base_path: string;
+            /** Canonical Path */
+            canonical_path: string;
             /** Is Default */
             is_default: boolean;
+            /** Is Platform */
+            is_platform: boolean;
+            /** Is Ready */
+            is_ready: boolean;
             /** Label */
             label: string;
             /** Slug */
@@ -5469,6 +5489,10 @@ export interface components {
             partner: string;
             /** Passed */
             passed: boolean;
+            /** Purged */
+            purged?: {
+                [key: string]: number;
+            };
             /** Results */
             results: components["schemas"]["ScenarioResult"][];
             /** Tenant */
@@ -8809,13 +8833,15 @@ export interface operations {
     gateway_run: {
         parameters: {
             query?: {
-                /** @description Defaults to the key's own dialect */
+                /** @description Must match the key's own dialect, which is the default */
                 dialect?: string | null;
                 /** @description Defaults to all */
                 scenarios?: string[] | null;
                 days_ahead?: number;
                 /** @description Defaults to the first bookable court */
                 court_id?: string | null;
+                /** @description Leave the bookings behind for inspection */
+                keep?: boolean;
             };
             header?: never;
             path?: never;

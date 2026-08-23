@@ -4780,8 +4780,20 @@
             "title": "Base Path",
             "type": "string"
           },
+          "canonical_path": {
+            "title": "Canonical Path",
+            "type": "string"
+          },
           "is_default": {
             "title": "Is Default",
+            "type": "boolean"
+          },
+          "is_platform": {
+            "title": "Is Platform",
+            "type": "boolean"
+          },
+          "is_ready": {
+            "title": "Is Ready",
             "type": "boolean"
           },
           "label": {
@@ -4802,7 +4814,10 @@
           "label",
           "summary",
           "base_path",
-          "is_default"
+          "canonical_path",
+          "is_default",
+          "is_platform",
+          "is_ready"
         ],
         "title": "DialectOut",
         "type": "object"
@@ -9893,6 +9908,13 @@
           "passed": {
             "title": "Passed",
             "type": "boolean"
+          },
+          "purged": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Purged",
+            "type": "object"
           },
           "results": {
             "items": {
@@ -16118,7 +16140,7 @@
         ]
       }
     },
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
       "get": {
         "description": "Reflects **every** booking \u2014 walk-ins at the counter, the dashboard, other platforms, and unconfirmed holds still in checkout \u2014 so a slot sold here is immediately unavailable to you.\n\nA slot marked `available` is not a reservation. Between this call and your create, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out \u2014 it is the database refusing to double-book the court, not a transient error to retry.\n\nUse `POST /gateway/bookings/hold` if you need the slot held while a customer pays.",
         "operationId": "gateway_availability",
@@ -16247,7 +16269,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
       "get": {
         "description": "Only bookings made through your own integration. Never walk-ins, and never another platform's. Holds are included, with `status: held`.",
         "operationId": "gateway_listBookings",
@@ -16423,7 +16445,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/confirm": {
+    "/api/v1/gateway/native/bookings/confirm": {
       "post": {
         "description": "Turns holds into real bookings. Only after this do they reach the venue's reports, its counter board and the day's takings.\n\n**All or nothing**, and idempotent \u2014 confirming an already-confirmed booking succeeds and returns it, so a dropped response is safe to retry.\n\nA hold that lapsed still confirms **if the court is free**: your customer paid, and our timer is not their problem. It is refused with **409** only when the slot has since been taken \u2014 at which point refund them.",
         "operationId": "gateway_confirmBookings",
@@ -16492,7 +16514,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/hold": {
+    "/api/v1/gateway/native/bookings/hold": {
       "post": {
         "description": "Blocks the courts without creating bookings. The hold competes for the slot against the counter exactly as a real booking does, so nobody can sell it underneath your customer \u2014 and it is **not** a booking: no revenue, no entry on the venue's board, nobody expected to arrive.\n\nHolds expire after 15 minutes if `/bookings/confirm` never comes, so an abandoned checkout costs the venue at most one slot rotation. Bookings come back with `status: held`.\n\nAll-or-nothing and idempotent, exactly as `POST /bookings`.",
         "operationId": "gateway_holdSlots",
@@ -16561,7 +16583,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/map": {
+    "/api/v1/gateway/native/bookings/map": {
       "post": {
         "description": "For platforms that issue two identifiers \u2014 an order id at checkout and a booking id once your side settles. `external_ref` holds the first; this records the second, so reconciliation can match on whichever one you quote.",
         "operationId": "gateway_mapBookings",
@@ -16619,7 +16641,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/{reference}": {
+    "/api/v1/gateway/native/bookings/{reference}": {
       "get": {
         "description": "By our reference (`XC-B-0042`) or your own `external_ref`.\n\n**404** for a booking your integration did not create, including walk-ins and other platforms' bookings \u2014 a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.",
         "operationId": "gateway_getBooking",
@@ -16683,7 +16705,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/{reference}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
       "post": {
         "description": "Frees the slot for everyone \u2014 the counter and every other platform \u2014 immediately. Works on holds as well as confirmed bookings.\n\nIdempotent: cancelling twice is not an error.",
         "operationId": "gateway_cancelBooking",
@@ -17247,11 +17269,11 @@
     },
     "/api/v1/gateway/sandbox/run": {
       "post": {
-        "description": "Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.\n\nThe scenarios are dialect-independent \u2014 the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. `dialect` defaults to whatever the API key was issued for.\n\n**This writes to the database.** Bookings are created and cancelled on the academy the key belongs to. Each scenario cleans up after itself and runs on its own future date, but it is a dev tool \u2014 the routes are not registered when `ENVIRONMENT=production`.",
+        "description": "Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.\n\nThe scenarios are dialect-independent \u2014 the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.\n\nEvery driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.\n\n**This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.\n\nPass `keep=true` to leave them behind for inspection \u2014 the transcript returns every request and response either way, so diagnosing a failure rarely needs it.\n\nStill a dev tool: the routes are not registered when `ENVIRONMENT=production`.",
         "operationId": "gateway_run",
         "parameters": [
           {
-            "description": "Defaults to the key's own dialect",
+            "description": "Must match the key's own dialect, which is the default",
             "in": "query",
             "name": "dialect",
             "required": false,
@@ -17264,7 +17286,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Defaults to the key's own dialect",
+              "description": "Must match the key's own dialect, which is the default",
               "title": "Dialect"
             }
           },
@@ -17317,6 +17339,18 @@
               ],
               "description": "Defaults to the first bookable court",
               "title": "Court Id"
+            }
+          },
+          {
+            "description": "Leave the bookings behind for inspection",
+            "in": "query",
+            "name": "keep",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Leave the bookings behind for inspection",
+              "title": "Keep",
+              "type": "boolean"
             }
           }
         ],
@@ -18750,7 +18784,7 @@
     },
     "/api/v1/partners/dialects": {
       "get": {
-        "description": "What to choose when adding an integration, and the base path to hand the partner.\n\nDeclared above `/partners/{partner_id}` deliberately \u2014 routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.",
+        "description": "What to choose when adding an integration.\n\n`base_path` is the same for every one of them \u2014 that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.\n\n`is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.\n\nEvery dialect is returned, including the ones not offered \u2014 a partner onboarded before a dialect was retired still needs its label to render.\n\nDeclared above `/partners/{partner_id}` deliberately \u2014 routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.",
         "operationId": "gateway_listDialects",
         "responses": {
           "200": {
@@ -18821,7 +18855,7 @@
         ]
       },
       "patch": {
-        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.",
+        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.\n\nChanging `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.",
         "operationId": "gateway_updatePartner",
         "parameters": [
           {
@@ -18872,7 +18906,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Rename or revoke an integration",
+        "summary": "Rename, re-point or revoke an integration",
         "tags": [
           "gateway"
         ]
@@ -20552,7 +20586,7 @@
       "name": "reporting"
     },
     {
-      "description": "Externalisation gateway. Any third-party platform reads availability and claims slots under a revocable API key, so a court is never sold twice.\n\nOne core owns the behaviour \u2014 all-or-nothing writes, idempotency on your own booking id, two-phase holds that expire, and strict per-partner scoping. A **dialect** is only a wire format on top of it. `/gateway/\u2026` is ours and the one to use unless you have a spec of your own; `/gateway/playo/\u2026` implements Playo's.",
+      "description": "Externalisation gateway. Any third-party platform reads availability and claims slots under a revocable API key, so a court is never sold twice.\n\nOne core owns the behaviour \u2014 all-or-nothing writes, idempotency on your own booking id, two-phase holds that expire, and strict per-partner scoping. A **dialect** is only a wire format on top of it.\n\n**Every platform is given the same base URL: `/api/v1/gateway`.** The API key identifies the platform, so the gateway routes each request to that platform's contract on its own. The per-platform paths documented below (`/gateway/native/\u2026`, `/gateway/playo/\u2026`) are where it routes *to* \u2014 callable directly, but nobody needs to.",
       "name": "gateway"
     },
     {

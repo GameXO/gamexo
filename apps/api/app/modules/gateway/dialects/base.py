@@ -76,3 +76,19 @@ class Dialect:
     #: True for the dialect a partner should be pointed at when they have no
     #: opinion. Exactly one dialect sets this.
     is_default: bool = False
+
+    #: True for a named third-party platform, False for our own contract. Only
+    #: platforms are offered in Manage → Integrations: the question there is "who is
+    #: this integration for?", and `native` is not an answer to it.
+    is_platform: bool = False
+
+    #: False for a platform we have named but whose spec we do not have yet.
+    #:
+    #: It exists in the registry so the dashboard can show it as coming, and so the
+    #: work of adding it is opening one file rather than deciding where it goes.
+    #: Declared rather than inferred from `router.routes` being empty: an adapter can
+    #: be half-written and mounted while still not being something to sell against.
+    #:
+    #: `create_partner` refuses one, so no key is ever issued against an adapter that
+    #: cannot answer.
+    is_ready: bool = True

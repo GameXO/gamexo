@@ -623,21 +623,18 @@ async def test_an_expired_native_hold_frees_the_court(
     assert counter.status_code == 201
 
 
-async def test_a_key_cannot_be_used_against_another_dialect(
+async def test_a_key_used_against_another_dialects_canonical_path_is_refused(
     client: AsyncClient, tenant_a: TenantFixture
 ) -> None:
-    """A misconfiguration alarm, not a security boundary.
+    """`speaking()`, on the path it still guards.
 
-    Both dialects reach the same core and are scoped to the same partner, so nothing
-    is exposed either way. But a partner driving the wrong contract gets results that
-    look almost right — a create that prices differently, a cancel that 404s for no
-    visible reason — and that is far harder to diagnose than a flat refusal.
+    A misconfiguration alarm, not a security boundary — both dialects reach the same
+    core and are scoped to the same partner, so nothing is exposed either way. It only
+    fires on a deliberate call to a canonical path, because everything arriving through
+    the advertised URL has already been routed by this same field.
     """
     ctx = await setup_academy(client, tenant_a)
     native_partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
-    playo_partner = await make_partner(
-        client, ctx, tenant_a, "Playo", "playo", dialect="playo"
-    )
 
     wrong_way = await client.get(
         "/api/v1/gateway/playo/availability",
@@ -646,13 +643,6 @@ async def test_a_key_cannot_be_used_against_another_dialect(
     )
     assert wrong_way.status_code == 401
     assert "native" in wrong_way.json()["error"]["message"]
-
-    other_way = await client.get(
-        "/api/v1/gateway/availability",
-        params={"date": at(9, 10)},
-        headers=playo_partner["headers"],
-    )
-    assert other_way.status_code == 401
 
 
 async def test_the_dialect_registry_is_listed_for_the_dashboard(
@@ -664,11 +654,59 @@ async def test_the_dialect_registry_is_listed_for_the_dashboard(
     response = await client.get("/api/v1/partners/dialects", headers=ctx["headers"])
     assert response.status_code == 200, response.text
 
-    by_slug = {d["slug"]: d for d in response.json()}
-    assert {"native", "playo"} <= set(by_slug)
+    listed = response.json()
+    by_slug = {d["slug"]: d for d in listed}
+    assert {"native", "playo", "hudle", "district"} <= set(by_slug)
     assert by_slug["native"]["is_default"] is True
-    assert by_slug["native"]["base_path"] == "/api/v1/gateway"
-    assert by_slug["playo"]["base_path"] == "/api/v1/gateway/playo"
+
+    # The same URL for every platform — the one thing this endpoint exists to say.
+    # A dashboard that offered a choice of base path would be offering a way to get
+    # it wrong.
+    assert {d["base_path"] for d in by_slug.values()} == {"/api/v1/gateway"}
+    assert by_slug["playo"]["canonical_path"] == "/api/v1/gateway/playo"
+    assert by_slug["native"]["canonical_path"] == "/api/v1/gateway/native"
+
+    # Exactly three platforms, and the one with an adapter comes first — the screen
+    # renders them in the order they arrive.
+    platforms = [d["slug"] for d in listed if d["is_platform"]]
+    assert platforms == ["playo", "hudle", "district"]
+    assert by_slug["native"]["is_platform"] is False
+
+    assert by_slug["playo"]["is_ready"] is True
+    assert by_slug["hudle"]["is_ready"] is False
+    assert by_slug["district"]["is_ready"] is False
+
+
+async def test_a_platform_without_an_adapter_cannot_be_given_a_key(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Greying the card out is presentation. This is the rule.
+
+    A key issued against Hudle would authenticate perfectly and then fail on every
+    call, because there is no adapter behind it — the worst kind of broken, since the
+    credential looks right and the integration simply never works.
+    """
+    ctx = await setup_academy(client, tenant_a)
+
+    created = await client.post(
+        "/api/v1/partners",
+        json={"name": "Hudle", "slug": "hudle", "dialect": "hudle"},
+        headers=ctx["headers"],
+    )
+    assert created.status_code == 409, created.text
+    assert "Hudle" in created.json()["error"]["message"]
+    assert created.json()["error"]["details"]["dialect"] == "hudle"
+
+    # And the same rule on the way in through the back door — re-pointing an existing
+    # integration onto an unbuilt platform is the identical mistake, one PATCH later.
+    partner = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+    moved = await client.patch(
+        f"/api/v1/partners/{partner['id']}",
+        json={"dialect": "district"},
+        headers=ctx["headers"],
+    )
+    assert moved.status_code == 409, moved.text
+    assert "District" in moved.json()["error"]["message"]
 
 
 async def test_an_unknown_dialect_is_refused(
@@ -682,6 +720,256 @@ async def test_an_unknown_dialect_is_refused(
     )
     assert response.status_code == 409
     assert "esperanto" in response.json()["error"]["message"]
+
+
+# ── One URL, and the key decides which platform is calling ──────────────────
+#
+# Every other gateway test in this file, and every test in test_playo.py, already
+# exercises the routing incidentally — they call `/api/v1/gateway/…` and reach the
+# right contract. These are the ones that would fail *first*, and say why, if
+# key-based dispatch broke.
+
+
+async def test_one_url_reaches_each_platforms_own_contract(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The whole point. Two platforms, one URL, two different contracts.
+
+    Neither request names a dialect anywhere — not in the path, not in a header, not
+    in the body. The only thing distinguishing them is which key was presented.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    ours = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    theirs = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+
+    mine = await client.post(
+        "/api/v1/gateway/bookings/hold",
+        json={
+            "slots": [
+                {
+                    "court_id": ctx["court_1"],
+                    "starts_at": at(4, 7),
+                    "duration_min": 60,
+                    "customer_name": "Ours",
+                    "customer_phone": "9876500000",
+                }
+            ]
+        },
+        headers=ours["headers"],
+    )
+    assert mine.status_code == 201, mine.text
+    # Our envelope: a bare list, snake_case, and a reference rather than their id.
+    assert one(mine)["reference"].startswith("XC-B-")
+
+    playo = await client.post(
+        "/api/v1/gateway/order/create",
+        json={
+            "userName": "Theirs",
+            "orders": [
+                {
+                    "date": "2026-09-04",
+                    "courtId": ctx["court_2"],
+                    "startTime": "07:00:00",
+                    "endTime": "08:00:00",
+                    "price": "1200",
+                    "paidAtPlayo": "1200",
+                    "playoOrderId": "P-DISPATCH-1",
+                }
+            ],
+        },
+        headers=theirs["headers"],
+    )
+    # Playo's envelope, not ours: a 200 carrying requestStatus, and camelCase.
+    assert playo.status_code == 200, playo.text
+    assert playo.json()["requestStatus"] == 1
+    assert playo.json()["orderIds"][0]["externalOrderId"]
+
+
+async def test_the_one_shared_path_still_answers_in_each_platforms_shape(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """`/availability` is the only path both platforms declare.
+
+    Nothing in the request tells them apart — same method, same path, a `date` query
+    param in both. It is the case a path-based router could not resolve at all, and
+    the reason the key is what decides.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    ours = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    theirs = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+
+    mine = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": at(11, 0)},
+        headers=ours["headers"],
+    )
+    assert mine.status_code == 200, mine.text
+    # A bare list of courts, snake_case, ISO instants.
+    assert isinstance(mine.json(), list)
+    assert "court_id" in mine.json()[0]
+
+    theirs_response = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": "2026-09-11"},
+        headers=theirs["headers"],
+    )
+    assert theirs_response.status_code == 200, theirs_response.text
+    body = theirs_response.json()
+    assert body["requestStatus"] == 1
+    assert "courtId" in body["courts"][0]
+
+
+async def test_calling_another_platforms_path_says_which_one_owns_it(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Removing the per-platform base URL removed the moment a wrong choice announced
+    itself. Without this message the same mistake is a bare 404 — strictly worse than
+    the 401 it replaced, because a 404 does not say what to change.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    theirs = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+
+    response = await client.post(
+        "/api/v1/gateway/bookings/hold", json={"slots": []}, headers=theirs["headers"]
+    )
+    assert response.status_code == 404, response.text
+
+    error = response.json()["error"]
+    assert "Playo" in error["message"]
+    assert "gamexo API" in error["message"]
+    assert error["details"]["registered_as"] == "playo"
+    assert error["details"]["path_belongs_to"] == ["native"]
+
+
+async def test_an_unknown_key_is_indistinguishable_from_no_key(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Routing must not become an oracle for which key prefixes exist.
+
+    Both land on the default dialect and are refused by it. If an unknown prefix
+    404'd while a real one 401'd, the difference would enumerate live integrations to
+    anyone who could reach the gateway.
+    """
+    await setup_academy(client, tenant_a)
+
+    invented = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": at(12, 0)},
+        headers={"X-API-Key": "gx_nobody_0000.beef", **tenant_a.headers},
+    )
+    missing = await client.get(
+        "/api/v1/gateway/availability", params={"date": at(12, 0)}, headers=tenant_a.headers
+    )
+
+    assert invented.status_code == 401
+    assert missing.status_code == 401
+
+
+async def test_repointing_a_partner_takes_effect_on_the_next_call(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The cache invalidation hook, which is invisible until it is missing.
+
+    A partner set up against the wrong contract is fixed by changing the dialect, not
+    by reissuing the key — and delete-and-recreate is not available, because the FK
+    from booking is RESTRICT. So this PATCH is the only repair, and it has to work
+    immediately rather than whenever a 5-minute cache happens to expire.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    # Set up wrongly: Playo, tagged as speaking our contract.
+    partner = await make_partner(client, ctx, tenant_a, "Playo", "playo")
+
+    body = {
+        "userName": "Theirs",
+        "orders": [
+            {
+                "date": "2026-09-04",
+                "courtId": ctx["court_1"],
+                "startTime": "11:00:00",
+                "endTime": "12:00:00",
+                "price": "1200",
+                "paidAtPlayo": "1200",
+                "playoOrderId": "P-REPOINT-1",
+            }
+        ],
+    }
+
+    before = await client.post(
+        "/api/v1/gateway/order/create", json=body, headers=partner["headers"]
+    )
+    assert before.status_code == 404
+    assert "Playo" in before.json()["error"]["message"]
+
+    fixed = await client.patch(
+        f"/api/v1/partners/{partner['id']}",
+        json={"dialect": "playo"},
+        headers=ctx["headers"],
+    )
+    assert fixed.status_code == 200, fixed.text
+
+    after = await client.post(
+        "/api/v1/gateway/order/create", json=body, headers=partner["headers"]
+    )
+    assert after.status_code == 200, after.text
+    assert after.json()["requestStatus"] == 1
+
+
+async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Rotation changes the prefix itself, so the retired one is what must be dropped.
+
+    Cached under the *old* prefix, the stale entry is harmless — no key hashes to it
+    any more. The test that matters is that the new prefix routes correctly straight
+    away, which it does only because misses are never cached.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+
+    warmed = await client.get(
+        "/api/v1/gateway/availability", params={"date": "2026-09-13"},
+        headers=partner["headers"],
+    )
+    assert warmed.json()["requestStatus"] == 1
+
+    rotated = await client.post(
+        f"/api/v1/partners/{partner['id']}/rotate-key", headers=ctx["headers"]
+    )
+    assert rotated.status_code == 200, rotated.text
+    new_headers = {"X-API-Key": rotated.json()["api_key"], **tenant_a.headers}
+
+    stale = await client.get(
+        "/api/v1/gateway/availability", params={"date": "2026-09-13"},
+        headers=partner["headers"],
+    )
+    assert stale.status_code == 401
+
+    fresh = await client.get(
+        "/api/v1/gateway/availability", params={"date": "2026-09-13"}, headers=new_headers
+    )
+    assert fresh.status_code == 200, fresh.text
+    assert fresh.json()["requestStatus"] == 1
+
+
+async def test_the_sandbox_refuses_a_dialect_its_key_cannot_drive(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The drivers call the advertised URL, so the key decides there too.
+
+    Before dispatch this needed two partners — one per dialect — which is how two
+    `Sandbox …` integrations came to exist on the dev database. Now it is one refusal
+    with a reason, instead of eight scenarios failing for no visible cause.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+
+    response = await client.post(
+        "/api/v1/gateway/sandbox/run", params={"dialect": "playo"},
+        headers=partner["headers"],
+    )
+    assert response.status_code == 409, response.text
+    assert "Playo" in response.json()["error"]["message"]
+    assert response.json()["error"]["details"]["key_dialect"] == "native"
 
 
 # ── The sandbox cleans up after itself ──────────────────────────────────────

@@ -121,9 +121,25 @@ class DialectOut(BaseModel):
     slug: str
     label: str
     summary: str
+
     #: Where to point this partner. Relative — the dashboard prefixes the API origin.
+    #: The **same for every dialect**, deliberately: the API key says which contract a
+    #: partner speaks, so there is one URL to hand out and no wrong one to choose.
     base_path: str
+
+    #: Where `base_path` routes to for this dialect. For reading the API reference and
+    #: for debugging a call; a partner never needs it.
+    canonical_path: str
+
     is_default: bool
+
+    #: True for a named third-party platform. The dashboard offers these and only
+    #: these — the question it asks is "who is this integration for?".
+    is_platform: bool
+
+    #: False for a platform whose spec we do not have yet: shown, but not selectable,
+    #: and refused by the API as well as by the form.
+    is_ready: bool
 
 
 class PartnerCreate(BaseModel):

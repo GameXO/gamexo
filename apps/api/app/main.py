@@ -25,6 +25,7 @@ from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
 from app.modules.gateway import sandbox as gateway_sandbox
 from app.modules.gateway.dialects import DIALECTS
+from app.modules.gateway.dispatch import GatewayDispatch
 from app.modules.payments import router as payments_router
 from app.modules.reporting import router as reporting_router
 from app.tenancy.deps import TenantCtx
@@ -135,13 +136,22 @@ def create_app() -> FastAPI:
                     "One core owns the behaviour — all-or-nothing writes, idempotency on "
                     "your own booking id, two-phase holds that expire, and strict "
                     "per-partner scoping. A **dialect** is only a wire format on top of "
-                    "it. `/gateway/…` is ours and the one to use unless you have a spec "
-                    "of your own; `/gateway/playo/…` implements Playo's."
+                    "it.\n\n"
+                    "**Every platform is given the same base URL: `/api/v1/gateway`.** "
+                    "The API key identifies the platform, so the gateway routes each "
+                    "request to that platform's contract on its own. The per-platform "
+                    "paths documented below (`/gateway/native/…`, `/gateway/playo/…`) "
+                    "are where it routes *to* — callable directly, but nobody needs to."
                 ),
             },
             {"name": "health", "description": "Liveness and tenancy diagnostics."},
         ],
     )
+
+    # Added first, so it ends up innermost: add_middleware inserts at index 0 and the
+    # stack is built by wrapping in reverse. Everything outside it — timing, CORS —
+    # therefore sees the path the partner actually sent, not the one that ran.
+    app.add_middleware(GatewayDispatch)
 
     # Outermost of the two, so its numbers cover the whole request. Server-Timing
     # is a response header, and CORS must expose it or the browser hides it.
@@ -175,11 +185,15 @@ def create_app() -> FastAPI:
     api.include_router(gateway_admin_router.router)
     api.include_router(payments_router.router)
 
+    # Every dialect under its own slug, and none of them at the bare `/gateway`
+    # prefix — that path belongs to GatewayDispatch, which rewrites it to whichever
+    # of these the caller's API key names.
+    #
     # One line per dialect, by construction. Adding a partner who dictates their own
     # spec is a module in gateway/dialects/ and an entry in its registry — never an
     # edit here, which is what stops this file becoming a list of customer names.
     for spec in DIALECTS.values():
-        api.include_router(spec.router, prefix="/gateway")
+        api.include_router(spec.router, prefix=f"/gateway/{spec.slug}")
 
     # Dev/staging only — see sandbox.register.
     gateway_sandbox.register(api)

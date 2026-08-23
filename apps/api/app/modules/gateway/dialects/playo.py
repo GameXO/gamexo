@@ -46,7 +46,10 @@ from app.modules.gateway.models import IntegrationPartner
 from app.modules.gateway.service import GatewayError, SlotRequest
 from app.tenancy.deps import Db
 
-router = APIRouter(prefix="/playo", tags=["gateway"])
+# No prefix of its own: main.py mounts every dialect under its slug, so the public
+# paths are still /api/v1/gateway/playo/… — and partners never type that anyway,
+# because GatewayDispatch routes them here from /api/v1/gateway.
+router = APIRouter(tags=["gateway"])
 
 #: This dialect's principal. Same authentication as everywhere else, plus a check
 #: that the key was actually issued for 'playo' — see `deps.speaking`.
@@ -542,6 +545,12 @@ class PlayoDriver:
 
     Note `ok` is derived from `requestStatus`, not the HTTP status: in this dialect a
     refusal is a 200. That mapping is the entire reason the driver exists.
+
+    The paths below are the *advertised* ones — `/gateway/order/create`, not
+    `/gateway/playo/order/create` — so the sandbox drives the gateway exactly as Playo
+    will. That makes the eight consistency scenarios a live test of GatewayDispatch
+    too: if key-based routing broke, all eight would fail here before anyone noticed
+    in production.
     """
 
     def __init__(self, call) -> None:
@@ -552,7 +561,7 @@ class PlayoDriver:
         return body.get("requestStatus") == SUCCESS
 
     async def availability(self, day: str):
-        _, body, _ = await self._call("GET", "/gateway/playo/availability", params={"date": day})
+        _, body, _ = await self._call("GET", "/gateway/availability", params={"date": day})
         return self._ok(body), body.get("courts", []), body.get("message", "")
 
     @staticmethod
@@ -572,7 +581,7 @@ class PlayoDriver:
 
     async def hold(self, slots):
         _, body, _ = await self._call(
-            "POST", "/gateway/playo/order/create",
+            "POST", "/gateway/order/create",
             json={"userName": slots[0]["userName"], "orders": self._orders(slots)},
         )
         refs = [p["externalOrderId"] for p in body.get("orderIds", [])]
@@ -580,7 +589,7 @@ class PlayoDriver:
 
     async def create(self, slots):
         _, body, _ = await self._call(
-            "POST", "/gateway/playo/booking/create",
+            "POST", "/gateway/booking/create",
             json={"userName": slots[0]["userName"], "bookings": self._orders(slots)},
         )
         refs = [p["externalBookingId"] for p in body.get("bookingIds", [])]
@@ -588,20 +597,20 @@ class PlayoDriver:
 
     async def confirm(self, refs):
         _, body, _ = await self._call(
-            "POST", "/gateway/playo/order/confirm", json={"orderIds": refs}
+            "POST", "/gateway/order/confirm", json={"orderIds": refs}
         )
         got = [p["externalBookingId"] for p in body.get("bookingIds", [])]
         return self._ok(body), got, body.get("message", "")
 
     async def cancel(self, refs):
         _, body, _ = await self._call(
-            "POST", "/gateway/playo/order/cancel", json={"orderIds": refs}
+            "POST", "/gateway/order/cancel", json={"orderIds": refs}
         )
         return self._ok(body), refs, body.get("message", "")
 
     async def map_ids(self, refs, external):
         _, body, _ = await self._call(
-            "POST", "/gateway/playo/booking/map",
+            "POST", "/gateway/booking/map",
             json={
                 "bookingIds": [
                     {"externalBookingId": r, "playoBookingId": external} for r in refs
@@ -618,4 +627,5 @@ DIALECT = Dialect(
     "requestStatus envelope instead of HTTP status codes.",
     router=router,
     driver=PlayoDriver,
+    is_platform=True,
 )

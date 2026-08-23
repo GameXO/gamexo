@@ -45,7 +45,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text, update
 
 from app.core.config import settings
-from app.core.errors import AuthenticationError, NotFoundError
+from app.core.errors import AuthenticationError, ConflictError, NotFoundError
 from app.db.session import tenant_session
 from app.modules.booking.models import Booking, Court
 from app.modules.gateway.deps import API_KEY_HEADER
@@ -440,8 +440,10 @@ async def list_scenarios() -> dict[str, str]:
         "what the scenario expected.\n\n"
         "The scenarios are dialect-independent — the same eight run against **any** "
         "dialect, because the guarantees belong to the gateway rather than to a "
-        "partner's adapter. `dialect` defaults to whatever the API key was issued "
-        "for.\n\n"
+        "partner's adapter. Which one runs is decided by the API key, so `dialect` is "
+        "only ever a redundant assertion of it.\n\n"
+        "Every driver calls the advertised `/api/v1/gateway`, never a per-platform "
+        "path, so a passing run is also proof that key-based routing works.\n\n"
         "**This writes to the database, then cleans up after itself.** Bookings are "
         "created on the academy the key belongs to and *deleted* again on the way "
         "out, so a run leaves the row counts and the booking reference counter "
@@ -456,7 +458,9 @@ async def list_scenarios() -> dict[str, str]:
 async def run(
     request: Request,
     tenant: TenantCtx,
-    dialect: Annotated[str | None, Query(description="Defaults to the key's own dialect")] = None,
+    dialect: Annotated[
+        str | None, Query(description="Must match the key's own dialect, which is the default")
+    ] = None,
     scenarios: Annotated[list[str] | None, Query(description="Defaults to all")] = None,
     days_ahead: Annotated[int, Query(ge=1, le=365)] = 60,
     court_id: Annotated[str | None, Query(description="Defaults to the first bookable court")] = None,
@@ -470,6 +474,17 @@ async def run(
     if spec is None or spec.driver is None:
         raise NotFoundError(
             f"No sandbox driver for dialect {slug!r}. Known: {sorted(DIALECTS)}."
+        )
+
+    # The drivers call the advertised URL, which routes on the key — so a key issued
+    # for one dialect cannot be made to drive another by asking. Refused here, with
+    # the reason, rather than as eight scenarios failing for no visible cause.
+    if slug != partner.dialect:
+        raise ConflictError(
+            f"{partner.name}'s key is registered as {DIALECTS[partner.dialect].label}, "
+            f"so it cannot drive {spec.label}. Use a key issued for {spec.label}, or "
+            f"re-point this integration in Manage → Integrations.",
+            details={"key_dialect": partner.dialect, "requested": slug},
         )
 
     names = [n for n in (scenarios or list(SCENARIOS)) if n in SCENARIOS]

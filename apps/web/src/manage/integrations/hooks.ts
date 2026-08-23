@@ -131,11 +131,20 @@ export function useCreatePartner() {
   })
 }
 
+/** Rename, revoke, or re-point at another API.
+ *
+ *  `dialect` is the repair for a platform set up against the wrong contract, and the
+ *  only one available: the booking foreign key is RESTRICT, so a platform that has
+ *  booked anything cannot be deleted and re-added. */
 export function useUpdatePartner() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { id: string; name?: string; is_active?: boolean }) =>
-      api.updatePartner(vars.id, { name: vars.name, is_active: vars.is_active }),
+    mutationFn: (vars: { id: string; name?: string; is_active?: boolean; dialect?: string }) =>
+      api.updatePartner(vars.id, {
+        name: vars.name,
+        is_active: vars.is_active,
+        dialect: vars.dialect,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: integrationKeys.partners }),
   })
 }
