@@ -15,12 +15,24 @@ export type ProviderFieldOut = components['schemas']['ProviderFieldOut']
 export type VerificationOut = components['schemas']['VerificationOut']
 export type PartnerOut = components['schemas']['PartnerOut']
 export type PartnerWithKey = components['schemas']['PartnerWithKey']
+export type DialectOut = components['schemas']['DialectOut']
 
 export type Surface = 'web' | 'pos'
 
 export const integrationKeys = {
   gateways: ['payment-providers'] as const,
   partners: ['integration-partners'] as const,
+  dialects: ['gateway-dialects'] as const,
+}
+
+/** What the gateway can speak. Rarely changes — it only moves when the API ships a
+ *  new dialect — so it is cached for the session rather than refetched per render. */
+export function useDialects() {
+  return useQuery({
+    queryKey: integrationKeys.dialects,
+    queryFn: () => api.listDialects(),
+    staleTime: Infinity,
+  })
 }
 
 /**
@@ -113,7 +125,8 @@ export function usePartners() {
 export function useCreatePartner() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { name: string; slug: string }) => api.createPartner(vars),
+    mutationFn: (vars: { name: string; slug: string; dialect: string }) =>
+      api.createPartner(vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: integrationKeys.partners }),
   })
 }

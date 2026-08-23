@@ -436,14 +436,32 @@ export const api = {
 
   listPartners: () => request<Ok<'/api/v1/partners', 'get'>>('/api/v1/partners'),
 
+  /** The wire formats the gateway speaks, and the base path to hand each partner.
+   *
+   *  Fetched rather than hardcoded: a dialect is added server-side by dropping a
+   *  file into `gateway/dialects/`, and this screen should offer whatever is there
+   *  without a frontend release. */
+  listDialects: () =>
+    request<Ok<'/api/v1/partners/dialects', 'get'>>('/api/v1/partners/dialects'),
+
   /** The response carries `api_key` and it is **the only time it exists in a form
    *  anyone can copy** — only a hash is stored. Show it, do not log it. */
-  createPartner: (body: { name: string; slug: string }) =>
+  createPartner: (body: {
+    name: string
+    slug: string
+    /** Which contract they speak. `native` is ours — the answer for any partner
+     *  without a spec of their own. */
+    dialect?: string
+    external_venue_id?: string | null
+  }) =>
     request<Ok<'/api/v1/partners', 'post', 201>>('/api/v1/partners', { method: 'POST', body }),
 
   /** `is_active: false` revokes immediately. Bookings the partner already made are
    *  untouched and keep their `source_platform`. */
-  updatePartner: (partnerId: string, body: { name?: string; is_active?: boolean }) =>
+  updatePartner: (
+    partnerId: string,
+    body: { name?: string; is_active?: boolean; dialect?: string; external_venue_id?: string | null },
+  ) =>
     request<Ok<'/api/v1/partners/{partner_id}', 'patch'>>(`/api/v1/partners/${partnerId}`, {
       method: 'PATCH',
       body,

@@ -84,6 +84,7 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
     setResendCooldown(RESEND_SECONDS)
   }
 
+  const booking = sessionQuery.data ?? null
   const amount = booking ? Number(booking.balance_due) : 0
   const alreadySettled = step === 'session' && !!booking && amount <= 0
 
@@ -132,11 +133,7 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
     setInvoice(undefined)
   }
 
-  const resultStatus = findSessionMutation.isPending
-    ? 'loading'
-    : booking && !lookupFailed
-      ? 'found'
-      : 'not-found'
+  const resultStatus = sessionQuery.isPending ? 'loading' : booking ? 'found' : 'not-found'
 
   const backHandlers: Record<Step, () => void> = {
     code: onHome,

@@ -12,14 +12,25 @@ import { Check, Copy, KeyRound, Plug, RotateCcw, Trash2 } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import ConfirmDialog from '../../ui/ConfirmDialog'
 import {
+  type DialectOut,
   type PartnerOut,
   type PartnerWithKey,
   useCreatePartner,
+  useDialects,
   useDeletePartner,
   usePartners,
   useRotatePartnerKey,
   useUpdatePartner,
 } from './hooks'
+
+/** A partner row shows what it speaks, so "why is Playo getting 401s?" is one
+ *  glance rather than a database query. Falls back to the raw slug if the registry
+ *  has not loaded, or if a partner was onboarded onto a dialect since removed. */
+const dialectLabel = (all: DialectOut[] | undefined, slug: string) =>
+  all?.find((d) => d.slug === slug)?.label ?? slug
+
+const dialectPath = (all: DialectOut[] | undefined, slug: string) =>
+  all?.find((d) => d.slug === slug)?.base_path ?? `/api/v1/gateway/${slug}`
 
 const slugify = (name: string) =>
   name
@@ -35,8 +46,10 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
   const rotate = useRotatePartnerKey()
   const remove = useDeletePartner()
 
+  const dialects = useDialects()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const [dialect, setDialect] = useState('native')
   const [freshKey, setFreshKey] = useState<PartnerWithKey | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<PartnerOut | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,8 +59,9 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
     if (!slug) return
     try {
       setError(null)
-      setFreshKey(await create.mutateAsync({ name: name.trim(), slug }))
+      setFreshKey(await create.mutateAsync({ name: name.trim(), slug, dialect }))
       setName('')
+      setDialect('native')
       setAdding(false)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not add that platform.')
@@ -152,6 +166,54 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
               <span className="font-mono text-slate">{slugify(name)}</span>.
             </p>
           )}
+
+          {/* Which contract they speak. Nearly always ours — a dialect exists only
+              for a platform big enough to dictate its own spec, and each one is a
+              file someone had to write. */}
+          <p className="mt-4 text-xs font-semibold tracking-wide text-slate uppercase">
+            Which API will they use?
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {(dialects.data ?? []).map((d) => (
+              <button
+                key={d.slug}
+                type="button"
+                onClick={() => setDialect(d.slug)}
+                className={`rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                  dialect === d.slug
+                    ? 'border-ink bg-ink text-white'
+                    : 'border-border-input bg-white text-ink'
+                }`}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  {d.label}
+                  {d.is_default && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        dialect === d.slug ? 'bg-white/20' : 'bg-surface-muted text-slate'
+                      }`}
+                    >
+                      Default
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`mt-1 block text-[11px] leading-snug ${
+                    dialect === d.slug ? 'text-white/70' : 'text-muted'
+                  }`}
+                >
+                  {d.summary}
+                </span>
+                <span
+                  className={`mt-1.5 block font-mono text-[11px] ${
+                    dialect === d.slug ? 'text-white/60' : 'text-slate'
+                  }`}
+                >
+                  {d.base_path}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -194,6 +256,13 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
               </div>
               <p className="mt-0.5 font-mono text-xs text-muted">
                 {partner.key_prefix}.••••••••
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate">
+                Speaks{' '}
+                <span className="font-medium text-ink">
+                  {dialectLabel(dialects.data, partner.dialect)}
+                </span>{' '}
+                · <span className="font-mono">{dialectPath(dialects.data, partner.dialect)}</span>
               </p>
             </div>
 

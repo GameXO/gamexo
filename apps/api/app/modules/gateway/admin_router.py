@@ -16,8 +16,10 @@ from app.api_utils import get_or_404
 from app.auth.deps import RequireAdmin
 from app.core.errors import ConflictError
 from app.modules.booking.models import Booking
+from app.modules.gateway.dialects import DIALECTS
 from app.modules.gateway.models import IntegrationPartner, generate_api_key
 from app.modules.gateway.schemas import (
+    DialectOut,
     PartnerCreate,
     PartnerOut,
     PartnerUpdate,
@@ -26,6 +28,30 @@ from app.modules.gateway.schemas import (
 from app.tenancy.deps import Db
 
 router = APIRouter(tags=["gateway"])
+
+
+@router.get(
+    "/partners/dialects",
+    response_model=list[DialectOut],
+    summary="Wire formats the gateway speaks",
+    description=(
+        "What to choose when adding an integration, and the base path to hand the "
+        "partner.\n\n"
+        "Declared above `/partners/{partner_id}` deliberately — routes match in order, "
+        "and `dialects` would otherwise be parsed as a malformed UUID."
+    ),
+)
+async def list_dialects(_: RequireAdmin) -> list[DialectOut]:
+    return [
+        DialectOut(
+            slug=d.slug,
+            label=d.label,
+            summary=d.summary,
+            base_path=f"/api/v1/gateway/{d.slug}" if not d.is_default else "/api/v1/gateway",
+            is_default=d.is_default,
+        )
+        for d in DIALECTS.values()
+    ]
 
 
 @router.get("/partners", response_model=list[PartnerOut], summary="List integrations")
@@ -57,10 +83,17 @@ async def create_partner(payload: PartnerCreate, db: Db, _: RequireAdmin) -> Par
     if clash.scalar_one_or_none() is not None:
         raise ConflictError(f"An integration with slug {payload.slug!r} already exists.")
 
+    if payload.dialect not in DIALECTS:
+        raise ConflictError(
+            f"Unknown dialect {payload.dialect!r}. Known: {sorted(DIALECTS)}."
+        )
+
     full_key, prefix, key_hash = generate_api_key(payload.slug)
     partner = IntegrationPartner(
         name=payload.name,
         slug=payload.slug.lower(),
+        dialect=payload.dialect,
+        external_venue_id=payload.external_venue_id,
         key_prefix=prefix,
         key_hash=key_hash,
         is_active=True,
@@ -85,7 +118,12 @@ async def update_partner(
     partner_id: uuid.UUID, payload: PartnerUpdate, db: Db, _: RequireAdmin
 ) -> PartnerOut:
     partner = await get_or_404(db, IntegrationPartner, partner_id, label="Integration")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if "dialect" in updates and updates["dialect"] not in DIALECTS:
+        raise ConflictError(
+            f"Unknown dialect {updates['dialect']!r}. Known: {sorted(DIALECTS)}."
+        )
+    for field, value in updates.items():
         setattr(partner, field, value)
     await db.flush()
     return PartnerOut.model_validate(partner)

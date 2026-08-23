@@ -23,7 +23,8 @@ from app.modules.advertising import router as advertising_router
 from app.modules.booking import router as booking_router
 from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
-from app.modules.gateway import router as gateway_router
+from app.modules.gateway import sandbox as gateway_sandbox
+from app.modules.gateway.dialects import DIALECTS
 from app.modules.payments import router as payments_router
 from app.modules.reporting import router as reporting_router
 from app.tenancy.deps import TenantCtx
@@ -128,10 +129,14 @@ def create_app() -> FastAPI:
             {
                 "name": "gateway",
                 "description": (
-                    "Externalisation gateway. Third-party platforms (Playo, Hudle) read "
-                    "availability and claim slots under a revocable API key, so a court "
-                    "is never sold twice. Availability reflects every booking; a partner "
-                    "can only read or cancel bookings it created itself."
+                    "Externalisation gateway. Any third-party platform reads availability "
+                    "and claims slots under a revocable API key, so a court is never sold "
+                    "twice.\n\n"
+                    "One core owns the behaviour — all-or-nothing writes, idempotency on "
+                    "your own booking id, two-phase holds that expire, and strict "
+                    "per-partner scoping. A **dialect** is only a wire format on top of "
+                    "it. `/gateway/…` is ours and the one to use unless you have a spec "
+                    "of your own; `/gateway/playo/…` implements Playo's."
                 ),
             },
             {"name": "health", "description": "Liveness and tenancy diagnostics."},
@@ -167,9 +172,17 @@ def create_app() -> FastAPI:
     api.include_router(admin_router.router)
     api.include_router(reporting_router.router)
     api.include_router(finance_router.router)
-    api.include_router(gateway_router.router)
     api.include_router(gateway_admin_router.router)
     api.include_router(payments_router.router)
+
+    # One line per dialect, by construction. Adding a partner who dictates their own
+    # spec is a module in gateway/dialects/ and an entry in its registry — never an
+    # edit here, which is what stops this file becoming a list of customer names.
+    for spec in DIALECTS.values():
+        api.include_router(spec.router, prefix="/gateway")
+
+    # Dev/staging only — see sandbox.register.
+    gateway_sandbox.register(api)
     api.include_router(_health_router())
     app.include_router(api)
 
