@@ -13,7 +13,7 @@ Everything the frontend needs to talk to `apps/api`.
 ## Regenerating
 
 ```bash
-pnpm --filter @gamexo/web run generate:api
+pnpm --filter @gamexo/dashboard run generate:api
 ```
 
 Run this after any backend route or schema change. It shells out to

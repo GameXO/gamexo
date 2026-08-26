@@ -1,8 +1,13 @@
 {
   // Demo deployment of both frontends as ONE static-asset Worker:
   //
-  //   /       -> apps/web  (admin dashboard)
-  //   /pos/   -> apps/pos  (walk-in counter)
+  //   /       -> apps/dashboard  (admin dashboard)
+  //   /pos/   -> apps/pos        (walk-in counter)
+  //
+  // apps/website — the public marketing site and self-serve signup — is NOT part
+  // of this Worker. It has no deployment target yet, so signup is unreachable in
+  // production. Giving it one is a routing decision, not an omission to paper
+  // over here: it wants the root, which this dashboard currently occupies.
   //
   // One origin, so the API needs exactly one CORS_ORIGINS entry rather than one
   // per app. apps/pos already builds with base '/pos/', so its bundle references
