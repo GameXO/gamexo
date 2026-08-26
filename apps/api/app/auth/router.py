@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.audit import write_audit
@@ -14,6 +15,7 @@ from app.auth.schemas import (
     MeOut,
     PlatformAdminOut,
     RefreshRequest,
+    SignupRequest,
     TenantOut,
     TokenPair,
     UserOut,
@@ -22,15 +24,67 @@ from app.auth.service import (
     access_token_ttl_seconds,
     authenticate_user,
     issue_user_tokens,
+    resolve_login_tenant,
+    signup_tenant,
 )
 from app.core.errors import AuthenticationError, PermissionDeniedError
 from app.core.security import Audience, TokenError, decode_token
+from app.db.session import bind_session_to
 from app.models.audit import ActorKind
 from app.models.tenant import Tenant
 from app.models.user import PlatformAdmin, User
-from app.tenancy.deps import Db, TenantCtx
+from app.modules.billing import service as billing_service
+from app.tenancy.deps import Db, OptionalTenantCtx, TenantCtx, UntenantedDb
+from app.tenancy.resolver import assert_tenant_usable
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post(
+    "/signup",
+    response_model=TokenPair,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new turf",
+    description=(
+        "Self-serve registration. Creates the academy, its default settings and its "
+        "first admin in one transaction, and signs the owner straight in.\n\n"
+        "The academy has no name yet — onboarding collects that — so it is created "
+        "under a placeholder slug with `onboarding_completed` false, which is what "
+        "routes the new owner into the wizard rather than the dashboard.\n\n"
+        "The email must be unused across the whole platform; see "
+        "`models/user.py::AccountDirectory` for why login emails are globally unique."
+    ),
+)
+async def signup(payload: SignupRequest, db: UntenantedDb, request: Request) -> TokenPair:
+    # TODO: unauthenticated and cheap to call in a loop. Before this is public,
+    # put a per-IP rate limit in front of it — an attacker cannot read anything,
+    # but they can fill the tenant table and burn bcrypt rounds.
+    tenant, admin = await signup_tenant(
+        db,
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+    )
+
+    # signup_tenant leaves the transaction bound to the new tenant, so this
+    # tenant-scoped audit row is insertable and lands in the same commit.
+    await write_audit(
+        db,
+        tenant_id=tenant.id,
+        action="tenant.signed_up",
+        actor_kind=ActorKind.USER,
+        actor_id=admin.id,
+        actor_label=admin.email,
+        entity_type="tenant",
+        entity_id=tenant.id,
+        changes={"after": {"slug": tenant.slug}},
+        request=request,
+    )
+
+    access, refresh = issue_user_tokens(admin)
+    return TokenPair(
+        access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
+    )
 
 
 @router.post(
@@ -38,31 +92,80 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=TokenPair,
     summary="Log in as academy staff",
     description=(
-        "Authenticates against the academy resolved from the request host "
-        "(or `X-Tenant-ID` in development). The same email may exist at more than "
-        "one academy; which one you reach is determined by the host, not the password."
+        "Sign in with a **username** — `admin@navigo-sports`, "
+        "`rahul.staff@navigo-sports`, `kiosk@navigo-sports`. The part after the `@` "
+        "is the academy's slug, not a domain; see `auth/usernames.py`.\n\n"
+        "Authenticates against the academy resolved from the request host (or "
+        "`X-Tenant-ID` in development). When the request names no academy — the "
+        "shared-origin deployment, where every turf answers on one hostname — the "
+        "academy is looked up from the username instead.\n\n"
+        "An email address is still accepted, so accounts created before usernames "
+        "existed keep working."
     ),
 )
-async def login(payload: LoginRequest, tenant: TenantCtx, db: Db, request: Request) -> TokenPair:
-    user = await authenticate_user(db, email=payload.email, password=payload.password)
-    access, refresh = issue_user_tokens(user)
-
-    await write_audit(
-        db,
-        tenant_id=tenant.id,
-        action="auth.login",
-        actor_kind=ActorKind.USER,
-        actor_id=user.id,
-        actor_label=user.email,
-        entity_type="app_user",
-        entity_id=user.id,
-        request=request,
-        tenant_context=tenant,
+async def login(
+    payload: LoginRequest, tenant: OptionalTenantCtx, db: UntenantedDb, request: Request
+) -> TokenPair:
+    # A resolved host still wins. On a per-academy subdomain the hostname is the
+    # authority on which academy you are signing in to, and the directory lookup
+    # must not be able to send you somewhere else.
+    tenant_id = (
+        tenant.id if tenant else await resolve_login_tenant(db, identifier=payload.username)
     )
+
+    async with bind_session_to(db, tenant_id):
+        user = await authenticate_user(
+            db, identifier=payload.username, password=payload.password
+        )
+        # After the password, never before — see resolver.assert_tenant_usable. On a
+        # subdomain the resolver has already refused a suspended academy; on a shared
+        # origin nothing has, because the academy came from the directory rather than
+        # from resolution, and without this a suspension would not actually keep
+        # anybody out.
+        await assert_tenant_usable(db, tenant_id)
+        access, refresh = issue_user_tokens(user)
+
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            action="auth.login",
+            actor_kind=ActorKind.USER,
+            actor_id=user.id,
+            actor_label=user.email,
+            entity_type="app_user",
+            entity_id=user.id,
+            request=request,
+            tenant_context=tenant,
+        )
 
     return TokenPair(
         access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
     )
+
+
+class HandoffRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=128)
+
+
+@router.post(
+    "/handoff",
+    response_model=TokenPair,
+    summary="Exchange a one-time signup token for a session",
+    description=(
+        "The last step of self-serve signup. The website receives this token when a "
+        "payment is confirmed and sends the browser to "
+        "`{dashboard_url}/?handoff={token}` — the dashboard posts it here and the "
+        "owner is signed in without ever seeing a login form.\n\n"
+        "**Single use, and short-lived.** It travels in a URL, so a copy of it is in "
+        "browser history and in the referrer of whatever the dashboard loads next. "
+        "Burning it on first use is what makes those copies inert.\n\n"
+        "401 for expired, already-used and never-existed alike — the differences are "
+        "only useful to somebody testing which of their guesses is closest."
+    ),
+)
+async def handoff(payload: HandoffRequest, db: UntenantedDb) -> TokenPair:
+    access, refresh, expires_in = await billing_service.redeem_handoff(db, payload.token)
+    return TokenPair(access_token=access, refresh_token=refresh, expires_in=expires_in)
 
 
 @router.post(
@@ -70,7 +173,9 @@ async def login(payload: LoginRequest, tenant: TenantCtx, db: Db, request: Reque
     response_model=TokenPair,
     summary="Exchange a refresh token for a new pair",
 )
-async def refresh_tokens(payload: RefreshRequest, tenant: TenantCtx, db: Db) -> TokenPair:
+async def refresh_tokens(
+    payload: RefreshRequest, tenant: OptionalTenantCtx, db: UntenantedDb
+) -> TokenPair:
     try:
         claims = decode_token(
             payload.refresh_token, audience=Audience.TENANT, expected_type="refresh"
@@ -78,22 +183,34 @@ async def refresh_tokens(payload: RefreshRequest, tenant: TenantCtx, db: Db) -> 
     except TokenError as exc:
         raise AuthenticationError(f"Invalid or expired refresh token: {exc}") from exc
 
-    # Same rule as the access path: a refresh token is bound to the academy it was
-    # issued for, and presenting it against another one is refused.
-    if claims.get("tid") != str(tenant.id):
+    claimed_tenant = claims.get("tid")
+    if not claimed_tenant:
+        raise AuthenticationError("This refresh token names no academy.")
+
+    # Same rule as the access path: where the request independently resolves an
+    # academy, a token issued for a different one is refused. With no host to
+    # resolve from, the signed claim is the academy — see tenancy/resolver.py.
+    if tenant is not None and claimed_tenant != str(tenant.id):
         raise PermissionDeniedError("This token was issued for a different academy.")
 
-    result = await db.execute(select(User).where(User.id == uuid.UUID(claims["sub"])))
-    user = result.scalar_one_or_none()
-    if user is None or not user.is_active:
-        raise AuthenticationError("This account is no longer active.")
+    async with bind_session_to(db, uuid.UUID(claimed_tenant)):
+        result = await db.execute(select(User).where(User.id == uuid.UUID(claims["sub"])))
+        user = result.scalar_one_or_none()
+        if user is None or not user.is_active:
+            raise AuthenticationError("This account is no longer active.")
 
-    # NOTE: refresh tokens are stateless for now, so a refresh token stays valid
-    # until it expires even after a password change. When that matters, add a
-    # `token_version` integer to app_user, put it in the claims, and compare here —
-    # bumping it invalidates every outstanding token for that user without needing
-    # a denylist or Redis.
-    access, refresh = issue_user_tokens(user)
+        # The token is proof enough to be told why this is refused. Without it, a
+        # session that predates a suspension renews itself forever on a shared
+        # origin, and the academy is only locked out once whoever holds it signs out.
+        await assert_tenant_usable(db, uuid.UUID(claimed_tenant))
+
+        # NOTE: refresh tokens are stateless for now, so a refresh token stays valid
+        # until it expires even after a password change. When that matters, add a
+        # `token_version` integer to app_user, put it in the claims, and compare here —
+        # bumping it invalidates every outstanding token for that user without needing
+        # a denylist or Redis.
+        access, refresh = issue_user_tokens(user)
+
     return TokenPair(
         access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
     )

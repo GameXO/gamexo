@@ -14,7 +14,7 @@ from tests.conftest import PASSWORD, TenantFixture, auth_headers, login, make_us
 async def test_login_returns_a_token_pair(client: AsyncClient, tenant_a: TenantFixture) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers=tenant_a.headers,
     )
     assert response.status_code == 200, response.text
@@ -33,12 +33,12 @@ async def test_wrong_password_and_unknown_email_are_indistinguishable(
     """Neither response discloses whether the email is registered."""
     wrong_password = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": "not-the-password"},
+        json={"username": tenant_a.admin_email, "password": "not-the-password"},
         headers=tenant_a.headers,
     )
     unknown_email = await client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@nowhere.example.com", "password": PASSWORD},
+        json={"username": "nobody@nowhere.example.com", "password": PASSWORD},
         headers=tenant_a.headers,
     )
 
@@ -56,7 +56,7 @@ async def test_credentials_do_not_work_against_another_academy(
     """
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers=tenant_b.headers,
     )
     assert response.status_code == 401
@@ -107,7 +107,7 @@ async def test_on_leave_staff_cannot_log_in(
     )
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": "onleave@alpha.example.com", "password": PASSWORD},
+        json={"username": "onleave@alpha.example.com", "password": PASSWORD},
         headers=tenant_a.headers,
     )
     assert response.status_code == 401
@@ -117,7 +117,7 @@ async def test_on_leave_staff_cannot_log_in(
 async def test_refresh_returns_a_new_pair(client: AsyncClient, tenant_a: TenantFixture) -> None:
     login_response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers=tenant_a.headers,
     )
     refresh_token = login_response.json()["refresh_token"]
@@ -153,7 +153,7 @@ async def test_a_refresh_token_is_not_a_bearer_credential(
 ) -> None:
     login_response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers=tenant_a.headers,
     )
     refresh_token = login_response.json()["refresh_token"]
@@ -191,7 +191,7 @@ async def test_validation_errors_do_not_echo_the_submitted_password(
     secret = "hunter2"
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": secret},
+        json={"username": tenant_a.admin_email, "password": secret},
         headers=tenant_a.headers,
     )
     assert response.status_code == 422
@@ -290,7 +290,7 @@ async def test_platform_login_and_tenant_provisioning(
 ) -> None:
     login_response = await client.post(
         "/api/v1/platform/login",
-        json={"email": platform_admin.email, "password": PASSWORD},
+        json={"username": platform_admin.email, "password": PASSWORD},
     )
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
@@ -315,7 +315,7 @@ async def test_platform_login_and_tenant_provisioning(
     # The provisioned admin can immediately log in to the new academy.
     staff_login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "owner@gamma.example.com", "password": PASSWORD},
+        json={"username": "owner@gamma.example.com", "password": PASSWORD},
         headers={"X-Tenant-ID": "gamma-club"},
     )
     assert staff_login.status_code == 200
@@ -337,7 +337,7 @@ async def test_duplicate_slug_is_rejected(
 ) -> None:
     login_response = await client.post(
         "/api/v1/platform/login",
-        json={"email": platform_admin.email, "password": PASSWORD},
+        json={"username": platform_admin.email, "password": PASSWORD},
     )
     token = login_response.json()["access_token"]
 
@@ -363,7 +363,7 @@ async def test_reserved_slugs_are_refused(
     """`api.gamexo.app` must not become somebody's academy."""
     login_response = await client.post(
         "/api/v1/platform/login",
-        json={"email": platform_admin.email, "password": PASSWORD},
+        json={"username": platform_admin.email, "password": PASSWORD},
     )
     token = login_response.json()["access_token"]
 

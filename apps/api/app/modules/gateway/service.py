@@ -353,6 +353,7 @@ async def _claim_one(
         booking_type=BookingType.ONLINE,
         status=BookingStatus.HELD if hold else BookingStatus.UPCOMING,
         hold_expires_at=(datetime.now(UTC) + HOLD_TTL) if hold else None,
+        open_slot=court.open_slots_enabled,
         created_by_partner_id=partner.id,
         # From the authenticated key, never from the request body — a platform must
         # not be able to file a booking under a competitor's name.

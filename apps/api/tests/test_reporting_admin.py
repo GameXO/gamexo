@@ -283,7 +283,7 @@ async def test_staff_crud_and_duplicate_email(
     assert (
         await client.post(
             "/api/v1/auth/login",
-            json={"email": "sunita@alpha.example.com", "password": PASSWORD},
+            json={"username": "sunita@alpha.example.com", "password": PASSWORD},
             headers=tenant_a.headers,
         )
     ).status_code == 200

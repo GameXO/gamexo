@@ -9,7 +9,7 @@ RLS policy, and is never checked for tenant scoping. Add new models here.
 from app.db.base import Base, TenantScoped
 from app.models.audit import ActorKind, AuditLog
 from app.models.tenant import Tenant, TenantSettings, TenantStatus
-from app.models.user import PlatformAdmin, User, UserStatus
+from app.models.user import AccountDirectory, PlatformAdmin, User, UserStatus
 from app.modules.admin.models import (
     Channel,
     DeliveryState,
@@ -28,6 +28,7 @@ from app.modules.advertising.models import (
     SpotStatus,
     SpotType,
 )
+from app.modules.billing.models import SignupIntent, SignupStatus
 from app.modules.gateway.models import IntegrationPartner
 from app.modules.payments.models import (
     PaymentProvider,
@@ -84,6 +85,7 @@ from app.modules.finance.models import (
 )
 
 __all__ = [
+    "AccountDirectory",
     "ActorKind",
     "AdContract",
     "AdSpot",
@@ -141,6 +143,8 @@ __all__ = [
     "PlatformAdmin",
     "Program",
     "SessionStatus",
+    "SignupIntent",
+    "SignupStatus",
     "Sport",
     "SpotStatus",
     "SpotType",

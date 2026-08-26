@@ -16,11 +16,17 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 
-from app.auth.service import initials, provision_tenant
+from app.auth import usernames
+from app.auth.service import (
+    claim_staff_username,
+    initials,
+    provision_tenant,
+    register_login,
+)
 from app.core.config import settings
 from app.core.security import Role, hash_password
 from app.db.session import dispose_engine, tenant_session, untenanted_session
@@ -118,12 +124,13 @@ async def _seed_platform_admin(identity: SeedIdentity) -> None:
 
         session.add(
             PlatformAdmin(
+                username=usernames.OPS_USERNAME,
                 email=email,
                 password_hash=hash_password(identity.platform_admin_password),
                 full_name="gamexo Operations",
             )
         )
-        print(f"  created platform admin {email}")
+        print(f"  created platform admin {usernames.OPS_USERNAME} ({email})")
 
 
 async def _seed_tenant(identity: SeedIdentity) -> uuid.UUID:
@@ -143,6 +150,9 @@ async def _seed_tenant(identity: SeedIdentity) -> uuid.UUID:
             admin_full_name="XCourt Administrator",
             business_name=BUSINESS_PROFILE["business_name"],
         )
+        # The demo academy arrives fully configured, so it must not be sent through
+        # the first-run wizard. Only a self-serve signup leaves this NULL.
+        tenant.onboarding_completed_at = datetime.now(UTC)
         print(f"  created tenant #1 '{tenant.slug}' with admin {admin.email}")
         return tenant.id
 
@@ -172,8 +182,12 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
             # db/session.py stamps it from the bound context. That is the ergonomic
             # the plan asked for — no endpoint threading tenant_id by hand — and
             # seeding is the first place it gets exercised.
+            username = await claim_staff_username(
+                session, full_name=name, tenant_slug=identity.tenant_slug
+            )
             session.add(
                 User(
+                    username=username,
                     email=email,
                     password_hash=hash_password(identity.admin_password),
                     full_name=name,
@@ -185,6 +199,11 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
                     avatar_initials=initials(name),
                 )
             )
+            # Every login needs a directory row, or this person authenticates on a
+            # subdomain and is invisible on the shared origin. See AccountDirectory.
+            await register_login(
+                session, username=username, email=email, tenant_id=tenant_id
+            )
             created += 1
 
         # The counter tablet's shared login. Not part of STAFF because it is not a
@@ -192,8 +211,10 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
         # env var rather than being the admin's — the dashboard credential must not
         # be the one left signed in on a tablet at a public counter.
         if identity.kiosk_email.lower() not in existing_emails:
+            kiosk_username = usernames.for_kiosk(identity.tenant_slug)
             session.add(
                 User(
+                    username=kiosk_username,
                     email=identity.kiosk_email,
                     password_hash=hash_password(identity.kiosk_password),
                     full_name="Walk-in Counter",
@@ -201,6 +222,12 @@ async def _seed_tenant_data(tenant_id: uuid.UUID, identity: SeedIdentity) -> Non
                     status=UserStatus.ACTIVE,
                     avatar_initials="POS",
                 )
+            )
+            await register_login(
+                session,
+                username=kiosk_username,
+                email=identity.kiosk_email,
+                tenant_id=tenant_id,
             )
             created += 1
 

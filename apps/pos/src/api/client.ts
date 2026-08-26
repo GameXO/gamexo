@@ -90,7 +90,9 @@ async function refreshOnce(): Promise<boolean> {
     try {
       const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': TENANT },
+        // No tenant header: the refresh token names its own academy, and a header
+        // naming a different one is refused rather than ignored. See `request`.
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: tokens.refresh_token }),
       })
       if (!res.ok) {
@@ -121,7 +123,18 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, anonymous = false } = opts
 
   const send = async (): Promise<Response> => {
-    const headers: Record<string, string> = { 'X-Tenant-ID': TENANT }
+    // No `X-Tenant-ID`, deliberately — the counter tablet must not name its own
+    // academy. `VITE_TENANT_SLUG` bakes one fixed slug into the bundle, and that
+    // header outranks everything else in tenant resolution (see
+    // `app/tenancy/resolver.py::_plan_resolution`), so on a build shared by more
+    // than one turf it would point every request at the wrong one.
+    //
+    // The kiosk login breaks first and most confusingly: login carries no token, so
+    // the academy is found from the email in `account_directory`, and a header
+    // sends that lookup somewhere the user does not exist — turning a correct
+    // password into "Incorrect email or password". Resolution is left to the host
+    // subdomain, or to the signed `tid` claim once signed in.
+    const headers: Record<string, string> = {}
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     if (!anonymous) {
       const token = getTokens()?.access_token
@@ -162,10 +175,12 @@ type Ok<P extends keyof paths, M extends keyof paths[P], S extends number = 200>
   : never
 
 export const api = {
-  login: (email: string, password: string) =>
+  /** The counter's shared credential — `kiosk@navigo-sports`, from the welcome
+   *  email. An admin's username works too; the role hierarchy admits it. */
+  login: (username: string, password: string) =>
     request<Ok<'/api/v1/auth/login', 'post'>>('/api/v1/auth/login', {
       method: 'POST',
-      body: { email, password },
+      body: { username, password },
       anonymous: true,
     }),
 

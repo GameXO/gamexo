@@ -6,7 +6,7 @@
  * in) without a cache in the way.
  */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api, ApiError } from '../api/client'
+import { api } from '../api/client'
 import { clearTokens, getTokens, setTokens, subscribeToTokens, type Me } from '../api/auth'
 
 type AuthState = {
@@ -31,16 +31,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setMe(await api.me())
       setStatus('authenticated')
-    } catch (err) {
-      // A stored token that no longer works (expired refresh, rotated secret,
-      // reseeded database) should land on the login screen, not an error page.
-      if (err instanceof ApiError && (err.isUnauthenticated || err.isForbidden)) {
-        clearTokens()
-        setMe(null)
-        setStatus('anonymous')
-        return
-      }
-      throw err
+    } catch {
+      // Any failure to establish who this is means we do not know who this is, and
+      // the only honest screen for that is the login form.
+      //
+      // This used to rethrow anything that was not a 401 or 403, which on a device
+      // that starts in 'checking' meant the counter tablet sat on a spinner
+      // permanently — no error, no login form, nothing to tap. The case that made it
+      // routine rather than theoretical: on a shared origin an expired token
+      // contributes no tenant, so resolution failed before authentication was
+      // reached and `/auth/me` answered *400*, not 401. Fixed server-side in
+      // tenancy/deps.py::get_tenant_context; the catch stays broad because a staffed
+      // counter cannot debug a spinner mid-shift.
+      clearTokens()
+      setMe(null)
+      setStatus('anonymous')
     }
   }, [])
 

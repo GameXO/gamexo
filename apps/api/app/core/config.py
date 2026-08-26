@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     tenant_base_domain: str = "gamexo.app"
     allow_tenant_header: bool = False
 
+    # Resolve the tenant from the JWT's `tid` claim when the host names no
+    # subdomain. This is what lets every academy share one origin — which is how
+    # the product is actually deployed today: one Cloudflare Worker serving the
+    # dashboard at `/` and the POS at `/pos/`, with no wildcard DNS.
+    #
+    # Deliberately NOT guarded in _guard_production the way ALLOW_TENANT_HEADER is.
+    # The header is a bare string the caller types, so honouring it in production
+    # would let anyone name any tenant. `tid` is a signed claim inside a token we
+    # minted: a caller can only ever present a tid we already issued to them.
+    allow_token_tenant: bool = True
+
     # ── Auth ────────────────────────────────────────────────────────────────
     jwt_secret_key: SecretStr
     jwt_algorithm: str = "HS256"
@@ -46,6 +57,26 @@ class Settings(BaseSettings):
 
     # ── HTTP ────────────────────────────────────────────────────────────────
     cors_origins: list[str] = Field(default_factory=list)
+
+    # ── Uploads ─────────────────────────────────────────────────────────────
+    #
+    # Turf logos and court photos. Cloudflare R2 when configured (S3-compatible, so
+    # boto3 talks to it unchanged and these same four settings point at real S3 by
+    # swapping the endpoint); otherwise the local disk, served at /media.
+    #
+    # The local backend is not a production fallback — it is what makes onboarding
+    # runnable without a Cloudflare account, and what lets the tests upload without
+    # a network. A deployment on more than one instance must set R2, or two workers
+    # will disagree about which images exist.
+    r2_account_id: str | None = None
+    r2_bucket: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: SecretStr | None = None
+    #: The public hostname the bucket is served from — an r2.dev subdomain, or a
+    #: custom domain. Uploads are unreachable without it: R2's API endpoint is not
+    #: a read endpoint.
+    r2_public_base_url: str | None = None
+    local_upload_dir: str = "var/uploads"
 
     # ── Secrets at rest ─────────────────────────────────────────────────────
     #
@@ -121,6 +152,58 @@ class Settings(BaseSettings):
             return "resend"
         return "smtp" if self.smtp_host else "none"
 
+    # ── Platform billing ────────────────────────────────────────────────────
+    #
+    # gamexo charging a turf owner for their subscription. Not to be confused with
+    # `modules/payments`, which is an academy's *own* gateway for charging *its*
+    # customers — different account, different money, different direction.
+    #
+    # One Razorpay account, ours, configured here rather than per tenant: the payer
+    # has no tenant yet when they reach checkout. That is the whole point of the
+    # flow — see modules/billing/models.py::SignupIntent.
+    platform_razorpay_key_id: str | None = None
+    platform_razorpay_key_secret: SecretStr | None = None
+    #: From Razorpay → Settings → Webhooks, set when the endpoint is created. A
+    #: webhook arriving without a matching signature is discarded, so leaving this
+    #: unset means no webhook can ever be trusted — the flow then depends entirely
+    #: on the browser returning from checkout.
+    platform_razorpay_webhook_secret: SecretStr | None = None
+
+    #: Signs the mock provider's payments — see modules/billing/razorpay.py. Exists
+    #: so mock mode runs the *same* HMAC verification as the real one rather than
+    #: skipping it: the code path under test is then the code path that ships.
+    billing_mock_secret: str = "gamexo-mock-billing-secret"
+
+    #: How long a half-finished signup survives. The wizard's answers are worth
+    #: keeping across a closed tab and a re-opened link; they are not worth keeping
+    #: forever, and an intent is a bearer capability with an email address in it.
+    signup_intent_ttl_hours: int = 48
+
+    #: The one-time token that carries a freshly-paid owner from the website into
+    #: the dashboard already signed in. Short: it travels in a URL, which means
+    #: browser history, referrer headers and shoulders.
+    handoff_token_ttl_seconds: int = 300
+
+    #: Where the two frontends live, for the redirect out of checkout and for the
+    #: links in the welcome email. Not derived from the request: the API may sit
+    #: behind a different hostname than either, and a guessed link in an email is
+    #: worse than no link.
+    dashboard_url: str = "http://localhost:5173"
+    website_url: str = "http://localhost:5175"
+    #: The counter tablet's address, for the kiosk half of the welcome email. The
+    #: POS is served under `/pos/`, which is why this is not just dashboard_url.
+    pos_url: str = "http://localhost:5174/pos/"
+
+    @property
+    def billing_provider(self) -> str:
+        """`razorpay` once our keys are set, `mock` before that.
+
+        Mock mode is what makes the signup flow runnable end to end on a laptop
+        with no Razorpay account — and it is refused in production below, so it
+        cannot become the way real money is not collected.
+        """
+        return "razorpay" if self.platform_razorpay_key_id else "mock"
+
     # ── Seed ────────────────────────────────────────────────────────────────
     seed_tenant_slug: str | None = None
     seed_tenant_name: str | None = None
@@ -167,6 +250,21 @@ class Settings(BaseSettings):
 
         if len(self.jwt_secret_key.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters in production")
+
+        # Mock billing hands out a working account for a payment that never
+        # happened. Fine on a laptop, and an open door to free subscriptions here.
+        if self.billing_provider == "mock":
+            raise ValueError(
+                "PLATFORM_RAZORPAY_KEY_ID must be set in production: without it the "
+                "signup checkout runs in mock mode and provisions academies without "
+                "taking payment."
+            )
+        if not self.platform_razorpay_key_secret:
+            raise ValueError(
+                "PLATFORM_RAZORPAY_KEY_SECRET must be set alongside the key id — the "
+                "secret is what verifies that a payment callback really came from "
+                "Razorpay."
+            )
 
         return self
 

@@ -9,10 +9,12 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.engine import make_url
 
 from app.auth import platform_router
 from app.auth import router as auth_router
+from app.core import storage
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.timing import DbTimingMiddleware
@@ -20,14 +22,17 @@ from app.db.session import dispose_engine, warm_pool
 from app.modules.academy import router as academy_router
 from app.modules.admin import router as admin_router
 from app.modules.advertising import router as advertising_router
+from app.modules.billing import router as billing_router
 from app.modules.booking import router as booking_router
 from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
 from app.modules.gateway import sandbox as gateway_sandbox
 from app.modules.gateway.dialects import DIALECTS
 from app.modules.gateway.dispatch import GatewayDispatch
+from app.modules.onboarding import router as onboarding_router
 from app.modules.payments import router as payments_router
 from app.modules.reporting import router as reporting_router
+from app.modules.uploads import router as uploads_router
 from app.tenancy.deps import TenantCtx
 
 # Importing the model registry populates Base.metadata. Without it, Alembic's
@@ -126,6 +131,15 @@ def create_app() -> FastAPI:
                 ),
             },
             {"name": "platform", "description": "Platform operator control plane."},
+            {
+                "name": "signup",
+                "description": (
+                    "Self-serve signup, from the marketing site. Unauthenticated by "
+                    "necessity — the caller has no account yet, and no academy is "
+                    "created until a payment clears. A signup is addressed by an "
+                    "opaque token the browser holds."
+                ),
+            },
             {"name": "reporting", "description": "Dashboard and Reports aggregates."},
             {
                 "name": "gateway",
@@ -176,6 +190,8 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=settings.api_v1_prefix)
     api.include_router(auth_router.router)
     api.include_router(platform_router.router)
+    api.include_router(billing_router.router)
+    api.include_router(onboarding_router.router)
     api.include_router(booking_router.router)
     api.include_router(academy_router.router)
     api.include_router(advertising_router.router)
@@ -184,6 +200,7 @@ def create_app() -> FastAPI:
     api.include_router(finance_router.router)
     api.include_router(gateway_admin_router.router)
     api.include_router(payments_router.router)
+    api.include_router(uploads_router.router)
 
     # Every dialect under its own slug, and none of them at the bare `/gateway`
     # prefix — that path belongs to GatewayDispatch, which rewrites it to whichever
@@ -195,12 +212,33 @@ def create_app() -> FastAPI:
     for spec in DIALECTS.values():
         api.include_router(spec.router, prefix=f"/gateway/{spec.slug}")
 
-    # Dev/staging only — see sandbox.register.
+    # Dev/staging only — see sandbox.register and register_mock_checkout. Both
+    # create real rows without a real counterparty, so neither is merely guarded:
+    # the routes do not exist at all where they would be dangerous.
     gateway_sandbox.register(api)
+    billing_router.register_mock_checkout(api)
     api.include_router(_health_router())
     app.include_router(api)
 
+    _mount_local_media(app)
+
     return app
+
+
+def _mount_local_media(app: FastAPI) -> None:
+    """Serve uploaded images from disk when R2 is not configured.
+
+    Development and test only in practice — see core/storage.py on why the local
+    backend exists. Mounted rather than routed because these are static bytes with
+    no tenancy to resolve: the key already contains the tenant id, and the URL is
+    the capability, exactly as it would be coming from a bucket.
+    """
+    if settings.r2_bucket:
+        return
+
+    directory = storage.local_upload_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=directory), name="media")
 
 
 def _health_router() -> APIRouter:

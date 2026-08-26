@@ -12,6 +12,11 @@ export default defineConfig({
     // Distinct from the dashboard's 5173 so both frontends can run side by side
     // against the same backend during local dev.
     port: 5174,
+    // Refuse to start rather than drift onto another app's port. Without this a
+    // busy 5174 silently moves the POS to 5175 (the website's), and whatever *is*
+    // on 5174 answers /pos/ with its own SPA fallback — which looks exactly like
+    // the POS ignoring its login and rendering the wrong app.
+    strictPort: true,
     // Bind every interface, not just loopback, so a phone/tablet on the same
     // Wi-Fi can reach this for on-device testing.
     host: true,

@@ -1,12 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
-import { TENANT } from '../api/client'
 import { useAuth } from './AuthProvider'
 import brandLogo from '../assets/figma/brand-logo.svg'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -16,10 +15,10 @@ export default function LoginPage() {
     setError(null)
     setBusy(true)
     try {
-      await login(email.trim(), password)
+      await login(username.trim(), password)
     } catch (err) {
-      // The API deliberately returns the same message for unknown-email and
-      // wrong-password, so there is nothing more specific to show here.
+      // The API deliberately returns the same message for an unknown username and
+      // a wrong password, so there is nothing more specific to show here.
       setError(err instanceof ApiError ? err.message : 'Could not reach the server. Is the API running?')
     } finally {
       setBusy(false)
@@ -32,20 +31,27 @@ export default function LoginPage() {
         <img src={brandLogo} alt="" className="h-8" />
 
         <h1 className="mt-6 font-display text-xl font-semibold text-ink">Counter sign-in</h1>
+        {/* The academy is no longer printed from a build-time slug: the username
+            carries it, and one POS build serves every venue. */}
         <p className="mt-1 text-sm text-slate">
-          Academy <span className="font-medium text-ink">{TENANT}</span> · POS
+          Use the counter login from your welcome email.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-ink">Email</span>
+            <span className="text-sm font-medium text-ink">Username</span>
+            {/* type="text", not "email": `kiosk@navigo-sports` has no dot after the
+                @, and the browser would refuse to submit a valid login. */}
             <input
-              type="email"
+              type="text"
               required
               autoFocus
               autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              spellCheck={false}
+              autoCapitalize="none"
+              placeholder="kiosk@your-turf"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="rounded-lg border border-border-input px-3 py-2.5 text-sm text-ink outline-none focus:border-lime-ink"
             />
           </label>
