@@ -213,6 +213,123 @@ def payment_receipt(
     return subject, text, html
 
 
+# ── Welcome, with the credentials to sign in ────────────────────────────────
+
+
+def _credential_box(label: str, username: str, password: str) -> str:
+    """One boxed username/password pair.
+
+    Monospaced, because these are about to be typed rather than read, and a
+    proportional font makes l/1 and O/0 a guess.
+    """
+    return (
+        '<div style="margin:14px 0 0;padding:14px 16px;border:1px solid #e7ebf0;'
+        'border-radius:10px;background:#fafafa;">'
+        '<div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;'
+        f'color:#8c8c8c;">{escape(label)}</div>'
+        '<div style="margin-top:8px;font-family:monospace;font-size:15px;color:#111111;">'
+        f'<strong>{escape(username)}</strong></div>'
+        '<div style="margin-top:4px;font-family:monospace;font-size:18px;font-weight:700;'
+        f'color:#111111;letter-spacing:0.04em;">{escape(password)}</div>'
+        "</div>"
+    )
+
+
+def welcome_credentials(
+    settings: TenantSettings,
+    *,
+    full_name: str,
+    username: str,
+    password: str,
+    kiosk_username: str,
+    kiosk_password: str,
+    dashboard_url: str,
+    pos_url: str,
+    plan_name: str,
+    amount_paid: Decimal,
+    payment_reference: str,
+) -> tuple[str, str, str]:
+    """The one email that carries passwords.
+
+    Two logins, because an academy needs both from the first day: the owner's
+    dashboard account, and the shared credential for the counter tablet. Sending
+    them together is deliberate — the counter login discovered a week later is a
+    support ticket, and the wizard has just finished asking which services the POS
+    should run.
+
+    Sending a password by email is a real weakness and it is a deliberate trade: the
+    alternative — a set-your-password link — is another round trip standing between
+    a customer who has just paid and the product they paid for, and a link that
+    expires unread is a support ticket. What limits the damage is that these
+    passwords exist nowhere else. They are generated at provisioning, hashed straight
+    into `app_user`, and never written to `signup_intent`, to a log, or to an audit
+    row.
+
+    Note that the logins are **usernames, not addresses** — `admin@your-slug` has no
+    mailbox behind it. See auth/usernames.py.
+    """
+    cur = settings.currency
+    subject = f"Your {settings.business_name} dashboard is ready"
+
+    receipt = [
+        ("Plan", plan_name),
+        ("Paid", money(amount_paid, cur)),
+        ("Reference", payment_reference),
+    ]
+
+    text = "\n".join(
+        [
+            f"Welcome to gamexo, {full_name or 'there'}.",
+            "",
+            f"{settings.business_name} is set up and ready to take bookings.",
+            "",
+            "── Your admin login (full access) ──",
+            f"  Sign in at : {dashboard_url}",
+            f"  Username   : {username}",
+            f"  Password   : {password}",
+            "",
+            "── Your counter login (POS only) ──",
+            f"  Sign in at : {pos_url}",
+            f"  Username   : {kiosk_username}",
+            f"  Password   : {kiosk_password}",
+            "",
+            "These are usernames, not email addresses — type them exactly as shown.",
+            "Change both passwords after your first sign-in — Settings → Security.",
+            "",
+            *(f"{label}: {value}" for label, value in receipt),
+        ]
+    )
+
+    html = _shell(
+        settings,
+        "Your dashboard is ready",
+        f"Welcome aboard, {full_name or 'there'}. {settings.business_name} is set up "
+        "and ready to take bookings.",
+        '<p style="margin:0 0 4px;font-size:14px;color:#111111;font-weight:600;">'
+        "Your admin login — full access</p>"
+        + _credential_box("Dashboard", username, password)
+        + f'<p style="margin:8px 0 0;font-size:12px;color:#888888;">{escape(dashboard_url)}</p>'
+        + '<div style="height:20px"></div>'
+        + '<p style="margin:0 0 4px;font-size:14px;color:#111111;font-weight:600;">'
+        "Your counter login — bookings and check-in only</p>"
+        + _credential_box("POS tablet", kiosk_username, kiosk_password)
+        + f'<p style="margin:8px 0 0;font-size:12px;color:#888888;">{escape(pos_url)}</p>'
+        + '<p style="margin:18px 0 0;font-size:13px;color:#555555;line-height:1.5;">'
+        "These are <strong>usernames, not email addresses</strong> — type them "
+        "exactly as shown, including the part after the @.</p>"
+        + f'<div style="margin:22px 0 0;"><a href="{escape(dashboard_url)}" '
+        f'style="display:inline-block;background:{settings.brand_primary};color:#ffffff;'
+        'text-decoration:none;padding:12px 22px;border-radius:10px;font-size:14px;'
+        'font-weight:600;">Open my dashboard</a></div>'
+        + '<div style="height:26px"></div>'
+        + _rows(receipt, emphasise_last=False),
+        "Please change both passwords after your first sign-in, under "
+        "Settings → Security. If you did not sign up for gamexo, reply to this "
+        "email and we will remove the account.",
+    )
+    return subject, text, html
+
+
 # ── Invoice ─────────────────────────────────────────────────────────────────
 
 

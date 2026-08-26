@@ -20,7 +20,7 @@ from app.auth.deps import (
     revoke_identity,
 )
 from app.auth.schemas import UserOut
-from app.auth.service import initials, register_email
+from app.auth.service import claim_staff_username, initials, register_login
 from app.core.errors import ConflictError
 from app.core.security import Role, hash_password
 from app.models.tenant import SERVICE_KEYS, TenantSettings
@@ -229,7 +229,18 @@ async def list_staff(
 
 
 @router.post(
-    "/staff", response_model=UserOut, status_code=status.HTTP_201_CREATED, summary="Add a staff member"
+    "/staff",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a staff member",
+    description=(
+        "The username is **generated, not chosen** — `rahul-joshi.staff@your-slug`, "
+        "suffixed on a clash. Two people called Rahul at one turf is ordinary, so "
+        "the second becomes `rahul-joshi-2.staff@…` rather than failing.\n\n"
+        "The email is where their mail goes and is not what they sign in with. "
+        "Hand them the `username` from the response — it is the only place it is "
+        "shown at creation time."
+    ),
 )
 async def create_staff(
     payload: StaffCreate, db: Db, tenant: TenantCtx, _: RequireAdmin
@@ -242,13 +253,29 @@ async def create_staff(
             "Someone at this academy already uses that email.", details={"field": "email"}
         )
 
-    # Claims the email platform-wide, so this person can sign in on the shared
-    # origin where there is no subdomain to say which academy they belong to.
-    # Raises ConflictError if it is taken at another academy — see AccountDirectory
-    # on why login emails are globally unique.
-    await register_email(db, email=payload.email, tenant_id=tenant.id)
+    # A kiosk login is provisioned with the academy and is a shared device rather
+    # than a person — creating a second one through the staff form would give the
+    # counter two credentials and no way to tell which is in use.
+    if payload.role is Role.KIOSK:
+        raise ConflictError(
+            "The counter login is created with the academy and cannot be added here. "
+            "Reset its password from Settings instead.",
+            details={"field": "role"},
+        )
+
+    username = await claim_staff_username(
+        db, full_name=payload.full_name, tenant_slug=tenant.slug
+    )
+    # Claims the username and the email platform-wide, so this person can sign in on
+    # the shared origin where there is no subdomain to say which academy they belong
+    # to. Raises ConflictError if either is taken — see AccountDirectory on why
+    # logins are globally unique.
+    await register_login(
+        db, username=username, email=payload.email, tenant_id=tenant.id
+    )
 
     user = User(
+        username=username,
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,

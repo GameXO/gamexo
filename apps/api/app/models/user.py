@@ -53,8 +53,21 @@ class User(TenantScoped):
         # priya@x.com cannot both exist — case-sensitive email uniqueness is a
         # duplicate-account bug waiting to happen.
         Index("uq_app_user_tenant_email", "tenant_id", text("lower(email)"), unique=True),
+        # The login identifier. Per-tenant here and globally unique via
+        # account_directory — the same split the email column already has.
+        Index("uq_app_user_tenant_username", "tenant_id", text("lower(username)"), unique=True),
     )
 
+    #: What this person types to sign in — `admin@navigo-sports`,
+    #: `rahul.staff@navigo-sports`, `kiosk@navigo-sports`. Generated once at
+    #: creation and stored, never derived from the slug on the fly: a tenant that
+    #: renames itself must not invalidate credentials its staff have written down.
+    #: See auth/usernames.py.
+    username: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    #: Where this account's mail goes, and **not** the login. The distinction is
+    #: load-bearing: `admin@navigo-sports` has no MX record, so the welcome message
+    #: carrying the generated password has to be addressed here instead.
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -84,7 +97,7 @@ class User(TenantScoped):
         return self.status is UserStatus.ACTIVE
 
     def __repr__(self) -> str:
-        return f"<User {self.email} role={self.role} tenant={self.tenant_id}>"
+        return f"<User {self.username} role={self.role} tenant={self.tenant_id}>"
 
 
 class PlatformAdmin(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -105,6 +118,9 @@ class PlatformAdmin(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "platform_admin"
 
+    #: `ops@gamexo`. Global unique is correct here: platform admins belong to no
+    #: tenant, so there is no tenant to scope the name to.
+    username: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
     # Global unique is correct here: platform admins belong to no tenant.
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -113,7 +129,7 @@ class PlatformAdmin(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     def __repr__(self) -> str:
-        return f"<PlatformAdmin {self.email}>"
+        return f"<PlatformAdmin {self.username}>"
 
 
 class AccountDirectory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -141,8 +157,20 @@ class AccountDirectory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "account_directory"
     __table_args__ = (
         Index("uq_account_directory_email", text("lower(email)"), unique=True),
+        # The identifier logins are actually resolved by, now that usernames rather
+        # than addresses are typed into the form. Unique platform-wide for the same
+        # reason the email index is: it is what makes "which academy owns this
+        # login" answerable from a session with no tenant bound.
+        Index("uq_account_directory_username", text("lower(username)"), unique=True),
     )
 
+    #: `admin@navigo-sports`. What is typed into the sign-in form.
+    username: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    #: The contact address, kept here so a login by legacy email still resolves —
+    #: accounts created before usernames existed had their address typed into the
+    #: form for months, and breaking those on deploy would lock out every academy
+    #: at once. See auth/service.py::resolve_login_tenant.
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True),
@@ -155,4 +183,4 @@ class AccountDirectory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<AccountDirectory {self.email} -> {self.tenant_id}>"
+        return f"<AccountDirectory {self.username} -> {self.tenant_id}>"

@@ -53,5 +53,5 @@ async def upload_image(
     # `put_object` takes bytes, and a partial write to local disk would leave a
     # truncated file behind a URL that already looks valid.
     data = await file.read()
-    stored = storage.store_image(data, tenant_id=tenant.id)
+    stored = storage.store_image(data, prefix=storage.tenant_prefix(tenant.id))
     return UploadOut(url=stored.url, content_type=stored.content_type, size=stored.size)

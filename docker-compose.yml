@@ -47,7 +47,14 @@ services:
       TENANT_BASE_DOMAIN: gamexo.app
       ALLOW_TENANT_HEADER: "true"
       JWT_SECRET_KEY: dev-only-insecure-secret-change-me-before-anything-real
-      CORS_ORIGINS: '["http://localhost:8443","http://localhost:5173","http://localhost:5174"]'
+      # 5173 dashboard, 5174 POS, 5175 marketing site. The last one is not optional
+      # in the way the others are: signup is entirely cross-origin browser calls to
+      # this API from a page with no session, so a missing entry there is a working
+      # backend and a website that cannot reach it.
+      CORS_ORIGINS: '["http://localhost:8443","http://localhost:5173","http://localhost:5174","http://localhost:5175"]'
+      # Where signup sends a paid owner, and the link in the welcome email.
+      DASHBOARD_URL: http://localhost:5173
+      WEBSITE_URL: http://localhost:5175
       RUN_MIGRATIONS_ON_START: "true"
       RUN_SEED_ON_START: "true"
       # The seed script has no built-in credentials — every deployment names its own,

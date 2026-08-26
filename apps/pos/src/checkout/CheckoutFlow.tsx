@@ -48,7 +48,6 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
   const [settleError, setSettleError] = useState<string | null>(null)
 
   const sessionQuery = useActiveSessionByCode(searchCode)
-  const booking = sessionQuery.data ?? null
   const recordPayment = useRecordPayment()
   const invoiceBooking = useInvoiceBooking()
 
@@ -85,6 +84,7 @@ export default function CheckoutFlow({ onHome }: { onHome: () => void }) {
     setResendCooldown(RESEND_SECONDS)
   }
 
+  const booking = sessionQuery.data ?? null
   const amount = booking ? Number(booking.balance_due) : 0
   const alreadySettled = step === 'session' && !!booking && amount <= 0
 

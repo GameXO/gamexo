@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.audit import write_audit
@@ -32,7 +33,9 @@ from app.db.session import bind_session_to
 from app.models.audit import ActorKind
 from app.models.tenant import Tenant
 from app.models.user import PlatformAdmin, User
+from app.modules.billing import service as billing_service
 from app.tenancy.deps import Db, OptionalTenantCtx, TenantCtx, UntenantedDb
+from app.tenancy.resolver import assert_tenant_usable
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -89,10 +92,15 @@ async def signup(payload: SignupRequest, db: UntenantedDb, request: Request) -> 
     response_model=TokenPair,
     summary="Log in as academy staff",
     description=(
+        "Sign in with a **username** — `admin@navigo-sports`, "
+        "`rahul.staff@navigo-sports`, `kiosk@navigo-sports`. The part after the `@` "
+        "is the academy's slug, not a domain; see `auth/usernames.py`.\n\n"
         "Authenticates against the academy resolved from the request host (or "
         "`X-Tenant-ID` in development). When the request names no academy — the "
         "shared-origin deployment, where every turf answers on one hostname — the "
-        "academy is looked up from the email instead."
+        "academy is looked up from the username instead.\n\n"
+        "An email address is still accepted, so accounts created before usernames "
+        "existed keep working."
     ),
 )
 async def login(
@@ -102,11 +110,19 @@ async def login(
     # authority on which academy you are signing in to, and the directory lookup
     # must not be able to send you somewhere else.
     tenant_id = (
-        tenant.id if tenant else await resolve_login_tenant(db, email=payload.email)
+        tenant.id if tenant else await resolve_login_tenant(db, identifier=payload.username)
     )
 
     async with bind_session_to(db, tenant_id):
-        user = await authenticate_user(db, email=payload.email, password=payload.password)
+        user = await authenticate_user(
+            db, identifier=payload.username, password=payload.password
+        )
+        # After the password, never before — see resolver.assert_tenant_usable. On a
+        # subdomain the resolver has already refused a suspended academy; on a shared
+        # origin nothing has, because the academy came from the directory rather than
+        # from resolution, and without this a suspension would not actually keep
+        # anybody out.
+        await assert_tenant_usable(db, tenant_id)
         access, refresh = issue_user_tokens(user)
 
         await write_audit(
@@ -125,6 +141,31 @@ async def login(
     return TokenPair(
         access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
     )
+
+
+class HandoffRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=128)
+
+
+@router.post(
+    "/handoff",
+    response_model=TokenPair,
+    summary="Exchange a one-time signup token for a session",
+    description=(
+        "The last step of self-serve signup. The website receives this token when a "
+        "payment is confirmed and sends the browser to "
+        "`{dashboard_url}/?handoff={token}` — the dashboard posts it here and the "
+        "owner is signed in without ever seeing a login form.\n\n"
+        "**Single use, and short-lived.** It travels in a URL, so a copy of it is in "
+        "browser history and in the referrer of whatever the dashboard loads next. "
+        "Burning it on first use is what makes those copies inert.\n\n"
+        "401 for expired, already-used and never-existed alike — the differences are "
+        "only useful to somebody testing which of their guesses is closest."
+    ),
+)
+async def handoff(payload: HandoffRequest, db: UntenantedDb) -> TokenPair:
+    access, refresh, expires_in = await billing_service.redeem_handoff(db, payload.token)
+    return TokenPair(access_token=access, refresh_token=refresh, expires_in=expires_in)
 
 
 @router.post(
@@ -157,6 +198,11 @@ async def refresh_tokens(
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
             raise AuthenticationError("This account is no longer active.")
+
+        # The token is proof enough to be told why this is refused. Without it, a
+        # session that predates a suspension renews itself forever on a shared
+        # origin, and the academy is only locked out once whoever holds it signs out.
+        await assert_tenant_usable(db, uuid.UUID(claimed_tenant))
 
         # NOTE: refresh tokens are stateless for now, so a refresh token stays valid
         # until it expires even after a password change. When that matters, add a

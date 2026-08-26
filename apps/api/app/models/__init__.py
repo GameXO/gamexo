@@ -28,6 +28,7 @@ from app.modules.advertising.models import (
     SpotStatus,
     SpotType,
 )
+from app.modules.billing.models import SignupIntent, SignupStatus
 from app.modules.gateway.models import IntegrationPartner
 from app.modules.payments.models import (
     PaymentProvider,
@@ -142,6 +143,8 @@ __all__ = [
     "PlatformAdmin",
     "Program",
     "SessionStatus",
+    "SignupIntent",
+    "SignupStatus",
     "Sport",
     "SpotStatus",
     "SpotType",

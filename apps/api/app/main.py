@@ -22,6 +22,7 @@ from app.db.session import dispose_engine, warm_pool
 from app.modules.academy import router as academy_router
 from app.modules.admin import router as admin_router
 from app.modules.advertising import router as advertising_router
+from app.modules.billing import router as billing_router
 from app.modules.booking import router as booking_router
 from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
@@ -130,6 +131,15 @@ def create_app() -> FastAPI:
                 ),
             },
             {"name": "platform", "description": "Platform operator control plane."},
+            {
+                "name": "signup",
+                "description": (
+                    "Self-serve signup, from the marketing site. Unauthenticated by "
+                    "necessity — the caller has no account yet, and no academy is "
+                    "created until a payment clears. A signup is addressed by an "
+                    "opaque token the browser holds."
+                ),
+            },
             {"name": "reporting", "description": "Dashboard and Reports aggregates."},
             {
                 "name": "gateway",
@@ -180,6 +190,7 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=settings.api_v1_prefix)
     api.include_router(auth_router.router)
     api.include_router(platform_router.router)
+    api.include_router(billing_router.router)
     api.include_router(onboarding_router.router)
     api.include_router(booking_router.router)
     api.include_router(academy_router.router)
@@ -201,8 +212,11 @@ def create_app() -> FastAPI:
     for spec in DIALECTS.values():
         api.include_router(spec.router, prefix=f"/gateway/{spec.slug}")
 
-    # Dev/staging only — see sandbox.register.
+    # Dev/staging only — see sandbox.register and register_mock_checkout. Both
+    # create real rows without a real counterparty, so neither is merely guarded:
+    # the routes do not exist at all where they would be dangerous.
     gateway_sandbox.register(api)
+    billing_router.register_mock_checkout(api)
     api.include_router(_health_router())
     app.include_router(api)
 

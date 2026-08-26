@@ -32,6 +32,25 @@ class TenantStatus(StrEnum):
     SUSPENDED = "suspended"
 
 
+class PlanTier(StrEnum):
+    """What an academy pays for.
+
+    Here rather than in modules/billing/plans.py because `Tenant.plan_tier` is the
+    column of record and models may not import a module that imports them back.
+    plans.py types its `code` field with this, so the catalogue the pricing page
+    renders and the value stored on the tenant cannot drift apart.
+
+    Stored as a plain String(50) rather than a Postgres enum, deliberately: plans get
+    renamed and retired far more often than tenant statuses do, and none of that is
+    worth a migration with an exclusive lock on the table every hostname lookup
+    reads.
+    """
+
+    STARTER = "starter"
+    GROWTH = "growth"
+    PRO = "pro"
+
+
 class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """An academy. My own centre is simply tenant #1.
 
@@ -51,7 +70,9 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=TenantStatus.TRIAL,
         nullable=False,
     )
-    plan_tier: Mapped[str] = mapped_column(String(50), default="starter", nullable=False)
+    plan_tier: Mapped[str] = mapped_column(
+        String(50), default=PlanTier.STARTER.value, nullable=False
+    )
 
     # NULL until the owner finishes the onboarding wizard, which is what routes a
     # freshly signed-up account into the wizard instead of an empty dashboard.
@@ -247,3 +268,42 @@ class TenantSettings(TenantScoped):
 
     def __repr__(self) -> str:
         return f"<TenantSettings {self.business_name}>"
+
+
+class DeletedTenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A tombstone for an academy that was hard-deleted.
+
+    Exists because deleting an academy destroys its own evidence. `audit_log` is
+    tenant-scoped, so the row recording "this academy was deleted" would be removed
+    by the very operation it describes — leaving a platform with one fewer tenant and
+    nothing at all to say where it went.
+
+    Deliberately NOT TenantScoped, and under no RLS policy: the tenant it refers to
+    no longer exists, so there is nothing to scope it to. It holds only what an
+    operator would need months later to answer "what happened to Kondapur Turf
+    Arena?" — never the academy's own data, which is the thing that was deleted.
+    """
+
+    __tablename__ = "deleted_tenant"
+
+    #: The id the academy had. Not a foreign key — the row it pointed at is gone.
+    tenant_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(63), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    plan_tier: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #: The platform operator who did it. Not a foreign key either — an operator
+    #: account may itself be removed, and losing the name of who deleted an academy
+    #: because of unrelated housekeeping would defeat the point of this table.
+    deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True))
+    deleted_by_label: Mapped[str | None] = mapped_column(String(320))
+
+    #: `{"booking": 412, "payment": 389, ...}` — how many rows went with it, by table.
+    #: The only surviving measure of what was destroyed, and what makes an accidental
+    #: deletion something anybody can argue about afterwards rather than invisible.
+    row_counts: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<DeletedTenant {self.slug} at {self.deleted_at:%Y-%m-%d}>"

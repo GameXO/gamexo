@@ -85,6 +85,18 @@ SPORT_CATALOGUE: tuple[CatalogueSport, ...] = (
     _sport("boxing", "Boxing & MMA", "🥊", "#DC2626", "#FDEAEA", 500, duration=45),
     _sport("gym", "Gym", "🏋️", "#525252", "#EFEFEF", 200, duration=60),
     _sport("archery", "Archery", "🏹", "#65A30D", "#F2F8E4", 500, duration=45),
+    # ── Studio and coaching formats ──────────────────────────────────────────
+    # Sold as a class on the clock rather than a court by the hour, which is why
+    # every one of them is 45–60 minutes at a per-head price. They are here because
+    # the venues signing up for this are rarely only courts — a turf with a mezzanine
+    # running yoga in the morning is the common case, not the exotic one.
+    _sport("yoga", "Yoga", "🧘", "#7C3AED", "#F1E9FE", 300, duration=60),
+    _sport("pilates", "Pilates", "🤸", "#BE185D", "#FCE8F1", 400, duration=60),
+    _sport("dance", "Dance", "💃", "#C026D3", "#FBE9FC", 350, duration=60),
+    _sport("martial-arts", "Martial Arts", "🥋", "#B91C1C", "#FCE9E9", 400, duration=60),
+    _sport("gymnastics", "Gymnastics", "🤾", "#0891B2", "#E2F5F9", 400, duration=60),
+    _sport("rock-climbing", "Rock Climbing", "🧗", "#78716C", "#F1EFEE", 600, duration=60),
+    _sport("golf", "Golf", "⛳", "#15803D", "#E8F6EC", 900, duration=60),
 )
 
 BY_SLUG: dict[str, CatalogueSport] = {sport.slug: sport for sport in SPORT_CATALOGUE}

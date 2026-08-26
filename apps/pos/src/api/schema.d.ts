@@ -401,6 +401,30 @@ export interface paths {
         patch: operations["advertising_updateSpot"];
         trace?: never;
     };
+    "/api/v1/auth/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a one-time signup token for a session
+         * @description The last step of self-serve signup. The website receives this token when a payment is confirmed and sends the browser to `{dashboard_url}/?handoff={token}` — the dashboard posts it here and the owner is signed in without ever seeing a login form.
+         *
+         *     **Single use, and short-lived.** It travels in a URL, so a copy of it is in browser history and in the referrer of whatever the dashboard loads next. Burning it on first use is what makes those copies inert.
+         *
+         *     401 for expired, already-used and never-existed alike — the differences are only useful to somebody testing which of their guesses is closest.
+         */
+        post: operations["auth_handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -412,7 +436,11 @@ export interface paths {
         put?: never;
         /**
          * Log in as academy staff
-         * @description Authenticates against the academy resolved from the request host (or `X-Tenant-ID` in development). The same email may exist at more than one academy; which one you reach is determined by the host, not the password.
+         * @description Sign in with a **username** — `admin@navigo-sports`, `rahul.staff@navigo-sports`, `kiosk@navigo-sports`. The part after the `@` is the academy's slug, not a domain; see `auth/usernames.py`.
+         *
+         *     Authenticates against the academy resolved from the request host (or `X-Tenant-ID` in development). When the request names no academy — the shared-origin deployment, where every turf answers on one hostname — the academy is looked up from the username instead.
+         *
+         *     An email address is still accepted, so accounts created before usernames existed keep working.
          */
         post: operations["auth_login"];
         delete?: never;
@@ -452,6 +480,54 @@ export interface paths {
         put?: never;
         /** Exchange a refresh token for a new pair */
         post: operations["auth_refreshTokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register a new turf
+         * @description Self-serve registration. Creates the academy, its default settings and its first admin in one transaction, and signs the owner straight in.
+         *
+         *     The academy has no name yet — onboarding collects that — so it is created under a placeholder slug with `onboarding_completed` false, which is what routes the new owner into the wizard rather than the dashboard.
+         *
+         *     The email must be unused across the whole platform; see `models/user.py::AccountDirectory` for why login emails are globally unique.
+         */
+        post: operations["auth_signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/webhook/razorpay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Razorpay payment webhook
+         * @description Subscribe this URL to `payment.captured` in Razorpay → Settings → Webhooks, and put the secret it gives you in `PLATFORM_RAZORPAY_WEBHOOK_SECRET`.
+         *
+         *     This is the half of the flow that does not depend on the payer's browser. A customer who pays and immediately closes the tab still gets their academy and their credentials, because this arrives regardless.
+         *
+         *     **Always answers 200**, including for a signature it rejected. Razorpay retries any non-2xx for 24 hours, and retrying a forged callback forever achieves nothing but load. What it does with a payload is in the logs.
+         */
+        post: operations["signup_razorpayWebhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -736,7 +812,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove a court
+         * @description Only a court with no bookings can be deleted — a booking is a financial record and the FK is RESTRICT. A court that has been played on should be marked unavailable (`is_bookable: false`) instead, which takes it out of availability without detaching it from its history.
+         */
+        delete: operations["booking_deleteCourt"];
         options?: never;
         head?: never;
         /** Update a court */
@@ -839,7 +919,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
         parameters: {
             query?: never;
             header?: never;
@@ -863,7 +943,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
         parameters: {
             query?: never;
             header?: never;
@@ -891,7 +971,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/confirm": {
+    "/api/v1/gateway/native/bookings/confirm": {
         parameters: {
             query?: never;
             header?: never;
@@ -915,7 +995,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/hold": {
+    "/api/v1/gateway/native/bookings/hold": {
         parameters: {
             query?: never;
             header?: never;
@@ -939,7 +1019,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/map": {
+    "/api/v1/gateway/native/bookings/map": {
         parameters: {
             query?: never;
             header?: never;
@@ -959,7 +1039,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{reference}": {
+    "/api/v1/gateway/native/bookings/{reference}": {
         parameters: {
             query?: never;
             header?: never;
@@ -981,7 +1061,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/gateway/bookings/{reference}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -1174,9 +1254,15 @@ export interface paths {
          * Sandbox: drive the gateway as if we were a partner
          * @description Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.
          *
-         *     The scenarios are dialect-independent — the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. `dialect` defaults to whatever the API key was issued for.
+         *     The scenarios are dialect-independent — the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.
          *
-         *     **This writes to the database.** Bookings are created and cancelled on the academy the key belongs to. Each scenario cleans up after itself and runs on its own future date, but it is a dev tool — the routes are not registered when `ENVIRONMENT=production`.
+         *     Every driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.
+         *
+         *     **This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.
+         *
+         *     Pass `keep=true` to leave them behind for inspection — the transcript returns every request and response either way, so diagnosing a failure rarely needs it.
+         *
+         *     Still a dev tool: the routes are not registered when `ENVIRONMENT=production`.
          */
         post: operations["gateway_run"];
         delete?: never;
@@ -1557,6 +1643,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish first-run setup
+         * @description Names the turf, sets its logo and services, and creates the sports it offers — atomically. Deliberately creates **no courts**: a new turf has none until the owner adds them, and the empty state on the dashboard is what points them at Sports & Courts to do it.
+         *
+         *     Safe to re-run. Sports that already exist are skipped rather than duplicated, so a retry after a dropped connection does the right thing.
+         */
+        post: operations["onboarding_completeOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/partners": {
         parameters: {
             query?: never;
@@ -1587,7 +1695,13 @@ export interface paths {
         };
         /**
          * Wire formats the gateway speaks
-         * @description What to choose when adding an integration, and the base path to hand the partner.
+         * @description What to choose when adding an integration.
+         *
+         *     `base_path` is the same for every one of them — that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.
+         *
+         *     `is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.
+         *
+         *     Every dialect is returned, including the ones not offered — a partner onboarded before a dialect was retired still needs its label to render.
          *
          *     Declared above `/partners/{partner_id}` deliberately — routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.
          */
@@ -1618,8 +1732,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename or revoke an integration
+         * Rename, re-point or revoke an integration
          * @description Setting `is_active: false` revokes access immediately — the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.
+         *
+         *     Changing `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.
          */
         patch: operations["gateway_updatePartner"];
         trace?: never;
@@ -2022,6 +2138,213 @@ export interface paths {
         patch: operations["admin_updateSettings"];
         trace?: never;
     };
+    "/api/v1/settings/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Branding and enabled services, for the counter tablet */
+        get: operations["admin_getPublicSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Begin a signup
+         * @description Creates a draft. **No academy, no user and no charge** — see `modules/billing/models.py` for why nothing is provisioned until a payment clears.
+         *
+         *     Returns a token the browser must keep: it is the only way to address this signup, and every later call needs it.
+         *
+         *     409 if the email already signs in somewhere on the platform. That check is repeated at provisioning, which is the one that counts — this one exists so the failure happens before anyone pays.
+         */
+        post: operations["signup_startSignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/intent/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a signup back
+         * @description Resumes the wizard in a reopened tab, and is what the success screen polls when a browser returns from checkout before the webhook has landed: keep asking until `tenant_slug` is set.
+         *
+         *     404 for an unknown *or* expired token — deliberately the same answer, so this cannot be used to test which tokens exist.
+         */
+        get: operations["signup_readSignup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Save a step of the wizard
+         * @description Called as the owner moves between steps, so a closed tab loses nothing.
+         *
+         *     Omitted fields are left alone; `sports` and `services` are replaced wholesale when present, because both are the complete answer to their own screen.
+         *
+         *     409 once the signup is paid for — the answers are what was provisioned, and editing them afterwards would describe an academy that does not exist.
+         */
+        patch: operations["signup_updateSignup"];
+        trace?: never;
+    };
+    "/api/v1/signup/intent/{token}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a logo, before there is an academy to own it
+         * @description The same validation as `POST /uploads` — PNG, JPEG or WebP up to 5 MB, typed from the file's own magic bytes rather than the multipart header — filed under `signup/{intent}/` instead of a tenant prefix, because no tenant exists yet.
+         *
+         *     Returns a URL. Storing it on the signup is a separate `PATCH`, so an upload the owner immediately replaces does not overwrite anything.
+         */
+        post: operations["signup_uploadSignupLogo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/intent/{token}/mock-pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay a mock order (development only)
+         * @description Completes a signup without Razorpay, for local development. Mints a payment id, signs it with `BILLING_MOCK_SECRET`, and runs it through the same signature check a real payment takes.
+         *
+         *     Present only when no Razorpay key is configured; production refuses to boot in that state.
+         */
+        post: operations["signup_mockPay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/intent/{token}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Raise a payment order for the chosen plan
+         * @description Prices the plan server-side and creates a Razorpay order. The amount is **never** taken from the request — a client that could name its own price would be the whole vulnerability.
+         *
+         *     Safe to call again: a checkout the owner dismissed leaves an unpaid order behind, and retrying replaces it rather than forcing the wizard to restart.
+         *
+         *     `provider: "mock"` means no Razorpay keys are configured. The website then shows its own stand-in checkout and calls `…/mock-pay`; production refuses to boot in that state.
+         */
+        post: operations["signup_createOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/intent/{token}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a payment from the browser and provision the academy
+         * @description Called by the website with the three values Razorpay Checkout hands it on success. The signature is HMAC-SHA256 of `"{order_id}|{payment_id}"` keyed with our API key secret, and it is verified before anything else happens — an unsigned or mis-signed callback provisions nothing.
+         *
+         *     Idempotent, and interchangeable with the webhook: whichever lands first creates the academy and the other finds it already made. That matters because either one can be lost — a closed tab kills this, a firewall kills the webhook.
+         *
+         *     Returns a one-time `handoff_token`. Send the browser to `{dashboard_url}/?handoff={token}` and it arrives signed in.
+         */
+        post: operations["signup_verifyPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What gamexo sells
+         * @description The pricing page reads this rather than hardcoding numbers, so a price change is one edit to `modules/billing/plans.py` — no migration and no frontend release.
+         *
+         *     Amounts are integers in paise. ₹2,499.00 is `249900`.
+         */
+        get: operations["signup_listPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/sports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sports a turf can pick from
+         * @description The same catalogue as `GET /sports/catalogue`, without the prices and without the login. The wizard's second step renders this rather than hardcoding a list, so a slug it sends always matches one the API stocks — an unrecognised slug is accepted too, but becomes a custom sport priced at zero for the owner to set.
+         *
+         *     Prices are omitted deliberately: they are opening suggestions to be edited per venue, and putting them on a public page invites them to be read as a rate card.
+         */
+        get: operations["signup_listCatalogueSports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sports": {
         parameters: {
             query?: never;
@@ -2040,6 +2363,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sports/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sports a turf can choose from
+         * @description The fixed menu the onboarding wizard and the Sports & Courts screen pick from. Not this academy's sports — `GET /sports` is that. Selecting one here is what creates the row.
+         */
+        get: operations["booking_sportCatalogue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sports/{sport_id}": {
         parameters: {
             query?: never;
@@ -2050,7 +2393,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove a sport
+         * @description Only a sport with no courts can be deleted. A sport that has been played has bookings hanging off its courts, and those are records — deactivate it with `PATCH /sports/{id}` `{is_active: false}` instead, which hides it everywhere without rewriting history.
+         */
+        delete: operations["booking_deleteSport"];
         options?: never;
         head?: never;
         /** Update a sport */
@@ -2070,7 +2417,12 @@ export interface paths {
          */
         get: operations["admin_listStaff"];
         put?: never;
-        /** Add a staff member */
+        /**
+         * Add a staff member
+         * @description The username is **generated, not chosen** — `rahul-joshi.staff@your-slug`, suffixed on a clash. Two people called Rahul at one turf is ordinary, so the second becomes `rahul-joshi-2.staff@…` rather than failing.
+         *
+         *     The email is where their mail goes and is not what they sign in with. Hand them the `username` from the response — it is the only place it is shown at creation time.
+         */
         post: operations["admin_createStaff"];
         delete?: never;
         options?: never;
@@ -2093,6 +2445,28 @@ export interface paths {
         head?: never;
         /** Update a staff member */
         patch: operations["admin_updateStaff"];
+        trace?: never;
+    };
+    "/api/v1/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload an image
+         * @description PNG, JPEG or WebP, up to 5 MB. The type is determined from the file's own magic bytes, not from the multipart `Content-Type` — a caller can claim anything there, and the result would be served back from our own domain.
+         *
+         *     Returns a URL to store on whatever the image belongs to. Uploading does not attach it to anything by itself.
+         */
+        post: operations["uploads_uploadImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -2687,6 +3061,22 @@ export interface components {
             status?: components["schemas"]["BatchStatus"] | null;
             /** Time Label */
             time_label?: string | null;
+        };
+        /** Body_signup_uploadSignupLogo */
+        Body_signup_uploadSignupLogo: {
+            /**
+             * File
+             * @description PNG, JPEG or WebP, max 5 MB
+             */
+            file: string;
+        };
+        /** Body_uploads_uploadImage */
+        Body_uploads_uploadImage: {
+            /**
+             * File
+             * @description PNG, JPEG or WebP, max 5 MB
+             */
+            file: string;
         };
         /** BookingCancel */
         BookingCancel: {
@@ -3293,6 +3683,11 @@ export interface components {
             amenities?: string[];
             /** Code */
             code: string;
+            /**
+             * Display Order
+             * @default 0
+             */
+            display_order?: number;
             /** Hourly Rate */
             hourly_rate: number | string;
             /** Images */
@@ -3306,9 +3701,21 @@ export interface components {
             maintenance_note?: string | null;
             /** Name */
             name: string;
+            /**
+             * Open Slots Enabled
+             * @default false
+             */
+            open_slots_enabled?: boolean;
             operating_hours?: components["schemas"]["OperatingHours"];
             /** Peak Rate */
             peak_rate: number | string;
+            /** Rating */
+            rating?: number | string | null;
+            /**
+             * Slot Capacity
+             * @description How many people may join one session. Required when open_slots_enabled.
+             */
+            slot_capacity?: number | null;
             /**
              * Sport Id
              * Format: uuid
@@ -3321,6 +3728,11 @@ export interface components {
             amenities?: string[];
             /** Code */
             code: string;
+            /**
+             * Display Order
+             * @default 0
+             */
+            display_order?: number;
             /** Hourly Rate */
             hourly_rate: string;
             /**
@@ -3339,9 +3751,21 @@ export interface components {
             maintenance_note?: string | null;
             /** Name */
             name: string;
+            /**
+             * Open Slots Enabled
+             * @default false
+             */
+            open_slots_enabled?: boolean;
             operating_hours?: components["schemas"]["OperatingHours"];
             /** Peak Rate */
             peak_rate: string;
+            /** Rating */
+            rating?: string | null;
+            /**
+             * Slot Capacity
+             * @description How many people may join one session. Required when open_slots_enabled.
+             */
+            slot_capacity?: number | null;
             /**
              * Sport Id
              * Format: uuid
@@ -3352,6 +3776,8 @@ export interface components {
         CourtUpdate: {
             /** Amenities */
             amenities?: string[] | null;
+            /** Display Order */
+            display_order?: number | null;
             /** Hourly Rate */
             hourly_rate?: number | string | null;
             /** Images */
@@ -3362,9 +3788,15 @@ export interface components {
             maintenance_note?: string | null;
             /** Name */
             name?: string | null;
+            /** Open Slots Enabled */
+            open_slots_enabled?: boolean | null;
             operating_hours?: components["schemas"]["OperatingHours"] | null;
             /** Peak Rate */
             peak_rate?: number | string | null;
+            /** Rating */
+            rating?: number | string | null;
+            /** Slot Capacity */
+            slot_capacity?: number | null;
             /** Sport Id */
             sport_id?: string | null;
         };
@@ -3394,6 +3826,11 @@ export interface components {
             code: string;
             /** Current Booking Id */
             current_booking_id?: string | null;
+            /**
+             * Display Order
+             * @default 0
+             */
+            display_order?: number;
             /** Hourly Rate */
             hourly_rate: string;
             /**
@@ -3412,9 +3849,21 @@ export interface components {
             maintenance_note?: string | null;
             /** Name */
             name: string;
+            /**
+             * Open Slots Enabled
+             * @default false
+             */
+            open_slots_enabled?: boolean;
             operating_hours?: components["schemas"]["OperatingHours"];
             /** Peak Rate */
             peak_rate: string;
+            /** Rating */
+            rating?: string | null;
+            /**
+             * Slot Capacity
+             * @description How many people may join one session. Required when open_slots_enabled.
+             */
+            slot_capacity?: number | null;
             /**
              * Sport Id
              * Format: uuid
@@ -3427,6 +3876,16 @@ export interface components {
              * @description available | occupied | maintenance
              */
             status: string;
+        };
+        /** CreateOrder */
+        CreateOrder: {
+            /**
+             * Billing Period
+             * @default monthly
+             */
+            billing_period?: string;
+            /** Plan Code */
+            plan_code: string;
         };
         /**
          * CreateTenantRequest
@@ -3604,8 +4063,14 @@ export interface components {
         DialectOut: {
             /** Base Path */
             base_path: string;
+            /** Canonical Path */
+            canonical_path: string;
             /** Is Default */
             is_default: boolean;
+            /** Is Platform */
+            is_platform: boolean;
+            /** Is Ready */
+            is_ready: boolean;
             /** Label */
             label: string;
             /** Slug */
@@ -3958,6 +4423,11 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HandoffRequest */
+        HandoffRequest: {
+            /** Token */
+            token: string;
+        };
         /**
          * IntegrationsOut
          * @description Everything the payment half of the screen needs, in one request.
@@ -4195,15 +4665,24 @@ export interface components {
             /** Total Revenue */
             total_revenue: string;
         };
-        /** LoginRequest */
+        /**
+         * LoginRequest
+         * @description Sign in with a username — `admin@navigo-sports`, `rahul.staff@navigo-sports`.
+         *
+         *     Not `EmailStr`, and that is the point: a username's domain part is the tenant
+         *     slug, so `admin@navigo-sports` has no dot in it and email validation rejects it
+         *     outright. See auth/usernames.py.
+         *
+         *     An email address is still accepted here, because accounts created before
+         *     usernames existed have been signing in with one and must not be locked out on
+         *     deploy. Resolution tries the username first — see
+         *     auth/service.py::tenant_id_for_login.
+         */
         LoginRequest: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
             /** Password */
             password: string;
+            /** Username */
+            username: string;
         };
         /**
          * MapRequest
@@ -4512,6 +4991,31 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** OnboardingRequest */
+        OnboardingRequest: {
+            /** Address */
+            address?: string | null;
+            /** Business Name */
+            business_name: string;
+            /** City */
+            city?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Services */
+            services?: {
+                [key: string]: boolean;
+            };
+            /** Sports */
+            sports?: components["schemas"]["SportSelection"][];
+        };
+        /** OnboardingResponse */
+        OnboardingResponse: {
+            /** Sports Created */
+            sports_created: number;
+            tenant: components["schemas"]["TenantOut"];
+        };
         /** OperatingHours */
         OperatingHours: {
             /**
@@ -4561,6 +5065,27 @@ export interface components {
         OrderIdsRequest: {
             /** Orderids */
             orderIds?: string[];
+        };
+        /** OrderOut */
+        OrderOut: {
+            /** Amount Paise */
+            amount_paise: number;
+            /** Business Name */
+            business_name: string | null;
+            /** Currency */
+            currency: string;
+            /** Key Id */
+            key_id: string;
+            /** Order Id */
+            order_id: string;
+            /** Prefill Contact */
+            prefill_contact: string | null;
+            /** Prefill Email */
+            prefill_email: string;
+            /** Prefill Name */
+            prefill_name: string;
+            /** Provider */
+            provider: string;
         };
         /** Page[AdContractOut] */
         Page_AdContractOut_: {
@@ -5033,6 +5558,29 @@ export interface components {
          * @enum {string}
          */
         PlanDuration: "1m" | "3m" | "6m" | "12m";
+        /** PlanOut */
+        PlanOut: {
+            /** Code */
+            code: string;
+            /** Currency */
+            currency: string;
+            /** Features */
+            features: string[];
+            /** Max Courts */
+            max_courts: number | null;
+            /** Max Staff */
+            max_staff: number | null;
+            /** Name */
+            name: string;
+            /** Popular */
+            popular: boolean;
+            /** Price Monthly Paise */
+            price_monthly_paise: number;
+            /** Price Yearly Paise */
+            price_yearly_paise: number;
+            /** Tagline */
+            tagline: string;
+        };
         /** PlatformAdminOut */
         PlatformAdminOut: {
             /**
@@ -5049,6 +5597,8 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Username */
+            username: string;
         };
         /** PlayoCourt */
         PlayoCourt: {
@@ -5372,6 +5922,33 @@ export interface components {
             config: components["schemas"]["ProviderConfigOut"];
             verification: components["schemas"]["VerificationOut"] | null;
         };
+        /**
+         * PublicSettingsOut
+         * @description What the counter tablet is allowed to know about the academy it belongs to.
+         *
+         *     `GET /settings` is RequireStaff and the kiosk role sits below reception, so the
+         *     POS cannot read it — deliberately, since the tablet login is the most exposed
+         *     credential in the academy and that payload carries GST numbers, invoice identity
+         *     and notification addresses. This is the branding subset, and nothing else.
+         */
+        PublicSettingsOut: {
+            /** Brand Accent */
+            brand_accent: string;
+            /** Brand Background */
+            brand_background: string;
+            /** Brand Primary */
+            brand_primary: string;
+            /** Business Name */
+            business_name: string;
+            /** Currency */
+            currency: string;
+            /** Enabled Services */
+            enabled_services: {
+                [key: string]: unknown;
+            };
+            /** Logo Url */
+            logo_url: string | null;
+        };
         /** QuoteOut */
         QuoteOut: {
             /** Court Charge */
@@ -5469,6 +6046,10 @@ export interface components {
             partner: string;
             /** Passed */
             passed: boolean;
+            /** Purged */
+            purged?: {
+                [key: string]: number;
+            };
             /** Results */
             results: components["schemas"]["ScenarioResult"][];
             /** Tenant */
@@ -5595,6 +6176,10 @@ export interface components {
             currency: string;
             /** Email */
             email: string | null;
+            /** Enabled Services */
+            enabled_services: {
+                [key: string]: unknown;
+            };
             /** Gst Number */
             gst_number: string | null;
             /**
@@ -5649,6 +6234,10 @@ export interface components {
             currency?: string | null;
             /** Email */
             email?: string | null;
+            /** Enabled Services */
+            enabled_services?: {
+                [key: string]: boolean;
+            } | null;
             /** Gst Number */
             gst_number?: string | null;
             /** Invoice Prefix */
@@ -5676,6 +6265,79 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
         };
+        /**
+         * SignupOut
+         * @description The wizard's own state, echoed back. Carries no secret.
+         *
+         *     Note what is absent: the intent token (the browser already has it, and echoing
+         *     a credential into a response body puts it in logs and caches) and the admin
+         *     password (which exists only in the welcome email — see `service.fulfil`).
+         */
+        SignupOut: {
+            /** Accepted Terms */
+            accepted_terms: boolean;
+            /** Address */
+            address: string | null;
+            /** Amount Paise */
+            amount_paise: number | null;
+            /** Billing Period */
+            billing_period: string | null;
+            /** Business Name */
+            business_name: string | null;
+            /** City */
+            city: string | null;
+            /** Credentials Emailed */
+            credentials_emailed: boolean;
+            /** Currency */
+            currency: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Paid At */
+            paid_at: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Plan Code */
+            plan_code: string | null;
+            /** Services */
+            services: {
+                [key: string]: boolean;
+            };
+            /** Sports */
+            sports: {
+                [key: string]: unknown;
+            }[];
+            status: components["schemas"]["SignupStatus"];
+            /** Tenant Slug */
+            tenant_slug: string | null;
+        };
+        /**
+         * SignupRequest
+         * @description Self-serve registration. The turf's own details come later, in onboarding.
+         */
+        SignupRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Password */
+            password: string;
+        };
+        /**
+         * SignupStatus
+         * @description Where a signup has got to.
+         *
+         *     Only `COMPLETED` means an academy exists. The state machine is deliberately
+         *     one-way — see `service.fulfil`, which refuses to run twice.
+         * @enum {string}
+         */
+        SignupStatus: "draft" | "awaiting_payment" | "provisioning" | "completed" | "failed";
         /** SkillScore */
         SkillScore: {
             /** Name */
@@ -5788,6 +6450,13 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** SportPick */
+        SportPick: {
+            /** Name */
+            name?: string | null;
+            /** Slug */
+            slug: string;
+        };
         /** SportPopularity */
         SportPopularity: {
             /** Bookings */
@@ -5796,6 +6465,16 @@ export interface components {
             percentage: number;
             /** Sport */
             sport: string;
+        };
+        /**
+         * SportSelection
+         * @description A sport the turf offers: a catalogue slug, or a name for one we don't list.
+         */
+        SportSelection: {
+            /** Name */
+            name?: string | null;
+            /** Slug */
+            slug: string;
         };
         /** SportUpdate */
         SportUpdate: {
@@ -5866,6 +6545,24 @@ export interface components {
             /** Shift */
             shift?: string | null;
             status?: components["schemas"]["UserStatus"] | null;
+        };
+        /** StartSignup */
+        StartSignup: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** StartSignupOut */
+        StartSignupOut: {
+            signup: components["schemas"]["SignupOut"];
+            /** Token */
+            token: string;
         };
         /** Step */
         Step: {
@@ -6163,6 +6860,16 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /**
+             * Onboarding Completed
+             * @default false
+             */
+            onboarding_completed?: boolean;
+            /**
+             * Plan Tier
+             * @default starter
+             */
+            plan_tier?: string;
             /** Slug */
             slug: string;
             /** Status */
@@ -6184,6 +6891,40 @@ export interface components {
              * @default bearer
              */
             token_type?: string;
+        };
+        /**
+         * UpdateSignup
+         * @description One step of the wizard. Every field is optional — omitted means unchanged,
+         *     so step 2 cannot blank what step 1 collected.
+         */
+        UpdateSignup: {
+            /** Accepted Terms */
+            accepted_terms?: boolean | null;
+            /** Address */
+            address?: string | null;
+            /** Business Name */
+            business_name?: string | null;
+            /** City */
+            city?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Services */
+            services?: {
+                [key: string]: boolean;
+            } | null;
+            /** Sports */
+            sports?: components["schemas"]["SportPick"][] | null;
+        };
+        /** UploadOut */
+        UploadOut: {
+            /** Content Type */
+            content_type: string;
+            /** Size */
+            size: number;
+            /** Url */
+            url: string;
         };
         /** UserOut */
         UserOut: {
@@ -6216,6 +6957,8 @@ export interface components {
              * Format: uuid
              */
             tenant_id: string;
+            /** Username */
+            username: string;
         };
         /**
          * UserStatus
@@ -6244,6 +6987,76 @@ export interface components {
             message: string;
             /** Ok */
             ok: boolean;
+        };
+        /** VerifyOut */
+        VerifyOut: {
+            /** Dashboard Url */
+            dashboard_url: string;
+            /** Handoff Token */
+            handoff_token: string | null;
+            signup: components["schemas"]["SignupOut"];
+        };
+        /**
+         * VerifyPayment
+         * @description Exactly what Razorpay Checkout hands the browser on success.
+         */
+        VerifyPayment: {
+            /** Razorpay Order Id */
+            razorpay_order_id: string;
+            /** Razorpay Payment Id */
+            razorpay_payment_id: string;
+            /** Razorpay Signature */
+            razorpay_signature: string;
+        };
+        /** CatalogueSportOut */
+        app__modules__billing__router__CatalogueSportOut: {
+            /** Bg Color */
+            bg_color: string;
+            /** Color */
+            color: string;
+            /** Icon */
+            icon: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /**
+         * CatalogueSportOut
+         * @description A sport the turf *could* offer. Not a row — see booking/catalogue.py.
+         */
+        app__modules__booking__schemas__CatalogueSportOut: {
+            /** Bg Color */
+            bg_color?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Default Duration Min
+             * @default 60
+             */
+            default_duration_min?: number;
+            /**
+             * Display Order
+             * @default 0
+             */
+            display_order?: number;
+            /** Icon */
+            icon?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active?: boolean;
+            /** Name */
+            name: string;
+            /** Price Base */
+            price_base: string;
+            /** Price Peak */
+            price_peak: string;
+            /** Price Weekend */
+            price_weekend: string;
+            /** Slug */
+            slug: string;
         };
     };
     responses: never;
@@ -7276,6 +8089,39 @@ export interface operations {
             };
         };
     };
+    auth_handoff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     auth_login: {
         parameters: {
             query?: never;
@@ -7349,6 +8195,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_razorpayWebhook: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-razorpay-signature"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -7888,6 +8800,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CourtAvailability"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_deleteCourt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                court_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -8809,13 +9750,15 @@ export interface operations {
     gateway_run: {
         parameters: {
             query?: {
-                /** @description Defaults to the key's own dialect */
+                /** @description Must match the key's own dialect, which is the default */
                 dialect?: string | null;
                 /** @description Defaults to all */
                 scenarios?: string[] | null;
                 days_ahead?: number;
                 /** @description Defaults to the first bookable court */
                 court_id?: string | null;
+                /** @description Leave the bookings behind for inspection */
+                keep?: boolean;
             };
             header?: never;
             path?: never;
@@ -9594,6 +10537,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onboarding_completeOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10443,6 +11419,301 @@ export interface operations {
             };
         };
     };
+    admin_getPublicSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSettingsOut"];
+                };
+            };
+        };
+    };
+    signup_startSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSignup"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartSignupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_readSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_updateSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSignup"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_uploadSignupLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_signup_uploadSignupLogo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_mockPay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_createOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_verifyPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyPayment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_listPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"][];
+                };
+            };
+        };
+    };
+    signup_listCatalogueSports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__modules__billing__router__CatalogueSportOut"][];
+                };
+            };
+        };
+    };
     booking_listSports: {
         parameters: {
             query?: {
@@ -10495,6 +11766,55 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SportOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_sportCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__modules__booking__schemas__CatalogueSportOut"][];
+                };
+            };
+        };
+    };
+    booking_deleteSport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sport_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -10632,6 +11952,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uploads_uploadImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_uploads_uploadImage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
                 };
             };
             /** @description Validation Error */

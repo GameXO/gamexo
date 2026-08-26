@@ -27,7 +27,20 @@ from tests.conftest import TenantFixture
 #   platform_admin    — platform operators belong to no academy
 #   account_directory — email -> tenant, read by login before a tenant exists to
 #                       bind. Holds no credentials: an email and a tenant id.
-UNSCOPED_TABLES = {"tenant", "platform_admin", "account_directory"}
+# `signup_intent` joins these three deliberately: it is written by an anonymous
+# browser before any tenant exists to bind a session to, so there is no tenant_id to
+# filter on and no RLS policy that could be written. See modules/billing/models.py.
+#: Tables with no RLS, each for a reason somebody had to argue for. `deleted_tenant`
+#: is the sharpest case: a policy filtering on tenant_id could only ever match a
+#: tenant that by definition no longer exists, so every row would be invisible to
+#: everyone forever. See models/tenant.py::DeletedTenant.
+UNSCOPED_TABLES = {
+    "tenant",
+    "platform_admin",
+    "account_directory",
+    "signup_intent",
+    "deleted_tenant",
+}
 
 
 async def test_raw_select_cannot_see_another_tenant(
@@ -305,6 +318,7 @@ async def test_tenant_id_is_stamped_automatically(tenant_a: TenantFixture) -> No
     """Endpoints never have to thread tenant_id by hand."""
     async with tenant_session(tenant_a.id) as session:
         user = User(
+            username="auto-stamped.staff@alpha-academy",
             email="auto@alpha.example.com",
             password_hash="x",
             full_name="Auto Stamped",

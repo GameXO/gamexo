@@ -8,7 +8,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import TenantResolutionError
+from app.core.errors import AuthenticationError, TenantResolutionError
 from app.core.security import Audience, TokenError, decode_token
 from app.db.session import tenant_session, untenanted_session
 from app.tenancy.context import TenantContext
@@ -67,6 +67,22 @@ def _tenant_from_token(credentials: HTTPAuthorizationCredentials | None) -> str 
     return str(tid) if tid else None
 
 
+def _token_is_valid(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Does this bearer verify as either audience?
+
+    Used only to tell "no usable token" apart from "no tenant in the request", so
+    that the first can be reported as 401 rather than 400. Not an authorisation
+    decision — auth/deps.py still establishes who this is.
+    """
+    for audience in (Audience.TENANT, Audience.PLATFORM):
+        try:
+            decode_token(credentials.credentials, audience=audience)
+        except TokenError:
+            continue
+        return True
+    return False
+
+
 async def get_tenant_context(
     request: Request, credentials: BearerToken = None
 ) -> TenantContext:
@@ -89,10 +105,30 @@ async def get_tenant_context(
         "token_tenant": _tenant_from_token(credentials),
     }
 
-    context = resolve_tenant_cached(**args)
-    if context is None:
-        async with untenanted_session() as session:
-            context = await resolve_tenant(session, **args)
+    try:
+        context = resolve_tenant_cached(**args)
+        if context is None:
+            async with untenanted_session() as session:
+                context = await resolve_tenant(session, **args)
+    except TenantResolutionError:
+        # An expired session is the single most common reason to arrive here, and
+        # "we could not tell which academy you meant" is the wrong thing to say
+        # about it. On a shared origin there is no subdomain to fall back on, so a
+        # token that no longer verifies contributes no `tid`, resolution runs out of
+        # options, and every authenticated request answers 400.
+        #
+        # 400 is not merely unhelpful, it is actively misleading: it is not the
+        # status a client retries a refresh on, and it is not the one that means
+        # "sign in again". A dashboard holding a day-old token gets an error it has
+        # no rule for, and renders a signed-in shell it can never populate.
+        #
+        # So: a bearer was presented and it verifies as neither audience. The honest
+        # answer is 401, and the client already knows what to do with it.
+        if credentials is not None and not _token_is_valid(credentials):
+            raise AuthenticationError(
+                "Your session has expired. Please sign in again."
+            ) from None
+        raise
 
     # Stash for the audit log and for logging middleware.
     request.state.tenant = context
@@ -111,15 +147,20 @@ async def get_optional_tenant_context(
     on a shared origin, where there is no subdomain and no token yet. Those resolve
     their academy from the request body instead.
 
-    Only TenantResolutionError is swallowed. A suspended academy raises
-    PermissionDeniedError and must keep doing so — "we could not tell which academy
-    you meant" and "we know exactly which one and it is suspended" are different
-    answers, and quietly turning the second into the first would let suspended staff
-    log in through the directory.
+    Only the two "we could not tell which academy" failures are swallowed. A
+    suspended academy raises PermissionDeniedError and must keep doing so — "we could
+    not tell which academy you meant" and "we know exactly which one and it is
+    suspended" are different answers, and quietly turning the second into the first
+    would let suspended staff log in through the directory.
+
+    AuthenticationError is swallowed here as well, and only here: these endpoints are
+    how you *get* a token, so a stale one left in storage must not be able to block
+    signing in to replace it. On the authenticated endpoints it stays a 401 — see
+    get_tenant_context.
     """
     try:
         return await get_tenant_context(request, credentials)
-    except TenantResolutionError:
+    except (TenantResolutionError, AuthenticationError):
         return None
 
 

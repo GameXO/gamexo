@@ -1903,6 +1903,36 @@
         "title": "BatchUpdate",
         "type": "object"
       },
+      "Body_signup_uploadSignupLogo": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PNG, JPEG or WebP, max 5 MB",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_signup_uploadSignupLogo",
+        "type": "object"
+      },
+      "Body_uploads_uploadImage": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PNG, JPEG or WebP, max 5 MB",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_uploads_uploadImage",
+        "type": "object"
+      },
       "BookingCancel": {
         "properties": {
           "reason": {
@@ -3702,6 +3732,11 @@
             "title": "Code",
             "type": "string"
           },
+          "display_order": {
+            "default": 0,
+            "title": "Display Order",
+            "type": "integer"
+          },
           "hourly_rate": {
             "anyOf": [
               {
@@ -3719,6 +3754,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 5,
             "title": "Images",
             "type": "array"
           },
@@ -3744,6 +3780,11 @@
             "title": "Name",
             "type": "string"
           },
+          "open_slots_enabled": {
+            "default": false,
+            "title": "Open Slots Enabled",
+            "type": "boolean"
+          },
           "operating_hours": {
             "$ref": "#/components/schemas/OperatingHours"
           },
@@ -3759,6 +3800,36 @@
               }
             ],
             "title": "Peak Rate"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "slot_capacity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many people may join one session. Required when open_slots_enabled.",
+            "title": "Slot Capacity"
           },
           "sport_id": {
             "format": "uuid",
@@ -3789,6 +3860,11 @@
             "title": "Code",
             "type": "string"
           },
+          "display_order": {
+            "default": 0,
+            "title": "Display Order",
+            "type": "integer"
+          },
           "hourly_rate": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Hourly Rate",
@@ -3803,6 +3879,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 5,
             "title": "Images",
             "type": "array"
           },
@@ -3828,6 +3905,11 @@
             "title": "Name",
             "type": "string"
           },
+          "open_slots_enabled": {
+            "default": false,
+            "title": "Open Slots Enabled",
+            "type": "boolean"
+          },
           "operating_hours": {
             "$ref": "#/components/schemas/OperatingHours"
           },
@@ -3835,6 +3917,31 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Peak Rate",
             "type": "string"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "slot_capacity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many people may join one session. Required when open_slots_enabled.",
+            "title": "Slot Capacity"
           },
           "sport_id": {
             "format": "uuid",
@@ -3869,6 +3976,17 @@
             ],
             "title": "Amenities"
           },
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
           "hourly_rate": {
             "anyOf": [
               {
@@ -3891,6 +4009,7 @@
                 "items": {
                   "type": "string"
                 },
+                "maxItems": 5,
                 "type": "array"
               },
               {
@@ -3934,6 +4053,17 @@
             ],
             "title": "Name"
           },
+          "open_slots_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Slots Enabled"
+          },
           "operating_hours": {
             "anyOf": [
               {
@@ -3959,6 +4089,35 @@
               }
             ],
             "title": "Peak Rate"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "slot_capacity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Capacity"
           },
           "sport_id": {
             "anyOf": [
@@ -4030,6 +4189,11 @@
             ],
             "title": "Current Booking Id"
           },
+          "display_order": {
+            "default": 0,
+            "title": "Display Order",
+            "type": "integer"
+          },
           "hourly_rate": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Hourly Rate",
@@ -4044,6 +4208,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 5,
             "title": "Images",
             "type": "array"
           },
@@ -4069,6 +4234,11 @@
             "title": "Name",
             "type": "string"
           },
+          "open_slots_enabled": {
+            "default": false,
+            "title": "Open Slots Enabled",
+            "type": "boolean"
+          },
           "operating_hours": {
             "$ref": "#/components/schemas/OperatingHours"
           },
@@ -4076,6 +4246,31 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Peak Rate",
             "type": "string"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "slot_capacity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many people may join one session. Required when open_slots_enabled.",
+            "title": "Slot Capacity"
           },
           "sport_id": {
             "format": "uuid",
@@ -4109,6 +4304,27 @@
           "status"
         ],
         "title": "CourtWithStatus",
+        "type": "object"
+      },
+      "CreateOrder": {
+        "properties": {
+          "billing_period": {
+            "default": "monthly",
+            "pattern": "^(monthly|yearly)$",
+            "title": "Billing Period",
+            "type": "string"
+          },
+          "plan_code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Plan Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_code"
+        ],
+        "title": "CreateOrder",
         "type": "object"
       },
       "CreateTenantRequest": {
@@ -4780,8 +4996,20 @@
             "title": "Base Path",
             "type": "string"
           },
+          "canonical_path": {
+            "title": "Canonical Path",
+            "type": "string"
+          },
           "is_default": {
             "title": "Is Default",
+            "type": "boolean"
+          },
+          "is_platform": {
+            "title": "Is Platform",
+            "type": "boolean"
+          },
+          "is_ready": {
+            "title": "Is Ready",
             "type": "boolean"
           },
           "label": {
@@ -4802,7 +5030,10 @@
           "label",
           "summary",
           "base_path",
-          "is_default"
+          "canonical_path",
+          "is_default",
+          "is_platform",
+          "is_ready"
         ],
         "title": "DialectOut",
         "type": "object"
@@ -5612,6 +5843,21 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandoffRequest": {
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "HandoffRequest",
+        "type": "object"
+      },
       "IntegrationsOut": {
         "description": "Everything the payment half of the screen needs, in one request.",
         "properties": {
@@ -6338,22 +6584,24 @@
         "type": "object"
       },
       "LoginRequest": {
+        "description": "Sign in with a username \u2014 `admin@navigo-sports`, `rahul.staff@navigo-sports`.\n\nNot `EmailStr`, and that is the point: a username's domain part is the tenant\nslug, so `admin@navigo-sports` has no dot in it and email validation rejects it\noutright. See auth/usernames.py.\n\nAn email address is still accepted here, because accounts created before\nusernames existed have been signing in with one and must not be locked out on\ndeploy. Resolution tries the username first \u2014 see\nauth/service.py::tenant_id_for_login.",
         "properties": {
-          "email": {
-            "format": "email",
-            "title": "Email",
-            "type": "string"
-          },
           "password": {
             "maxLength": 128,
             "minLength": 8,
             "title": "Password",
             "type": "string"
+          },
+          "username": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "password",
-          "email"
+          "username"
         ],
         "title": "LoginRequest",
         "type": "object"
@@ -7304,6 +7552,98 @@
         "title": "NotificationOut",
         "type": "object"
       },
+      "OnboardingRequest": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "business_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Business Name",
+            "type": "string"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "services": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Services",
+            "type": "object"
+          },
+          "sports": {
+            "items": {
+              "$ref": "#/components/schemas/SportSelection"
+            },
+            "title": "Sports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "business_name"
+        ],
+        "title": "OnboardingRequest",
+        "type": "object"
+      },
+      "OnboardingResponse": {
+        "properties": {
+          "sports_created": {
+            "title": "Sports Created",
+            "type": "integer"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantOut"
+          }
+        },
+        "required": [
+          "tenant",
+          "sports_created"
+        ],
+        "title": "OnboardingResponse",
+        "type": "object"
+      },
       "OperatingHours": {
         "properties": {
           "close": {
@@ -7425,6 +7765,73 @@
           }
         },
         "title": "OrderIdsRequest",
+        "type": "object"
+      },
+      "OrderOut": {
+        "properties": {
+          "amount_paise": {
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "business_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Name"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "prefill_contact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefill Contact"
+          },
+          "prefill_email": {
+            "title": "Prefill Email",
+            "type": "string"
+          },
+          "prefill_name": {
+            "title": "Prefill Name",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "amount_paise",
+          "currency",
+          "provider",
+          "key_id",
+          "prefill_name",
+          "prefill_email",
+          "prefill_contact",
+          "business_name"
+        ],
+        "title": "OrderOut",
         "type": "object"
       },
       "Page_AdContractOut_": {
@@ -8675,6 +9082,81 @@
         "title": "PlanDuration",
         "type": "string"
       },
+      "PlanOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "max_courts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Courts"
+          },
+          "max_staff": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Staff"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "popular": {
+            "title": "Popular",
+            "type": "boolean"
+          },
+          "price_monthly_paise": {
+            "title": "Price Monthly Paise",
+            "type": "integer"
+          },
+          "price_yearly_paise": {
+            "title": "Price Yearly Paise",
+            "type": "integer"
+          },
+          "tagline": {
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "tagline",
+          "price_monthly_paise",
+          "price_yearly_paise",
+          "currency",
+          "features",
+          "max_courts",
+          "max_staff",
+          "popular"
+        ],
+        "title": "PlanOut",
+        "type": "object"
+      },
       "PlatformAdminOut": {
         "properties": {
           "email": {
@@ -8694,10 +9176,15 @@
           "is_active": {
             "title": "Is Active",
             "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "id",
+          "username",
           "email",
           "full_name",
           "is_active"
@@ -9688,6 +10175,58 @@
         "title": "ProviderSaveOut",
         "type": "object"
       },
+      "PublicSettingsOut": {
+        "description": "What the counter tablet is allowed to know about the academy it belongs to.\n\n`GET /settings` is RequireStaff and the kiosk role sits below reception, so the\nPOS cannot read it \u2014 deliberately, since the tablet login is the most exposed\ncredential in the academy and that payload carries GST numbers, invoice identity\nand notification addresses. This is the branding subset, and nothing else.",
+        "properties": {
+          "brand_accent": {
+            "title": "Brand Accent",
+            "type": "string"
+          },
+          "brand_background": {
+            "title": "Brand Background",
+            "type": "string"
+          },
+          "brand_primary": {
+            "title": "Brand Primary",
+            "type": "string"
+          },
+          "business_name": {
+            "title": "Business Name",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "enabled_services": {
+            "additionalProperties": true,
+            "title": "Enabled Services",
+            "type": "object"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          }
+        },
+        "required": [
+          "business_name",
+          "logo_url",
+          "brand_primary",
+          "brand_accent",
+          "brand_background",
+          "currency",
+          "enabled_services"
+        ],
+        "title": "PublicSettingsOut",
+        "type": "object"
+      },
       "QuoteOut": {
         "properties": {
           "court_charge": {
@@ -9893,6 +10432,13 @@
           "passed": {
             "title": "Passed",
             "type": "boolean"
+          },
+          "purged": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Purged",
+            "type": "object"
           },
           "results": {
             "items": {
@@ -10226,6 +10772,11 @@
             ],
             "title": "Email"
           },
+          "enabled_services": {
+            "additionalProperties": true,
+            "title": "Enabled Services",
+            "type": "object"
+          },
           "gst_number": {
             "anyOf": [
               {
@@ -10329,6 +10880,7 @@
           "booking_rules",
           "tax_config",
           "security_flags",
+          "enabled_services",
           "notification_sender_name",
           "notification_sender_email"
         ],
@@ -10444,6 +10996,20 @@
               }
             ],
             "title": "Email"
+          },
+          "enabled_services": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled Services"
           },
           "gst_number": {
             "anyOf": [
@@ -10565,6 +11131,223 @@
         },
         "title": "SettingsUpdate",
         "type": "object"
+      },
+      "SignupOut": {
+        "description": "The wizard's own state, echoed back. Carries no secret.\n\nNote what is absent: the intent token (the browser already has it, and echoing\na credential into a response body puts it in logs and caches) and the admin\npassword (which exists only in the welcome email \u2014 see `service.fulfil`).",
+        "properties": {
+          "accepted_terms": {
+            "title": "Accepted Terms",
+            "type": "boolean"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "amount_paise": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Paise"
+          },
+          "billing_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billing Period"
+          },
+          "business_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Name"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "credentials_emailed": {
+            "title": "Credentials Emailed",
+            "type": "boolean"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "plan_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Code"
+          },
+          "services": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Services",
+            "type": "object"
+          },
+          "sports": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sports",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SignupStatus"
+          },
+          "tenant_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Slug"
+          }
+        },
+        "required": [
+          "status",
+          "email",
+          "full_name",
+          "phone",
+          "business_name",
+          "logo_url",
+          "city",
+          "address",
+          "sports",
+          "services",
+          "accepted_terms",
+          "plan_code",
+          "billing_period",
+          "amount_paise",
+          "currency",
+          "paid_at",
+          "tenant_slug",
+          "credentials_emailed"
+        ],
+        "title": "SignupOut",
+        "type": "object"
+      },
+      "SignupRequest": {
+        "description": "Self-serve registration. The turf's own details come later, in onboarding.",
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "email",
+          "full_name"
+        ],
+        "title": "SignupRequest",
+        "type": "object"
+      },
+      "SignupStatus": {
+        "description": "Where a signup has got to.\n\nOnly `COMPLETED` means an academy exists. The state machine is deliberately\none-way \u2014 see `service.fulfil`, which refuses to run twice.",
+        "enum": [
+          "draft",
+          "awaiting_payment",
+          "provisioning",
+          "completed",
+          "failed"
+        ],
+        "title": "SignupStatus",
+        "type": "string"
       },
       "SkillScore": {
         "properties": {
@@ -10873,6 +11656,33 @@
         "title": "SportOut",
         "type": "object"
       },
+      "SportPick": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "slug": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "title": "SportPick",
+        "type": "object"
+      },
       "SportPopularity": {
         "properties": {
           "bookings": {
@@ -10894,6 +11704,34 @@
           "percentage"
         ],
         "title": "SportPopularity",
+        "type": "object"
+      },
+      "SportSelection": {
+        "description": "A sport the turf offers: a catalogue slug, or a name for one we don't list.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "slug": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "title": "SportSelection",
         "type": "object"
       },
       "SportUpdate": {
@@ -11173,6 +12011,56 @@
           }
         },
         "title": "StaffUpdate",
+        "type": "object"
+      },
+      "StartSignup": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "email",
+          "full_name"
+        ],
+        "title": "StartSignup",
+        "type": "object"
+      },
+      "StartSignupOut": {
+        "properties": {
+          "signup": {
+            "$ref": "#/components/schemas/SignupOut"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "signup"
+        ],
+        "title": "StartSignupOut",
         "type": "object"
       },
       "Step": {
@@ -12130,6 +13018,16 @@
             "title": "Name",
             "type": "string"
           },
+          "onboarding_completed": {
+            "default": false,
+            "title": "Onboarding Completed",
+            "type": "boolean"
+          },
+          "plan_tier": {
+            "default": "starter",
+            "title": "Plan Tier",
+            "type": "string"
+          },
           "slug": {
             "title": "Slug",
             "type": "string"
@@ -12175,6 +13073,134 @@
           "expires_in"
         ],
         "title": "TokenPair",
+        "type": "object"
+      },
+      "UpdateSignup": {
+        "description": "One step of the wizard. Every field is optional \u2014 omitted means unchanged,\nso step 2 cannot blank what step 1 collected.",
+        "properties": {
+          "accepted_terms": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Terms"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "business_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Name"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "services": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Services"
+          },
+          "sports": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SportPick"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sports"
+          }
+        },
+        "title": "UpdateSignup",
+        "type": "object"
+      },
+      "UploadOut": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "content_type",
+          "size"
+        ],
+        "title": "UploadOut",
         "type": "object"
       },
       "UserOut": {
@@ -12260,11 +13286,16 @@
             "format": "uuid",
             "title": "Tenant Id",
             "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "tenant_id",
+          "username",
           "email",
           "full_name",
           "role",
@@ -12344,6 +13375,190 @@
           "checked_live"
         ],
         "title": "VerificationOut",
+        "type": "object"
+      },
+      "VerifyOut": {
+        "properties": {
+          "dashboard_url": {
+            "title": "Dashboard Url",
+            "type": "string"
+          },
+          "handoff_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff Token"
+          },
+          "signup": {
+            "$ref": "#/components/schemas/SignupOut"
+          }
+        },
+        "required": [
+          "signup",
+          "handoff_token",
+          "dashboard_url"
+        ],
+        "title": "VerifyOut",
+        "type": "object"
+      },
+      "VerifyPayment": {
+        "description": "Exactly what Razorpay Checkout hands the browser on success.",
+        "properties": {
+          "razorpay_order_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Razorpay Order Id",
+            "type": "string"
+          },
+          "razorpay_payment_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Razorpay Payment Id",
+            "type": "string"
+          },
+          "razorpay_signature": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Razorpay Signature",
+            "type": "string"
+          }
+        },
+        "required": [
+          "razorpay_order_id",
+          "razorpay_payment_id",
+          "razorpay_signature"
+        ],
+        "title": "VerifyPayment",
+        "type": "object"
+      },
+      "app__modules__billing__router__CatalogueSportOut": {
+        "properties": {
+          "bg_color": {
+            "title": "Bg Color",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "icon": {
+            "title": "Icon",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "icon",
+          "color",
+          "bg_color"
+        ],
+        "title": "CatalogueSportOut",
+        "type": "object"
+      },
+      "app__modules__booking__schemas__CatalogueSportOut": {
+        "description": "A sport the turf *could* offer. Not a row \u2014 see booking/catalogue.py.",
+        "properties": {
+          "bg_color": {
+            "anyOf": [
+              {
+                "maxLength": 9,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bg Color"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "maxLength": 9,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "default_duration_min": {
+            "default": 60,
+            "maximum": 600.0,
+            "minimum": 15.0,
+            "title": "Default Duration Min",
+            "type": "integer"
+          },
+          "display_order": {
+            "default": 0,
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "price_base": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Price Base",
+            "type": "string"
+          },
+          "price_peak": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Price Peak",
+            "type": "string"
+          },
+          "price_weekend": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Price Weekend",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "price_base",
+          "price_peak",
+          "price_weekend",
+          "slug"
+        ],
+        "title": "CatalogueSportOut",
         "type": "object"
       }
     },
@@ -14262,9 +15477,51 @@
         ]
       }
     },
+    "/api/v1/auth/handoff": {
+      "post": {
+        "description": "The last step of self-serve signup. The website receives this token when a payment is confirmed and sends the browser to `{dashboard_url}/?handoff={token}` \u2014 the dashboard posts it here and the owner is signed in without ever seeing a login form.\n\n**Single use, and short-lived.** It travels in a URL, so a copy of it is in browser history and in the referrer of whatever the dashboard loads next. Burning it on first use is what makes those copies inert.\n\n401 for expired, already-used and never-existed alike \u2014 the differences are only useful to somebody testing which of their guesses is closest.",
+        "operationId": "auth_handoff",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Exchange a one-time signup token for a session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
-        "description": "Authenticates against the academy resolved from the request host (or `X-Tenant-ID` in development). The same email may exist at more than one academy; which one you reach is determined by the host, not the password.",
+        "description": "Sign in with a **username** \u2014 `admin@navigo-sports`, `rahul.staff@navigo-sports`, `kiosk@navigo-sports`. The part after the `@` is the academy's slug, not a domain; see `auth/usernames.py`.\n\nAuthenticates against the academy resolved from the request host (or `X-Tenant-ID` in development). When the request names no academy \u2014 the shared-origin deployment, where every turf answers on one hostname \u2014 the academy is looked up from the username instead.\n\nAn email address is still accepted, so accounts created before usernames existed keep working.",
         "operationId": "auth_login",
         "requestBody": {
           "content": {
@@ -14379,6 +15636,96 @@
         "summary": "Exchange a refresh token for a new pair",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/signup": {
+      "post": {
+        "description": "Self-serve registration. Creates the academy, its default settings and its first admin in one transaction, and signs the owner straight in.\n\nThe academy has no name yet \u2014 onboarding collects that \u2014 so it is created under a placeholder slug with `onboarding_completed` false, which is what routes the new owner into the wizard rather than the dashboard.\n\nThe email must be unused across the whole platform; see `models/user.py::AccountDirectory` for why login emails are globally unique.",
+        "operationId": "auth_signup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register a new turf",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/billing/webhook/razorpay": {
+      "post": {
+        "description": "Subscribe this URL to `payment.captured` in Razorpay \u2192 Settings \u2192 Webhooks, and put the secret it gives you in `PLATFORM_RAZORPAY_WEBHOOK_SECRET`.\n\nThis is the half of the flow that does not depend on the payer's browser. A customer who pays and immediately closes the tab still gets their academy and their credentials, because this arrives regardless.\n\n**Always answers 200**, including for a signature it rejected. Razorpay retries any non-2xx for 24 hours, and retrying a forged callback forever achieves nothing but load. What it does with a payload is in the logs.",
+        "operationId": "signup_razorpayWebhook",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-razorpay-signature",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Razorpay-Signature",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Signup Razorpaywebhook",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Razorpay payment webhook",
+        "tags": [
+          "signup"
         ]
       }
     },
@@ -15416,6 +16763,46 @@
       }
     },
     "/api/v1/courts/{court_id}": {
+      "delete": {
+        "description": "Only a court with no bookings can be deleted \u2014 a booking is a financial record and the FK is RESTRICT. A court that has been played on should be marked unavailable (`is_bookable: false`) instead, which takes it out of availability without detaching it from its history.",
+        "operationId": "booking_deleteCourt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "court_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Court Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove a court",
+        "tags": [
+          "booking"
+        ]
+      },
       "patch": {
         "operationId": "booking_updateCourt",
         "parameters": [
@@ -16118,7 +17505,7 @@
         ]
       }
     },
-    "/api/v1/gateway/availability": {
+    "/api/v1/gateway/native/availability": {
       "get": {
         "description": "Reflects **every** booking \u2014 walk-ins at the counter, the dashboard, other platforms, and unconfirmed holds still in checkout \u2014 so a slot sold here is immediately unavailable to you.\n\nA slot marked `available` is not a reservation. Between this call and your create, someone at the counter may take it; the create then returns **409**. Treat that as authoritative and mark the slot sold out \u2014 it is the database refusing to double-book the court, not a transient error to retry.\n\nUse `POST /gateway/bookings/hold` if you need the slot held while a customer pays.",
         "operationId": "gateway_availability",
@@ -16247,7 +17634,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings": {
+    "/api/v1/gateway/native/bookings": {
       "get": {
         "description": "Only bookings made through your own integration. Never walk-ins, and never another platform's. Holds are included, with `status: held`.",
         "operationId": "gateway_listBookings",
@@ -16423,7 +17810,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/confirm": {
+    "/api/v1/gateway/native/bookings/confirm": {
       "post": {
         "description": "Turns holds into real bookings. Only after this do they reach the venue's reports, its counter board and the day's takings.\n\n**All or nothing**, and idempotent \u2014 confirming an already-confirmed booking succeeds and returns it, so a dropped response is safe to retry.\n\nA hold that lapsed still confirms **if the court is free**: your customer paid, and our timer is not their problem. It is refused with **409** only when the slot has since been taken \u2014 at which point refund them.",
         "operationId": "gateway_confirmBookings",
@@ -16492,7 +17879,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/hold": {
+    "/api/v1/gateway/native/bookings/hold": {
       "post": {
         "description": "Blocks the courts without creating bookings. The hold competes for the slot against the counter exactly as a real booking does, so nobody can sell it underneath your customer \u2014 and it is **not** a booking: no revenue, no entry on the venue's board, nobody expected to arrive.\n\nHolds expire after 15 minutes if `/bookings/confirm` never comes, so an abandoned checkout costs the venue at most one slot rotation. Bookings come back with `status: held`.\n\nAll-or-nothing and idempotent, exactly as `POST /bookings`.",
         "operationId": "gateway_holdSlots",
@@ -16561,7 +17948,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/map": {
+    "/api/v1/gateway/native/bookings/map": {
       "post": {
         "description": "For platforms that issue two identifiers \u2014 an order id at checkout and a booking id once your side settles. `external_ref` holds the first; this records the second, so reconciliation can match on whichever one you quote.",
         "operationId": "gateway_mapBookings",
@@ -16619,7 +18006,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/{reference}": {
+    "/api/v1/gateway/native/bookings/{reference}": {
       "get": {
         "description": "By our reference (`XC-B-0042`) or your own `external_ref`.\n\n**404** for a booking your integration did not create, including walk-ins and other platforms' bookings \u2014 a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.",
         "operationId": "gateway_getBooking",
@@ -16683,7 +18070,7 @@
         ]
       }
     },
-    "/api/v1/gateway/bookings/{reference}/cancel": {
+    "/api/v1/gateway/native/bookings/{reference}/cancel": {
       "post": {
         "description": "Frees the slot for everyone \u2014 the counter and every other platform \u2014 immediately. Works on holds as well as confirmed bookings.\n\nIdempotent: cancelling twice is not an error.",
         "operationId": "gateway_cancelBooking",
@@ -17247,11 +18634,11 @@
     },
     "/api/v1/gateway/sandbox/run": {
       "post": {
-        "description": "Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.\n\nThe scenarios are dialect-independent \u2014 the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. `dialect` defaults to whatever the API key was issued for.\n\n**This writes to the database.** Bookings are created and cancelled on the academy the key belongs to. Each scenario cleans up after itself and runs on its own future date, but it is a dev tool \u2014 the routes are not registered when `ENVIRONMENT=production`.",
+        "description": "Runs the consistency scenarios end to end against the live endpoints, over real HTTP, and returns every request, every response, and whether it was what the scenario expected.\n\nThe scenarios are dialect-independent \u2014 the same eight run against **any** dialect, because the guarantees belong to the gateway rather than to a partner's adapter. Which one runs is decided by the API key, so `dialect` is only ever a redundant assertion of it.\n\nEvery driver calls the advertised `/api/v1/gateway`, never a per-platform path, so a passing run is also proof that key-based routing works.\n\n**This writes to the database, then cleans up after itself.** Bookings are created on the academy the key belongs to and *deleted* again on the way out, so a run leaves the row counts and the booking reference counter exactly as it found them. `purged` in the response says what was removed.\n\nPass `keep=true` to leave them behind for inspection \u2014 the transcript returns every request and response either way, so diagnosing a failure rarely needs it.\n\nStill a dev tool: the routes are not registered when `ENVIRONMENT=production`.",
         "operationId": "gateway_run",
         "parameters": [
           {
-            "description": "Defaults to the key's own dialect",
+            "description": "Must match the key's own dialect, which is the default",
             "in": "query",
             "name": "dialect",
             "required": false,
@@ -17264,7 +18651,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Defaults to the key's own dialect",
+              "description": "Must match the key's own dialect, which is the default",
               "title": "Dialect"
             }
           },
@@ -17317,6 +18704,18 @@
               ],
               "description": "Defaults to the first bookable court",
               "title": "Court Id"
+            }
+          },
+          {
+            "description": "Leave the bookings behind for inspection",
+            "in": "query",
+            "name": "keep",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Leave the bookings behind for inspection",
+              "title": "Keep",
+              "type": "boolean"
             }
           }
         ],
@@ -18673,6 +20072,53 @@
         ]
       }
     },
+    "/api/v1/onboarding/complete": {
+      "post": {
+        "description": "Names the turf, sets its logo and services, and creates the sports it offers \u2014 atomically. Deliberately creates **no courts**: a new turf has none until the owner adds them, and the empty state on the dashboard is what points them at Sports & Courts to do it.\n\nSafe to re-run. Sports that already exist are skipped rather than duplicated, so a retry after a dropped connection does the right thing.",
+        "operationId": "onboarding_completeOnboarding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Finish first-run setup",
+        "tags": [
+          "onboarding"
+        ]
+      }
+    },
     "/api/v1/partners": {
       "get": {
         "operationId": "gateway_listPartners",
@@ -18750,7 +20196,7 @@
     },
     "/api/v1/partners/dialects": {
       "get": {
-        "description": "What to choose when adding an integration, and the base path to hand the partner.\n\nDeclared above `/partners/{partner_id}` deliberately \u2014 routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.",
+        "description": "What to choose when adding an integration.\n\n`base_path` is the same for every one of them \u2014 that is the point. A partner is handed one URL and one key, and the key tells the gateway which contract to route them to. `canonical_path` is where it routes to, useful when reading the reference below or debugging a call, and not something a partner needs.\n\n`is_platform` marks the named third-party platforms, which are what the dashboard offers. `is_ready` is false for one whose spec we do not have yet: listed so it can be shown as coming, and refused by `POST /partners`.\n\nEvery dialect is returned, including the ones not offered \u2014 a partner onboarded before a dialect was retired still needs its label to render.\n\nDeclared above `/partners/{partner_id}` deliberately \u2014 routes match in order, and `dialects` would otherwise be parsed as a malformed UUID.",
         "operationId": "gateway_listDialects",
         "responses": {
           "200": {
@@ -18821,7 +20267,7 @@
         ]
       },
       "patch": {
-        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.",
+        "description": "Setting `is_active: false` revokes access immediately \u2014 the next gateway request with that key is refused. Bookings the partner already made are untouched and keep their `source_platform`.\n\nChanging `dialect` re-points the partner at another contract without reissuing their key, which is the fix when an integration was set up against the wrong one. Deleting and re-creating is not an alternative: the FK from `booking` is RESTRICT, so a partner that has booked anything cannot be deleted at all.",
         "operationId": "gateway_updatePartner",
         "parameters": [
           {
@@ -18872,7 +20318,7 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Rename or revoke an integration",
+        "summary": "Rename, re-point or revoke an integration",
         "tags": [
           "gateway"
         ]
@@ -20175,6 +21621,422 @@
         ]
       }
     },
+    "/api/v1/settings/public": {
+      "get": {
+        "operationId": "admin_getPublicSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Branding and enabled services, for the counter tablet",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/signup/intent": {
+      "post": {
+        "description": "Creates a draft. **No academy, no user and no charge** \u2014 see `modules/billing/models.py` for why nothing is provisioned until a payment clears.\n\nReturns a token the browser must keep: it is the only way to address this signup, and every later call needs it.\n\n409 if the email already signs in somewhere on the platform. That check is repeated at provisioning, which is the one that counts \u2014 this one exists so the failure happens before anyone pays.",
+        "operationId": "signup_startSignup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSignup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartSignupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Begin a signup",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/intent/{token}": {
+      "get": {
+        "description": "Resumes the wizard in a reopened tab, and is what the success screen polls when a browser returns from checkout before the webhook has landed: keep asking until `tenant_slug` is set.\n\n404 for an unknown *or* expired token \u2014 deliberately the same answer, so this cannot be used to test which tokens exist.",
+        "operationId": "signup_readSignup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read a signup back",
+        "tags": [
+          "signup"
+        ]
+      },
+      "patch": {
+        "description": "Called as the owner moves between steps, so a closed tab loses nothing.\n\nOmitted fields are left alone; `sports` and `services` are replaced wholesale when present, because both are the complete answer to their own screen.\n\n409 once the signup is paid for \u2014 the answers are what was provisioned, and editing them afterwards would describe an academy that does not exist.",
+        "operationId": "signup_updateSignup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSignup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save a step of the wizard",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/intent/{token}/logo": {
+      "post": {
+        "description": "The same validation as `POST /uploads` \u2014 PNG, JPEG or WebP up to 5 MB, typed from the file's own magic bytes rather than the multipart header \u2014 filed under `signup/{intent}/` instead of a tenant prefix, because no tenant exists yet.\n\nReturns a URL. Storing it on the signup is a separate `PATCH`, so an upload the owner immediately replaces does not overwrite anything.",
+        "operationId": "signup_uploadSignupLogo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_signup_uploadSignupLogo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload a logo, before there is an academy to own it",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/intent/{token}/mock-pay": {
+      "post": {
+        "description": "Completes a signup without Razorpay, for local development. Mints a payment id, signs it with `BILLING_MOCK_SECRET`, and runs it through the same signature check a real payment takes.\n\nPresent only when no Razorpay key is configured; production refuses to boot in that state.",
+        "operationId": "signup_mockPay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pay a mock order (development only)",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/intent/{token}/order": {
+      "post": {
+        "description": "Prices the plan server-side and creates a Razorpay order. The amount is **never** taken from the request \u2014 a client that could name its own price would be the whole vulnerability.\n\nSafe to call again: a checkout the owner dismissed leaves an unpaid order behind, and retrying replaces it rather than forcing the wizard to restart.\n\n`provider: \"mock\"` means no Razorpay keys are configured. The website then shows its own stand-in checkout and calls `\u2026/mock-pay`; production refuses to boot in that state.",
+        "operationId": "signup_createOrder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raise a payment order for the chosen plan",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/intent/{token}/verify": {
+      "post": {
+        "description": "Called by the website with the three values Razorpay Checkout hands it on success. The signature is HMAC-SHA256 of `\"{order_id}|{payment_id}\"` keyed with our API key secret, and it is verified before anything else happens \u2014 an unsigned or mis-signed callback provisions nothing.\n\nIdempotent, and interchangeable with the webhook: whichever lands first creates the academy and the other finds it already made. That matters because either one can be lost \u2014 a closed tab kills this, a firewall kills the webhook.\n\nReturns a one-time `handoff_token`. Send the browser to `{dashboard_url}/?handoff={token}` and it arrives signed in.",
+        "operationId": "signup_verifyPayment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyPayment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm a payment from the browser and provision the academy",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/plans": {
+      "get": {
+        "description": "The pricing page reads this rather than hardcoding numbers, so a price change is one edit to `modules/billing/plans.py` \u2014 no migration and no frontend release.\n\nAmounts are integers in paise. \u20b92,499.00 is `249900`.",
+        "operationId": "signup_listPlans",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanOut"
+                  },
+                  "title": "Response Signup Listplans",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "What gamexo sells",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/sports": {
+      "get": {
+        "description": "The same catalogue as `GET /sports/catalogue`, without the prices and without the login. The wizard's second step renders this rather than hardcoding a list, so a slug it sends always matches one the API stocks \u2014 an unrecognised slug is accepted too, but becomes a custom sport priced at zero for the owner to set.\n\nPrices are omitted deliberately: they are opening suggestions to be edited per venue, and putting them on a public page invites them to be read as a rate card.",
+        "operationId": "signup_listCatalogueSports",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/app__modules__billing__router__CatalogueSportOut"
+                  },
+                  "title": "Response Signup Listcataloguesports",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The sports a turf can pick from",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
     "/api/v1/sports": {
       "get": {
         "operationId": "booking_listSports",
@@ -20271,7 +22133,78 @@
         ]
       }
     },
+    "/api/v1/sports/catalogue": {
+      "get": {
+        "description": "The fixed menu the onboarding wizard and the Sports & Courts screen pick from. Not this academy's sports \u2014 `GET /sports` is that. Selecting one here is what creates the row.",
+        "operationId": "booking_sportCatalogue",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/app__modules__booking__schemas__CatalogueSportOut"
+                  },
+                  "title": "Response Booking Sportcatalogue",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Sports a turf can choose from",
+        "tags": [
+          "booking"
+        ]
+      }
+    },
     "/api/v1/sports/{sport_id}": {
+      "delete": {
+        "description": "Only a sport with no courts can be deleted. A sport that has been played has bookings hanging off its courts, and those are records \u2014 deactivate it with `PATCH /sports/{id}` `{is_active: false}` instead, which hides it everywhere without rewriting history.",
+        "operationId": "booking_deleteSport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sport_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove a sport",
+        "tags": [
+          "booking"
+        ]
+      },
       "patch": {
         "operationId": "booking_updateSport",
         "parameters": [
@@ -20411,6 +22344,7 @@
         ]
       },
       "post": {
+        "description": "The username is **generated, not chosen** \u2014 `rahul-joshi.staff@your-slug`, suffixed on a clash. Two people called Rahul at one turf is ordinary, so the second becomes `rahul-joshi-2.staff@\u2026` rather than failing.\n\nThe email is where their mail goes and is not what they sign in with. Hand them the `username` from the response \u2014 it is the only place it is shown at creation time.",
         "operationId": "admin_createStaff",
         "requestBody": {
           "content": {
@@ -20512,6 +22446,53 @@
           "admin"
         ]
       }
+    },
+    "/api/v1/uploads": {
+      "post": {
+        "description": "PNG, JPEG or WebP, up to 5 MB. The type is determined from the file's own magic bytes, not from the multipart `Content-Type` \u2014 a caller can claim anything there, and the result would be served back from our own domain.\n\nReturns a URL to store on whatever the image belongs to. Uploading does not attach it to anything by itself.",
+        "operationId": "uploads_uploadImage",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_uploads_uploadImage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Upload an image",
+        "tags": [
+          "uploads"
+        ]
+      }
     }
   },
   "tags": [
@@ -20548,11 +22529,15 @@
       "name": "platform"
     },
     {
+      "description": "Self-serve signup, from the marketing site. Unauthenticated by necessity \u2014 the caller has no account yet, and no academy is created until a payment clears. A signup is addressed by an opaque token the browser holds.",
+      "name": "signup"
+    },
+    {
       "description": "Dashboard and Reports aggregates.",
       "name": "reporting"
     },
     {
-      "description": "Externalisation gateway. Any third-party platform reads availability and claims slots under a revocable API key, so a court is never sold twice.\n\nOne core owns the behaviour \u2014 all-or-nothing writes, idempotency on your own booking id, two-phase holds that expire, and strict per-partner scoping. A **dialect** is only a wire format on top of it. `/gateway/\u2026` is ours and the one to use unless you have a spec of your own; `/gateway/playo/\u2026` implements Playo's.",
+      "description": "Externalisation gateway. Any third-party platform reads availability and claims slots under a revocable API key, so a court is never sold twice.\n\nOne core owns the behaviour \u2014 all-or-nothing writes, idempotency on your own booking id, two-phase holds that expire, and strict per-partner scoping. A **dialect** is only a wire format on top of it.\n\n**Every platform is given the same base URL: `/api/v1/gateway`.** The API key identifies the platform, so the gateway routes each request to that platform's contract on its own. The per-platform paths documented below (`/gateway/native/\u2026`, `/gateway/playo/\u2026`) are where it routes *to* \u2014 callable directly, but nobody needs to.",
       "name": "gateway"
     },
     {

@@ -52,7 +52,7 @@ async def test_login_works_over_the_subdomain(
 ) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers={"Host": tenant_a.host},
     )
     assert response.status_code == 200, response.text
@@ -127,7 +127,7 @@ async def test_platform_operator_can_impersonate(
     """
     login_response = await client.post(
         "/api/v1/platform/login",
-        json={"email": platform_admin.email, "password": PASSWORD},
+        json={"username": platform_admin.email, "password": PASSWORD},
     )
     token = login_response.json()["access_token"]
 

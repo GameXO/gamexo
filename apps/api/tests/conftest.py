@@ -24,9 +24,20 @@ import pytest
 
 API_DIR = Path(__file__).resolve().parent.parent
 
-TEST_APP_URL = "postgresql+asyncpg://gamexo_app:gamexo_app_pw@localhost:5433/gamexo_test"
-TEST_MIGRATION_URL = (
-    "postgresql+asyncpg://gamexo_migrator:gamexo_migrator_pw@localhost:5433/gamexo_test"
+# Defaults point at the Compose Postgres. Both are overridable so the suite can be
+# aimed at any database with the same two-role setup — a Neon branch, say, for a
+# machine that is not running Docker.
+#
+# It must be a database you are willing to lose: `_clean_tables` TRUNCATEs `tenant`
+# CASCADE between every single test, which is most of the schema. Never point this
+# at a development database somebody is using.
+TEST_APP_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://gamexo_app:gamexo_app_pw@localhost:5433/gamexo_test",
+)
+TEST_MIGRATION_URL = os.environ.get(
+    "TEST_MIGRATION_DATABASE_URL",
+    "postgresql+asyncpg://gamexo_migrator:gamexo_migrator_pw@localhost:5433/gamexo_test",
 )
 
 # Set BEFORE importing anything from `app`: core.config builds a settings singleton
@@ -58,7 +69,8 @@ from app.tenancy.resolver import invalidate_tenant_cache  # noqa: E402
 from app.db.session import dispose_engine, tenant_session, untenanted_session  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 from app.models.tenant import Tenant  # noqa: E402
-from app.models.user import PlatformAdmin, User, UserStatus  # noqa: E402
+from app.auth import usernames  # noqa: E402
+from app.models.user import AccountDirectory, PlatformAdmin, User, UserStatus  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
 
@@ -132,6 +144,10 @@ class TenantFixture:
         self.slug: str = tenant.slug
         self.name: str = tenant.name
         self.admin_email: str = admin.email
+        #: What the admin actually signs in with — `admin@alpha-academy`. The email
+        #: still works (see auth/service.py::tenant_id_for_login) but the username
+        #: is the credential under test.
+        self.admin_username: str = admin.username
         self.admin_id: uuid.UUID = admin.id
 
     @property
@@ -171,6 +187,7 @@ async def tenant_b() -> TenantFixture:
 async def platform_admin() -> PlatformAdmin:
     async with untenanted_session() as session:
         admin = PlatformAdmin(
+            username=usernames.OPS_USERNAME,
             email="ops@gamexo.example.com",
             password_hash=hash_password(PASSWORD),
             full_name="Platform Operator",
@@ -196,26 +213,46 @@ async def make_user(
     status: UserStatus = UserStatus.ACTIVE,
     password: str = PASSWORD,
 ) -> User:
-    """Add a staff member to an academy, through the tenant-scoped session."""
+    """Add a staff member to an academy, through the tenant-scoped session.
+
+    The username follows the same scheme the API generates — kiosk logins get
+    `kiosk@{slug}`, everyone else `{name}.staff@{slug}` — so a test that signs in
+    with one is exercising the real credential shape. Registered in the directory
+    too, or the user resolves to no academy on a request with no host.
+    """
+    local = email.split("@")[0]
     async with tenant_session(tenant.id) as session:
+        username = (
+            usernames.for_kiosk(tenant.slug)
+            if role is Role.KIOSK
+            else usernames.for_staff(local, tenant.slug)
+        )
         user = User(
+            username=username,
             email=email,
             password_hash=hash_password(password),
-            full_name=email.split("@")[0].title(),
+            full_name=local.title(),
             role=role,
             status=status,
         )
         session.add(user)
+        session.add(
+            AccountDirectory(username=username, email=email, tenant_id=tenant.id)
+        )
         await session.flush()
         session.expunge(user)
         return user
 
 
-async def login(client: AsyncClient, tenant: TenantFixture, email: str, password: str) -> str:
-    """Log in and return the access token."""
+async def login(client: AsyncClient, tenant: TenantFixture, identifier: str, password: str) -> str:
+    """Log in and return the access token.
+
+    `identifier` is a username or an email — the endpoint accepts both, so existing
+    tests that pass an address keep working unchanged.
+    """
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json={"username": identifier, "password": password},
         headers=tenant.headers,
     )
     assert response.status_code == 200, response.text

@@ -151,6 +151,30 @@ def _assert_usable(snapshot: _TenantSnapshot) -> None:
         )
 
 
+async def assert_tenant_usable(session: AsyncSession, tenant_id: uuid.UUID) -> None:
+    """The same suspension rule, for the paths that never resolve a tenant.
+
+    Two endpoints decide which academy they mean without going through
+    `resolve_tenant`, because on a shared origin there is nothing to resolve *from*:
+    login looks the academy up in `account_directory` by the username typed into the
+    form, and refresh reads it out of the token's own `tid`. Both would otherwise
+    let a suspended academy carry on exactly as before — which, since every
+    deployment that matters is a shared origin, would make suspension decorative.
+
+    Callers must invoke this *after* verifying the credential, never before. Refusing
+    an unauthenticated caller with "that academy is suspended" would confirm that the
+    username they guessed exists; refusing them after they have already proved the
+    password tells them nothing they did not know.
+    """
+    tenant = await _load_tenant_by_id(session, tenant_id)
+    # A token naming an academy that no longer exists is not a suspension problem;
+    # it is handled where the row is actually needed.
+    if tenant is not None and tenant.status is TenantStatus.SUSPENDED:
+        raise PermissionDeniedError(
+            f"Academy '{tenant.slug}' is suspended.", details={"tenant_slug": tenant.slug}
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class _Plan:
     """Which tenant this request names, and how. Decided without touching the database."""

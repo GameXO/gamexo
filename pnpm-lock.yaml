@@ -15,6 +15,64 @@ importers:
         specifier: ^4.120.0
         version: 4.120.0
 
+  apps/dashboard:
+    dependencies:
+      '@fontsource/geist-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/plus-jakarta-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
+      '@tanstack/react-query':
+        specifier: ^5.90.2
+        version: 5.101.4(react@19.2.8)
+      jspdf:
+        specifier: ^4.2.1
+        version: 4.2.1
+      lucide-react:
+        specifier: ^1.28.0
+        version: 1.28.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      recharts:
+        specifier: ^3.10.1
+        version: 3.10.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.8)(react@19.2.8)(redux@5.0.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.4
+        version: 6.0.5(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
+      openapi-typescript:
+        specifier: ^7.9.1
+        version: 7.13.0(typescript@6.0.3)
+      oxlint:
+        specifier: ^1.75.0
+        version: 1.76.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)
+
   apps/pos:
     dependencies:
       '@fontsource/manrope':
@@ -76,7 +134,7 @@ importers:
         specifier: ^8.2.0
         version: 8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)
 
-  apps/web:
+  apps/website:
     dependencies:
       '@fontsource/geist-sans':
         specifier: ^5.3.0
@@ -87,34 +145,16 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
-      '@tanstack/react-query':
-        specifier: ^5.90.2
-        version: 5.101.4(react@19.2.8)
-      jspdf:
-        specifier: ^4.2.1
-        version: 4.2.1
-      lucide-react:
-        specifier: ^1.28.0
-        version: 1.28.0(react@19.2.8)
-      qrcode:
-        specifier: ^1.5.4
-        version: 1.5.4
       react:
         specifier: ^19.2.8
         version: 19.2.8
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
-      recharts:
-        specifier: ^3.10.1
-        version: 3.10.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.8)(react@19.2.8)(redux@5.0.1)
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
-      '@types/qrcode':
-        specifier: ^1.5.6
-        version: 1.5.6
       '@types/react':
         specifier: ^19.2.17
         version: 19.2.18
@@ -124,9 +164,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.4
         version: 6.0.5(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
-      openapi-typescript:
-        specifier: ^7.9.1
-        version: 7.13.0(typescript@6.0.3)
       oxlint:
         specifier: ^1.75.0
         version: 1.76.0

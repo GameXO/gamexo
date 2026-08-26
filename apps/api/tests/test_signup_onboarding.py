@@ -124,7 +124,7 @@ async def test_login_finds_the_academy_from_the_email(client: AsyncClient) -> No
 
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": "shared@origin.example.com", "password": PASSWORD},
+        json={"username": "shared@origin.example.com", "password": PASSWORD},
         headers=NO_TENANT,
     )
     assert response.status_code == 200, response.text
@@ -137,12 +137,12 @@ async def test_an_unknown_email_is_rejected_like_a_wrong_password(client: AsyncC
 
     unknown = await client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@example.com", "password": PASSWORD},
+        json={"username": "nobody@example.com", "password": PASSWORD},
         headers=NO_TENANT,
     )
     wrong_password = await client.post(
         "/api/v1/auth/login",
-        json={"email": "known@example.com", "password": "not-the-password"},
+        json={"username": "known@example.com", "password": "not-the-password"},
         headers=NO_TENANT,
     )
 
@@ -156,7 +156,7 @@ async def test_login_still_works_over_a_subdomain(
     """The existing path is untouched: a resolved host still names the academy."""
     response = await client.post(
         "/api/v1/auth/login",
-        json={"email": tenant_a.admin_email, "password": PASSWORD},
+        json={"username": tenant_a.admin_email, "password": PASSWORD},
         headers={"host": tenant_a.host},
     )
     assert response.status_code == 200, response.text
@@ -603,7 +603,7 @@ async def test_new_staff_can_sign_in_without_a_subdomain(client: AsyncClient) ->
 
     signed_in = await client.post(
         "/api/v1/auth/login",
-        json={"email": "reception@staffing.example.com", "password": PASSWORD},
+        json={"username": "reception@staffing.example.com", "password": PASSWORD},
         headers=NO_TENANT,
     )
     assert signed_in.status_code == 200, signed_in.text

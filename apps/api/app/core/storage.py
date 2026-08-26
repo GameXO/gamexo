@@ -66,14 +66,33 @@ class StoredFile:
     size: int
 
 
-def _key_for(tenant_id: uuid.UUID, extension: str) -> str:
-    """Tenant-prefixed, so an object in the bucket is traceable to an academy.
+def tenant_prefix(tenant_id: uuid.UUID) -> str:
+    """Where an academy's own images live.
 
     Not a secret and not an access control — anyone with the URL can fetch it, the
     same as any other image on the web. It is what makes "delete everything
     belonging to this turf" a prefix listing rather than a join.
     """
-    return f"t/{tenant_id}/{uuid.uuid4().hex}{extension}"
+    return f"t/{tenant_id}"
+
+
+def signup_prefix(intent_id: uuid.UUID) -> str:
+    """Where a logo uploaded *before* the academy exists lives.
+
+    The self-serve wizard asks for a logo on its first screen, which is long before
+    there is a tenant to file it under — see modules/billing/models.py. A separate
+    prefix rather than a fabricated tenant id, so these are obviously not an
+    academy's objects and a sweep of abandoned signups is one prefix listing.
+
+    The uploaded URL is copied onto `tenant_settings.logo_url` at provisioning and
+    is not moved. Rewriting the object into `t/{tenant_id}/` would buy tidiness and
+    cost a copy, a delete and a window where the logo 404s.
+    """
+    return f"signup/{intent_id}"
+
+
+def _key_for(prefix: str, extension: str) -> str:
+    return f"{prefix.strip('/')}/{uuid.uuid4().hex}{extension}"
 
 
 def _r2_configured() -> bool:
@@ -128,8 +147,14 @@ def _store_local(key: str, data: bytes, content_type: str) -> str:
     return f"/media/{key}"
 
 
-def store_image(data: bytes, *, tenant_id: uuid.UUID) -> StoredFile:
-    """Validate and store one image, returning the URL to render it from."""
+def store_image(data: bytes, *, prefix: str) -> StoredFile:
+    """Validate and store one image, returning the URL to render it from.
+
+    `prefix` comes from `tenant_prefix` or `signup_prefix` — never from a request.
+    It is interpolated into an object key, so a caller-supplied value would be a
+    path traversal on the local backend and a way to write over another academy's
+    objects on R2.
+    """
     if not data:
         raise InvalidInputError("The uploaded file is empty.", details={"field": "file"})
     if len(data) > MAX_UPLOAD_BYTES:
@@ -140,7 +165,7 @@ def store_image(data: bytes, *, tenant_id: uuid.UUID) -> StoredFile:
 
     content_type = sniff(data)
     extension = ALLOWED_TYPES.get(content_type) or mimetypes.guess_extension(content_type) or ".bin"
-    key = _key_for(tenant_id, extension)
+    key = _key_for(prefix, extension)
 
     url = _store_r2(key, data, content_type) if _r2_configured() else _store_local(
         key, data, content_type

@@ -18,11 +18,7 @@ export function lookupErrorMessage(error: unknown): string {
 
 /** Looks a booking up by the id typed on the check-in keyboard. The backend already
  *  scopes this to bookings starting within 30 minutes either side of now and 404s
- *  otherwise — that 404 is a normal "not found" result here, not a query error.
- *
- *  Replaced `useFindBookingByPhone`, which searched every booking for a phone number
- *  and then guessed which one the customer meant by ranking active over upcoming.
- *  A reference identifies exactly one booking, so there is nothing left to guess. */
+ *  otherwise — that 404 is a normal "not found" result here, not a query error. */
 export function useFindBookingByCode(code: string | null) {
   return useQuery({
     queryKey: ['checkin-booking-by-code', code],

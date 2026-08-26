@@ -10,3 +10,9 @@ __pycache__/
 # Re-include it: it documents every setting the API reads and contains no secrets,
 # only local-dev placeholders. A rule in a nested .gitignore overrides the parent.
 .env.example
+
+# Uploaded images, when R2 is not configured and core/storage.py falls back to
+# local disk. Turf logos and court photos — somebody else's content, written by
+# whoever used the dev server last, and no more a source artefact than the
+# database is. See app/core/storage.py on why the local backend exists at all.
+var/uploads/
