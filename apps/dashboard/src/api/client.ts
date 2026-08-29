@@ -214,6 +214,19 @@ export const api = {
 
   me: () => request<Ok<'/api/v1/auth/me', 'get'>>('/api/v1/auth/me'),
 
+  /** Change your own password. Admin only, and it names no account — you can only
+   *  ever change your own.
+   *
+   *  **Signs out every other session for this account**, which is the point: the
+   *  password being replaced is usually the generated one that arrived by email in
+   *  plaintext. The tokens it returns are the only ones that still work, so the
+   *  caller must store them immediately or its next request will 401. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<Ok<'/api/v1/auth/password', 'post'>>('/api/v1/auth/password', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+    }),
+
   /** Sign in as the platform operator — `ops@gamexo`.
    *
    *  A separate endpoint because a platform admin is not a member of any academy
@@ -289,6 +302,23 @@ export const api = {
       `/api/v1/platform/tenants/${tenantId}/admin-password`,
       { method: 'POST', body },
     ),
+
+  /** This academy's settings. Reception and above may read them. */
+  getSettings: () => request<Ok<'/api/v1/settings', 'get'>>('/api/v1/settings'),
+
+  /** Patch settings. Admin only.
+   *
+   *  `enabled_services` is **merged** server-side, not replaced, so sending only
+   *  the keys this screen knows about cannot silently switch off the ones it has
+   *  never heard of. Unknown keys are dropped rather than rejected. */
+  updateSettings: (body: {
+    enabled_services?: Record<string, boolean>
+    business_name?: string
+  }) =>
+    request<Ok<'/api/v1/settings', 'patch'>>('/api/v1/settings', {
+      method: 'PATCH',
+      body,
+    }),
 
   /** Returns a plain array, not a page. */
   listSports: (query?: { include_inactive?: boolean }) =>

@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app.audit import write_audit
 from app.auth import usernames
-from app.auth.deps import CurrentPlatformAdmin
+from app.auth.deps import CurrentPlatformAdmin, revoke_identity
 from app.auth.schemas import (
     CreateTenantRequest,
     CreateTenantResponse,
@@ -332,7 +332,13 @@ async def reset_admin_password(
             raise NotFoundError(f"No account '{wanted}' at this academy.")
 
         user.password_hash = hash_password(password)
+        # Ends every session this account already has. An operator reset is often an
+        # offboarding step — somebody is meant to lose access — and it would be worth
+        # very little if the person being reset simply kept the tab they had open.
+        # See models/user.py::User.token_version.
+        user.token_version += 1
         await db.flush()
+        revoke_identity(tenant.id, user.id)
 
         await write_audit(
             db,

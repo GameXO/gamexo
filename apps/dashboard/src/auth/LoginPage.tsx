@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { useAuth } from './AuthProvider'
-import { goToOps, isOpsRoute, subscribeToOpsRoute } from './opsRoute'
+// `goToOps` is not imported: the signpost that used it is commented out below.
+// Re-add it there if the link comes back. The #/ops route itself still works.
+import { isOpsRoute, subscribeToOpsRoute } from './opsRoute'
 import brandLogo from '../assets/figma/brand-logo.svg'
 
 export default function LoginPage() {
@@ -101,7 +103,9 @@ export default function LoginPage() {
         {/* Small and at the bottom, deliberately. There is exactly one operator
             account and thousands of academy logins, so this is a signpost for the
             person who already knows it exists — not an invitation. */}
-        {!operatorMode && (
+            {/* disable for now */}
+        {/* Needs `goToOps` back in the import above to compile. */}
+        {/* {!operatorMode && (
           <button
             type="button"
             onClick={goToOps}
@@ -109,7 +113,7 @@ export default function LoginPage() {
           >
             Platform operator sign-in
           </button>
-        )}
+        )} */}
       </div>
     </div>
   )

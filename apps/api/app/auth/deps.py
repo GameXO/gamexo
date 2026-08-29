@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Callable, Literal
+from typing import Annotated, Any, Callable, Literal
 
 from fastapi import Depends
 from sqlalchemy import select
@@ -59,6 +59,11 @@ class _Identity:
     email: str
     tenant_id: uuid.UUID | None
     role: Role | None
+    #: Compared against the token's `ver` claim on every request. Cached alongside
+    #: the rest of the snapshot, so a password change is only guaranteed to evict
+    #: other sessions once the TTL lapses in each worker process — `revoke_identity`
+    #: makes it immediate in the process that handled the change.
+    token_version: int = 1
 
 
 # (tenant_id, user_id) -> (expires_at, identity). Keyed on the tenant too so a
@@ -100,6 +105,23 @@ def clear_identity_cache() -> None:
     outlive a TRUNCATE and would otherwise answer for rows that no longer exist.
     """
     _identities.clear()
+
+
+def _assert_current_version(payload: dict[str, Any], snapshot: _Identity) -> None:
+    """Refuse a token minted before the account's last password change.
+
+    The claim is compared, not merely required, so a token from *any* earlier
+    version is refused rather than only the immediately preceding one.
+
+    A token with no `ver` at all predates this mechanism and is refused too — the
+    alternative, treating a missing claim as "fine", would let anyone strip the claim
+    to opt out of the check. That does sign everyone out once, at the deploy that
+    adds the column, which is the correct trade and is noted in the migration.
+    """
+    if payload.get("ver") != snapshot.token_version:
+        raise AuthenticationError(
+            "Your password was changed. Please sign in again."
+        )
 
 
 async def load_user(session: AsyncSession, principal: Principal) -> User:
@@ -195,9 +217,14 @@ async def get_current_principal(
         if not user.is_active:
             raise AuthenticationError(f"This account is {user.status.value}.")
         snapshot = _Identity(
-            id=user.id, email=user.email, tenant_id=user.tenant_id, role=user.role
+            id=user.id,
+            email=user.email,
+            tenant_id=user.tenant_id,
+            role=user.role,
+            token_version=user.token_version,
         )
         _identity_put(tenant.id, snapshot)
+        _assert_current_version(payload, snapshot)
         # `user` is handed on so handlers needing the ORM object still get it
         # without a second read on the request that populated the cache.
         return Principal(
@@ -209,6 +236,7 @@ async def get_current_principal(
             user=user,
         )
 
+    _assert_current_version(payload, snapshot)
     return Principal(
         id=snapshot.id,
         kind="user",

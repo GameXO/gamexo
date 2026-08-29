@@ -2875,6 +2875,29 @@
         "title": "BookingUpdate",
         "type": "object"
       },
+      "ChangePasswordRequest": {
+        "description": "Replace your own password. Not anyone else's \u2014 see auth/router.py.\n\n`current_password` is required even though the caller is already authenticated.\nA bearer token proves the session was opened by this account at some point; it\ndoes not prove the person holding the laptop right now is the owner. Without\nthis field an unattended dashboard is a permanent account takeover, and the\naccount being protected is the one that can delete every booking in the academy.",
+        "properties": {
+          "current_password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
       "Channel": {
         "enum": [
           "email",
@@ -15765,6 +15788,53 @@
           }
         ],
         "summary": "The current principal and the academy they are acting in",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "description": "For the owner who was sent a generated password and wants one of their own. Requires the current password, and replaces only the caller's own credential \u2014 there is no way to name another account here.\n\n**Every other session for this account is signed out.** The password being replaced is usually the one that arrived by email in plaintext, so leaving sessions opened with it alive would defeat the point. The caller keeps working: a fresh token pair comes back in the response and must replace the stored one, or the very next request will 401.\n\nAdmin only, for now. Staff passwords are set for them by an admin on the staff form and there is no screen for a staff member to change their own.",
+        "operationId": "auth_changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Change your own password",
         "tags": [
           "auth"
         ]

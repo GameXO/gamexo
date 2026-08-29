@@ -104,8 +104,19 @@ def issue_user_tokens(user: User) -> tuple[str, str]:
     as a tenant *selector* — auth/deps.py checks it against the independently
     resolved tenant — but carrying it means a token stolen from academy A cannot be
     replayed against academy B's hostname without that mismatch being detected.
+
+    `ver` is the account's `token_version`, and it is what gives an otherwise
+    stateless token a kill switch: bumping the column refuses every token already
+    issued. Checked on both the access path (auth/deps.py) and the refresh path
+    (auth/router.py) — checking only the latter would leave a stolen access token
+    working for the rest of its lifetime.
     """
-    claims = {"tid": str(user.tenant_id), "role": user.role.value, "email": user.email}
+    claims = {
+        "tid": str(user.tenant_id),
+        "role": user.role.value,
+        "email": user.email,
+        "ver": user.token_version,
+    }
     return (
         create_access_token(subject=str(user.id), audience=Audience.TENANT, claims=claims),
         create_refresh_token(subject=str(user.id), audience=Audience.TENANT, claims=claims),

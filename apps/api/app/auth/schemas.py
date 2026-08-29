@@ -231,6 +231,37 @@ class ResetAdminPasswordRequest(BaseModel):
     username: str | None = None
 
 
+class ChangePasswordRequest(BaseModel):
+    """Replace your own password. Not anyone else's — see auth/router.py.
+
+    `current_password` is required even though the caller is already authenticated.
+    A bearer token proves the session was opened by this account at some point; it
+    does not prove the person holding the laptop right now is the owner. Without
+    this field an unattended dashboard is a permanent account takeover, and the
+    account being protected is the one that can delete every booking in the academy.
+    """
+
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def _within_bcrypt_limit(cls, v: str) -> str:
+        # Same rule as _Password: bcrypt reads only the first 72 bytes, so two long
+        # passwords sharing a prefix would be interchangeable.
+        if len(v.encode("utf-8")) > BCRYPT_MAX_BYTES:
+            raise ValueError(
+                f"password must be at most {BCRYPT_MAX_BYTES} bytes when UTF-8 encoded"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _actually_a_change(self) -> ChangePasswordRequest:
+        if self.current_password == self.new_password:
+            raise ValueError("The new password must be different from the current one.")
+        return self
+
+
 class DeleteTenantRequest(BaseModel):
     """Hard-delete an academy. Irreversible, and it takes everything with it.
 

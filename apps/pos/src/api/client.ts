@@ -186,6 +186,15 @@ export const api = {
 
   me: () => request<Ok<'/api/v1/auth/me', 'get'>>('/api/v1/auth/me'),
 
+  /** Branding and which services this academy offers, readable by the kiosk role.
+   *
+   *  Deliberately a separate endpoint from `GET /settings`, which is reception and
+   *  above: the tablet login is the most exposed credential in the academy, and the
+   *  full settings payload carries GST numbers, invoice identity and notification
+   *  addresses. This is the subset the counter is allowed to know. */
+  publicSettings: () =>
+    request<Ok<'/api/v1/settings/public', 'get'>>('/api/v1/settings/public'),
+
   /** Returns a plain array, not a page. */
   listSports: (query?: { include_inactive?: boolean }) =>
     request<Ok<'/api/v1/sports', 'get'>>('/api/v1/sports', { query }),
