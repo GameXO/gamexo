@@ -7,6 +7,7 @@ import BookingFlow from './booking/BookingFlow'
 import AddOns from './addons/AddOns'
 import ActiveGames from './pos/ActiveGames'
 import CourtsOverview from './facility/CourtsOverview'
+import SettingsPage from './settings/SettingsPage'
 import NotificationSettings from './manage/NotificationSettings'
 import PaymentModes from './manage/PaymentModes'
 import Integrations from './manage/Integrations'
@@ -258,7 +259,7 @@ function Shell() {
         {view === 'settings' && (
           <>
             <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Settings" icon={settings} />
-            <ComingSoon label="Settings" />
+            <SettingsPage />
           </>
         )}
         {view === 'helpCenter' && (

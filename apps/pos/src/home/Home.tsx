@@ -3,6 +3,7 @@ import { LogOut } from 'lucide-react'
 import type { View } from '../App'
 import { TopBar } from '../ui/TopBar'
 import { useAuth } from '../auth/AuthProvider'
+import { usePosServices } from '../api/hooks'
 import checkinIllustration from '../assets/figma/home/checkin-illustration.png'
 import shopIllustration from '../assets/figma/home/shop-illustration.png'
 import academyIllustration from '../assets/figma/home/academy-illustration.png'
@@ -38,6 +39,10 @@ function Tile({
 }
 
 export default function Home({ onNavigate }: { onNavigate: (view: View) => void }) {
+  // Which tiles this academy offers — set by an admin in the dashboard's
+  // Settings -> Counter services. Unknown and not-yet-loaded both read as enabled,
+  // so the counter never flashes an empty home screen.
+  const { isEnabled } = usePosServices()
   const { logout } = useAuth()
   const [showSignOut, setShowSignOut] = useState(false)
 
@@ -82,30 +87,38 @@ export default function Home({ onNavigate }: { onNavigate: (view: View) => void 
         </div>
 
         <div className="flex w-full max-w-[100%] flex-row items-stretch justify-start gap-5 overflow-x-auto px-1 pb-2 min-[850px]:justify-center min-[850px]:overflow-visible min-[850px]:px-0 min-[850px]:pb-0">
-          <Tile
-            image={checkinIllustration}
-            title="Check In"
-            detail="Already have a Booking or Book now"
-            onClick={() => onNavigate('checkin')}
-          />
-          <Tile
-            image={shopIllustration}
-            title="Shop"
-            detail="Rent any equipment, shoes, and more ."
-            onClick={() => onNavigate('store')}
-          />
-          <Tile
-            image={academyIllustration}
-            title="Academy"
-            detail="Student attendance & membership"
-            onClick={() => onNavigate('academy')}
-          />
-          <Tile
-            image={membershipIllustration}
-            title="Membership"
-            detail="Student attendance & membership"
-            onClick={() => onNavigate('academy')}
-          />
+          {isEnabled('checkin') && (
+            <Tile
+              image={checkinIllustration}
+              title="Check In"
+              detail="Already have a Booking or Book now"
+              onClick={() => onNavigate('checkin')}
+            />
+          )}
+          {isEnabled('shop') && (
+            <Tile
+              image={shopIllustration}
+              title="Shop"
+              detail="Rent any equipment, shoes, and more ."
+              onClick={() => onNavigate('store')}
+            />
+          )}
+          {isEnabled('academy') && (
+            <Tile
+              image={academyIllustration}
+              title="Academy"
+              detail="Batches, coaches and student attendance"
+              onClick={() => onNavigate('academy')}
+            />
+          )}
+          {isEnabled('membership') && (
+            <Tile
+              image={membershipIllustration}
+              title="Membership"
+              detail="Passes, packages and renewals"
+              onClick={() => onNavigate('academy')}
+            />
+          )}
         </div>
       </main>
     </div>

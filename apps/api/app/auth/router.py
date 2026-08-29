@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.audit import write_audit
-from app.auth.deps import CurrentPrincipal, load_user
+from app.auth.deps import CurrentPrincipal, RequireAdmin, load_user, revoke_identity
 from app.auth.schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     MeOut,
     PlatformAdminOut,
@@ -28,7 +29,7 @@ from app.auth.service import (
     signup_tenant,
 )
 from app.core.errors import AuthenticationError, PermissionDeniedError
-from app.core.security import Audience, TokenError, decode_token
+from app.core.security import Audience, TokenError, decode_token, hash_password, verify_password
 from app.db.session import bind_session_to
 from app.models.audit import ActorKind
 from app.models.tenant import Tenant
@@ -204,13 +205,85 @@ async def refresh_tokens(
         # origin, and the academy is only locked out once whoever holds it signs out.
         await assert_tenant_usable(db, uuid.UUID(claimed_tenant))
 
-        # NOTE: refresh tokens are stateless for now, so a refresh token stays valid
-        # until it expires even after a password change. When that matters, add a
-        # `token_version` integer to app_user, put it in the claims, and compare here —
-        # bumping it invalidates every outstanding token for that user without needing
-        # a denylist or Redis.
+        # Refresh tokens are stateless and long-lived, so this comparison is what
+        # stops one outliving the password it was issued under. Without it, changing
+        # a leaked temporary password would lock nobody out: whoever used it would
+        # simply refresh their way past the change until the token expired on its
+        # own. See models/user.py::User.token_version.
+        if claims.get("ver") != user.token_version:
+            raise AuthenticationError("Your password was changed. Please sign in again.")
+
         access, refresh = issue_user_tokens(user)
 
+    return TokenPair(
+        access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
+    )
+
+
+@router.post(
+    "/password",
+    response_model=TokenPair,
+    summary="Change your own password",
+    description=(
+        "For the owner who was sent a generated password and wants one of their "
+        "own. Requires the current password, and replaces only the caller's own "
+        "credential — there is no way to name another account here.\n\n"
+        "**Every other session for this account is signed out.** The password being "
+        "replaced is usually the one that arrived by email in plaintext, so leaving "
+        "sessions opened with it alive would defeat the point. The caller keeps "
+        "working: a fresh token pair comes back in the response and must replace the "
+        "stored one, or the very next request will 401.\n\n"
+        "Admin only, for now. Staff passwords are set for them by an admin on the "
+        "staff form and there is no screen for a staff member to change their own."
+    ),
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    principal: RequireAdmin,
+    tenant: TenantCtx,
+    db: Db,
+    request: Request,
+) -> TokenPair:
+    user = await load_user(db, principal)
+
+    # Deliberately the same generic message as a failed login, and deliberately not
+    # "that is not your current password" — this endpoint is reachable with a stolen
+    # session, and confirming a guessed password is worth more to an attacker than
+    # the marginal clarity is worth to the owner.
+    if not verify_password(payload.current_password, user.password_hash):
+        raise AuthenticationError("Incorrect password.")
+
+    user.password_hash = hash_password(payload.new_password)
+    # The bump is the sign-out. Everything already issued for this account carries
+    # the old number and is refused from here on — see models/user.py.
+    user.token_version += 1
+    await db.flush()
+
+    # The identity snapshot caches token_version, so without this the old tokens
+    # would keep working in *this* process for the rest of the TTL. Other worker
+    # processes still expire on their own TTL; that window is seconds, and is the
+    # trade-off already documented on the cache.
+    revoke_identity(tenant.id, user.id)
+
+    await write_audit(
+        db,
+        tenant_id=tenant.id,
+        action="user.password_changed",
+        actor_kind=ActorKind.USER,
+        actor_id=user.id,
+        actor_label=user.email,
+        entity_type="app_user",
+        entity_id=user.id,
+        # Neither password is recorded, obviously. What matters for the trail is
+        # that the account's own holder rotated it, as against an operator reset.
+        changes={"after": {"token_version": user.token_version, "by": "self"}},
+        request=request,
+        tenant_context=tenant,
+    )
+
+    # Minted after the bump, so this pair carries the new version and is the only
+    # one that still works.
+    access, refresh = issue_user_tokens(user)
     return TokenPair(
         access_token=access, refresh_token=refresh, expires_in=access_token_ttl_seconds()
     )

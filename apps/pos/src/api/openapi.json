@@ -2875,6 +2875,29 @@
         "title": "BookingUpdate",
         "type": "object"
       },
+      "ChangePasswordRequest": {
+        "description": "Replace your own password. Not anyone else's \u2014 see auth/router.py.\n\n`current_password` is required even though the caller is already authenticated.\nA bearer token proves the session was opened by this account at some point; it\ndoes not prove the person holding the laptop right now is the owner. Without\nthis field an unattended dashboard is a permanent account takeover, and the\naccount being protected is the one that can delete every booking in the academy.",
+        "properties": {
+          "current_password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
       "Channel": {
         "enum": [
           "email",
@@ -4383,6 +4406,39 @@
           "admin": {
             "$ref": "#/components/schemas/UserOut"
           },
+          "admin_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Password"
+          },
+          "kiosk_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kiosk Password"
+          },
+          "kiosk_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kiosk Username"
+          },
           "tenant": {
             "$ref": "#/components/schemas/TenantOut"
           }
@@ -4987,6 +5043,55 @@
           }
         },
         "title": "CustomerUpdate",
+        "type": "object"
+      },
+      "DeleteTenantRequest": {
+        "description": "Hard-delete an academy. Irreversible, and it takes everything with it.\n\n`confirm_name` must equal the academy's own name, exactly. The dialog in the\nconsole asks the operator to type it, and the server checks it again rather than\ntrusting that it did \u2014 a DELETE that only needs an id is one stray curl from an\nacademy that no longer exists, and there is nothing to undo it with.",
+        "properties": {
+          "confirm_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Confirm Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_name"
+        ],
+        "title": "DeleteTenantRequest",
+        "type": "object"
+      },
+      "DeleteTenantResponse": {
+        "description": "What was destroyed. Mirrors the tombstone row left behind.",
+        "properties": {
+          "deleted_at": {
+            "format": "date-time",
+            "title": "Deleted At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "row_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Row Counts",
+            "type": "object"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "deleted_at",
+          "row_counts"
+        ],
+        "title": "DeleteTenantResponse",
         "type": "object"
       },
       "DialectOut": {
@@ -9157,6 +9262,16 @@
         "title": "PlanOut",
         "type": "object"
       },
+      "PlanTier": {
+        "description": "What an academy pays for.\n\nHere rather than in modules/billing/plans.py because `Tenant.plan_tier` is the\ncolumn of record and models may not import a module that imports them back.\nplans.py types its `code` field with this, so the catalogue the pricing page\nrenders and the value stored on the tenant cannot drift apart.\n\nStored as a plain String(50) rather than a Postgres enum, deliberately: plans get\nrenamed and retired far more often than tenant statuses do, and none of that is\nworth a migration with an exclusive lock on the table every hostname lookup\nreads.",
+        "enum": [
+          "starter",
+          "growth",
+          "pro"
+        ],
+        "title": "PlanTier",
+        "type": "string"
+      },
       "PlatformAdminOut": {
         "properties": {
           "email": {
@@ -10349,6 +10464,49 @@
           "refresh_token"
         ],
         "title": "RefreshRequest",
+        "type": "object"
+      },
+      "ResetAdminPasswordRequest": {
+        "description": "Reissue one academy account's password.\n\n`username` is optional and defaults to the academy's `admin@{slug}`, which is the\naccount that actually goes missing: it is the one created by provisioning, the one\nthe welcome email named, and the one nobody can reset for themselves because\nthere is no self-serve reset flow yet.",
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "title": "ResetAdminPasswordRequest",
+        "type": "object"
+      },
+      "ResetAdminPasswordResponse": {
+        "description": "Shown once, in the browser, and never retrievable again.\n\nReturned in the response rather than emailed because the situation this exists\nfor *is* email not arriving. The operator reads it out or pastes it into whatever\nchannel they already have with the owner.",
+        "properties": {
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "email"
+        ],
+        "title": "ResetAdminPasswordResponse",
         "type": "object"
       },
       "RevenuePoint": {
@@ -12993,14 +13151,20 @@
             "type": "string"
           },
           "password": {
-            "maxLength": 128,
-            "minLength": 8,
-            "title": "Password",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
           }
         },
         "required": [
-          "password",
           "email",
           "full_name"
         ],
@@ -13045,6 +13209,15 @@
         ],
         "title": "TenantOut",
         "type": "object"
+      },
+      "TenantStatus": {
+        "enum": [
+          "active",
+          "trial",
+          "suspended"
+        ],
+        "title": "TenantStatus",
+        "type": "string"
       },
       "TokenPair": {
         "properties": {
@@ -13178,6 +13351,33 @@
           }
         },
         "title": "UpdateSignup",
+        "type": "object"
+      },
+      "UpdateTenantRequest": {
+        "description": "Change an academy's standing or its plan. Both optional, at least one required.\n\nDeliberately narrow. An operator editing an academy's *name* or *slug* from here\nwould be editing somebody else's business identity behind their back, and the\nslug is a DNS label other things point at. Those stay where they belong \u2014 inside\nthe academy, where the audit trail names the person who did it.",
+        "properties": {
+          "plan_tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanTier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "UpdateTenantRequest",
         "type": "object"
       },
       "UploadOut": {
@@ -15588,6 +15788,53 @@
           }
         ],
         "summary": "The current principal and the academy they are acting in",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "description": "For the owner who was sent a generated password and wants one of their own. Requires the current password, and replaces only the caller's own credential \u2014 there is no way to name another account here.\n\n**Every other session for this account is signed out.** The password being replaced is usually the one that arrived by email in plaintext, so leaving sessions opened with it alive would defeat the point. The caller keeps working: a fresh token pair comes back in the response and must replace the stored one, or the very next request will 401.\n\nAdmin only, for now. Staff passwords are set for them by an admin on the staff form and there is no screen for a staff member to change their own.",
+        "operationId": "auth_changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Change your own password",
         "tags": [
           "auth"
         ]
@@ -21086,6 +21333,181 @@
           }
         ],
         "summary": "Onboard an academy",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}": {
+      "delete": {
+        "description": "**Irreversible.** Removes the academy and every row it owned across all tenant-scoped tables \u2014 bookings, customers, invoices, payments, staff, and its own audit log. There is no undo and no backup taken here.\n\n`confirm_name` must match the academy's name exactly. To stop an academy operating without destroying anything, PATCH its status to `suspended` instead.\n\nA row is written to `deleted_tenant` recording who did it and how much was removed, because the academy's own audit log goes with it.",
+        "operationId": "platform_deleteTenantEndpoint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTenantResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Permanently delete an academy",
+        "tags": [
+          "platform"
+        ]
+      },
+      "patch": {
+        "description": "Suspending an academy takes effect on the next request: its staff are refused at login and every resolution of its subdomain fails. An operator with `X-Impersonate-Tenant` can still reach it, which is what makes support possible on a suspended venue.",
+        "operationId": "platform_updateTenant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Change an academy's standing or plan",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/admin-password": {
+      "post": {
+        "description": "Returns the new password once, in the response body. There is no self-serve reset yet, so an owner whose welcome email never arrived has no other way back in. The old password stops working immediately.",
+        "operationId": "platform_resetAdminPassword",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetAdminPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetAdminPasswordResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Reissue an academy account's password",
         "tags": [
           "platform"
         ]

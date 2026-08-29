@@ -469,6 +469,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change your own password
+         * @description For the owner who was sent a generated password and wants one of their own. Requires the current password, and replaces only the caller's own credential — there is no way to name another account here.
+         *
+         *     **Every other session for this account is signed out.** The password being replaced is usually the one that arrived by email in plaintext, so leaving sessions opened with it alive would defeat the point. The caller keeps working: a fresh token pair comes back in the response and must replace the stored one, or the very next request will 401.
+         *
+         *     Admin only, for now. Staff passwords are set for them by an admin on the staff form and there is no screen for a staff member to change their own.
+         */
+        post: operations["auth_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -1994,6 +2018,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/tenants/{tenant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Permanently delete an academy
+         * @description **Irreversible.** Removes the academy and every row it owned across all tenant-scoped tables — bookings, customers, invoices, payments, staff, and its own audit log. There is no undo and no backup taken here.
+         *
+         *     `confirm_name` must match the academy's name exactly. To stop an academy operating without destroying anything, PATCH its status to `suspended` instead.
+         *
+         *     A row is written to `deleted_tenant` recording who did it and how much was removed, because the academy's own audit log goes with it.
+         */
+        delete: operations["platform_deleteTenantEndpoint"];
+        options?: never;
+        head?: never;
+        /**
+         * Change an academy's standing or plan
+         * @description Suspending an academy takes effect on the next request: its staff are refused at login and every resolution of its subdomain fails. An operator with `X-Impersonate-Tenant` can still reach it, which is what makes support possible on a suspended venue.
+         */
+        patch: operations["platform_updateTenant"];
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/admin-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reissue an academy account's password
+         * @description Returns the new password once, in the response body. There is no self-serve reset yet, so an owner whose welcome email never arrived has no other way back in. The old password stops working immediately.
+         */
+        post: operations["platform_resetAdminPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/court-utilization": {
         parameters: {
             query?: never;
@@ -3413,6 +3485,22 @@ export interface components {
             status?: components["schemas"]["BookingStatus"] | null;
         };
         /**
+         * ChangePasswordRequest
+         * @description Replace your own password. Not anyone else's — see auth/router.py.
+         *
+         *     `current_password` is required even though the caller is already authenticated.
+         *     A bearer token proves the session was opened by this account at some point; it
+         *     does not prove the person holding the laptop right now is the owner. Without
+         *     this field an unattended dashboard is a permanent account takeover, and the
+         *     account being protected is the one that can delete every booking in the academy.
+         */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
          * Channel
          * @enum {string}
          */
@@ -3916,6 +4004,12 @@ export interface components {
         /** CreateTenantResponse */
         CreateTenantResponse: {
             admin: components["schemas"]["UserOut"];
+            /** Admin Password */
+            admin_password?: string | null;
+            /** Kiosk Password */
+            kiosk_password?: string | null;
+            /** Kiosk Username */
+            kiosk_username?: string | null;
             tenant: components["schemas"]["TenantOut"];
         };
         /** CustomerCreate */
@@ -4055,6 +4149,38 @@ export interface components {
             notes?: string | null;
             /** Phone */
             phone?: string | null;
+        };
+        /**
+         * DeleteTenantRequest
+         * @description Hard-delete an academy. Irreversible, and it takes everything with it.
+         *
+         *     `confirm_name` must equal the academy's own name, exactly. The dialog in the
+         *     console asks the operator to type it, and the server checks it again rather than
+         *     trusting that it did — a DELETE that only needs an id is one stray curl from an
+         *     academy that no longer exists, and there is nothing to undo it with.
+         */
+        DeleteTenantRequest: {
+            /** Confirm Name */
+            confirm_name: string;
+        };
+        /**
+         * DeleteTenantResponse
+         * @description What was destroyed. Mirrors the tombstone row left behind.
+         */
+        DeleteTenantResponse: {
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
+            /** Name */
+            name: string;
+            /** Row Counts */
+            row_counts: {
+                [key: string]: number;
+            };
+            /** Slug */
+            slug: string;
         };
         /**
          * DialectOut
@@ -5581,6 +5707,22 @@ export interface components {
             /** Tagline */
             tagline: string;
         };
+        /**
+         * PlanTier
+         * @description What an academy pays for.
+         *
+         *     Here rather than in modules/billing/plans.py because `Tenant.plan_tier` is the
+         *     column of record and models may not import a module that imports them back.
+         *     plans.py types its `code` field with this, so the catalogue the pricing page
+         *     renders and the value stored on the tenant cannot drift apart.
+         *
+         *     Stored as a plain String(50) rather than a Postgres enum, deliberately: plans get
+         *     renamed and retired far more often than tenant statuses do, and none of that is
+         *     worth a migration with an exclusive lock on the table every hostname lookup
+         *     reads.
+         * @enum {string}
+         */
+        PlanTier: "starter" | "growth" | "pro";
         /** PlatformAdminOut */
         PlatformAdminOut: {
             /**
@@ -5999,6 +6141,38 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * ResetAdminPasswordRequest
+         * @description Reissue one academy account's password.
+         *
+         *     `username` is optional and defaults to the academy's `admin@{slug}`, which is the
+         *     account that actually goes missing: it is the one created by provisioning, the one
+         *     the welcome email named, and the one nobody can reset for themselves because
+         *     there is no self-serve reset flow yet.
+         */
+        ResetAdminPasswordRequest: {
+            /** Username */
+            username?: string | null;
+        };
+        /**
+         * ResetAdminPasswordResponse
+         * @description Shown once, in the browser, and never retrievable again.
+         *
+         *     Returned in the response rather than emailed because the situation this exists
+         *     for *is* email not arriving. The operator reads it out or pastes it into whatever
+         *     channel they already have with the owner.
+         */
+        ResetAdminPasswordResponse: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+            /** Username */
+            username: string;
         };
         /** RevenuePoint */
         RevenuePoint: {
@@ -6849,7 +7023,7 @@ export interface components {
             /** Full Name */
             full_name: string;
             /** Password */
-            password: string;
+            password?: string | null;
         };
         /** TenantOut */
         TenantOut: {
@@ -6875,6 +7049,11 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * TenantStatus
+         * @enum {string}
+         */
+        TenantStatus: "active" | "trial" | "suspended";
         /** TokenPair */
         TokenPair: {
             /** Access Token */
@@ -6916,6 +7095,19 @@ export interface components {
             } | null;
             /** Sports */
             sports?: components["schemas"]["SportPick"][] | null;
+        };
+        /**
+         * UpdateTenantRequest
+         * @description Change an academy's standing or its plan. Both optional, at least one required.
+         *
+         *     Deliberately narrow. An operator editing an academy's *name* or *slug* from here
+         *     would be editing somebody else's business identity behind their back, and the
+         *     slug is a DNS label other things point at. Those stay where they belong — inside
+         *     the academy, where the audit trail names the person who did it.
+         */
+        UpdateTenantRequest: {
+            plan_tier?: components["schemas"]["PlanTier"] | null;
+            status?: components["schemas"]["TenantStatus"] | null;
         };
         /** UploadOut */
         UploadOut: {
@@ -8171,6 +8363,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    auth_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -11161,6 +11386,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreateTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_deleteTenantEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_updateTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_resetAdminPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetAdminPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetAdminPasswordResponse"];
                 };
             };
             /** @description Validation Error */

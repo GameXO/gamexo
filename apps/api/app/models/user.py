@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -70,6 +70,22 @@ class User(TenantScoped):
     #: carrying the generated password has to be addressed here instead.
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    #: Bumped whenever every outstanding session for this account must stop working
+    #: — today that means a password change.
+    #:
+    #: It rides in the token claims as `ver` and is compared on every authenticated
+    #: request (auth/deps.py) and every refresh (auth/router.py). Anything carrying
+    #: an older number is refused.
+    #:
+    #: This is what makes changing a password *mean* something. Access and refresh
+    #: tokens are stateless and signed, so without a value to compare them against,
+    #: a session opened with the old password keeps working until its refresh token
+    #: expires — and the temporary password people are changing is precisely the one
+    #: that was emailed to them in plaintext. An integer on the row beats a denylist:
+    #: no extra store, no expiry sweeping, and one UPDATE invalidates everything.
+    token_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[Role] = mapped_column(enum_type(Role, name="user_role"), nullable=False)
 

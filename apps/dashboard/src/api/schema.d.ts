@@ -469,6 +469,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change your own password
+         * @description For the owner who was sent a generated password and wants one of their own. Requires the current password, and replaces only the caller's own credential — there is no way to name another account here.
+         *
+         *     **Every other session for this account is signed out.** The password being replaced is usually the one that arrived by email in plaintext, so leaving sessions opened with it alive would defeat the point. The caller keeps working: a fresh token pair comes back in the response and must replace the stored one, or the very next request will 401.
+         *
+         *     Admin only, for now. Staff passwords are set for them by an admin on the staff form and there is no screen for a staff member to change their own.
+         */
+        post: operations["auth_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -3459,6 +3483,22 @@ export interface components {
             /** Starts At */
             starts_at?: string | null;
             status?: components["schemas"]["BookingStatus"] | null;
+        };
+        /**
+         * ChangePasswordRequest
+         * @description Replace your own password. Not anyone else's — see auth/router.py.
+         *
+         *     `current_password` is required even though the caller is already authenticated.
+         *     A bearer token proves the session was opened by this account at some point; it
+         *     does not prove the person holding the laptop right now is the owner. Without
+         *     this field an unattended dashboard is a permanent account takeover, and the
+         *     account being protected is the one that can delete every booking in the academy.
+         */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
         };
         /**
          * Channel
@@ -8323,6 +8363,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    auth_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

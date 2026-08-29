@@ -136,6 +136,35 @@ export const queryKeys = {
     ['availability', courtId, date, durationMin] as const,
   equipment: ['equipment'] as const,
   bookingSearch: (query: string) => ['bookingSearch', query] as const,
+  publicSettings: ['publicSettings'] as const,
+}
+
+/**
+ * Which services this academy offers at the counter.
+ *
+ * Read from `/settings/public` rather than `/settings`, which the kiosk role cannot
+ * reach. An academy that has never touched the switches has every key defaulted to
+ * true server-side, and an unknown key reads as enabled — a tile should never vanish
+ * because a setting has not been written yet.
+ *
+ * `staleTime` is deliberately short: a tablet is left running for a whole shift, and
+ * an admin who switches a service off expects the counter to follow within minutes
+ * rather than at the next reboot.
+ */
+export function usePosServices() {
+  const query = useQuery({
+    queryKey: queryKeys.publicSettings,
+    queryFn: () => api.publicSettings(),
+    staleTime: 60_000,
+  })
+  const services = query.data?.enabled_services as Record<string, unknown> | undefined
+  return {
+    /** Defaults to true, including while the request is still in flight — the
+     *  counter shows its full set and removes a tile if the answer says so, rather
+     *  than flashing an empty home screen on every load. */
+    isEnabled: (key: string) => services?.[key] !== false,
+    isLoading: query.isLoading,
+  }
 }
 
 /** Sports, with each one's court count folded in for the "N Courts" label. */

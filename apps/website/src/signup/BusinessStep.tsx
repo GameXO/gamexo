@@ -192,7 +192,7 @@ export function BusinessStep({
                     </>
                   )}
                 </p>
-                <p className="mt-1 text-[12px] text-muted">Svg, png, jpeg</p>
+                <p className="mt-1 text-[12px] text-muted">png or jpeg</p>
               </>
             )}
             <input
