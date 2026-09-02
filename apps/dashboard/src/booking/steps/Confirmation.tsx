@@ -20,7 +20,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-11 items-center justify-center gap-2 rounded-full border border-border-input bg-white px-4 text-sm font-medium text-ink hover:bg-surface-muted"
+      className="flex items-center justify-center gap-2 rounded-xl bg-surface-muted px-4 py-3.5 text-sm font-bold text-ink"
     >
       <Icon size={15} />
       {label}
@@ -64,7 +64,7 @@ export default function Confirmation({
         </p>
       </div>
 
-      <span className="rounded-full bg-ink px-4 py-1.5 font-mono text-sm font-semibold text-white">{bookingId}</span>
+      <span className="rounded-2xl bg-ink px-4 py-1.5 font-mono text-sm font-semibold text-white">{bookingId}</span>
 
       <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">
         <div id="invoice-print-area" className="w-full lg:max-w-[380px] lg:shrink-0">
@@ -75,10 +75,9 @@ export default function Confirmation({
           <button
             type="button"
             onClick={onDone}
-            className="flex h-14 w-full items-center justify-center rounded-full text-white shadow-[0px_4px_10px_0px_rgba(0,0,0,0.05),0px_10px_120px_0px_rgba(15,73,106,0.1)]"
-            style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+            className="flex h-14 w-full items-center justify-center rounded-xl bg-ink text-white"
           >
-            <span className="text-sm font-medium">Done</span>
+            <span className="text-sm font-bold">Done</span>
           </button>
 
           <div className="grid w-full grid-cols-2 gap-3">
@@ -92,7 +91,7 @@ export default function Confirmation({
             <ActionButton icon={RotateCcw} label="Book another" onClick={onBookAnother} />
           </div>
 
-          <div className="flex w-full flex-col gap-2.5 rounded-xl bg-white p-5">
+          <div className="flex w-full flex-col gap-2.5 rounded-2xl bg-white p-5">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Email the invoice</p>
             <div className="flex gap-2">
               <input
@@ -103,7 +102,7 @@ export default function Confirmation({
                   setQueued(false)
                 }}
                 placeholder="name@example.com"
-                className="flex-1 rounded-lg border border-border-input bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                className="flex-1 rounded-xl border-2 border-white bg-border-input px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none"
               />
               <button
                 type="button"
@@ -122,7 +121,7 @@ export default function Confirmation({
             </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 rounded-xl border border-dashed border-border-input px-5 py-4">
+          <div className="flex w-full flex-col gap-2 rounded-2xl border border-dashed border-border-input px-5 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Before you come</p>
             <ul className="flex flex-col gap-1.5 text-sm text-slate">
               <li>Show this booking ID at the desk — no printout needed.</li>

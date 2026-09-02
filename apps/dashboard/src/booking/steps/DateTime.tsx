@@ -28,13 +28,13 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
   return (
     <div className="flex w-full flex-col gap-5">
       <div className="flex w-full items-center justify-between">
-        <p className="text-xl text-ink">When do you want to play?</p>
-        <p className="text-sm text-slate">
-          {court?.name} · <span className="text-positive">{money(court?.price || 0)}/hr</span>
+        <p className="text-[clamp(1rem,1.3vw,1.125rem)] font-medium text-ink">When do you want to play?</p>
+        <p className="text-[clamp(0.875rem,1vw,0.9375rem)] text-slate">
+          {court?.name} · <span className="font-semibold text-positive">{money(court?.price || 0)}/hr</span>
         </p>
       </div>
 
-      <div className="flex w-full gap-2 overflow-x-auto rounded-xl bg-white p-3">
+      <div className="flex w-full gap-2 overflow-x-auto rounded-2xl bg-white p-[clamp(0.625rem,1.2vw,0.875rem)]">
         {days.map((d) => {
           const active = date === d.iso
           return (
@@ -42,13 +42,13 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
               key={d.iso}
               type="button"
               onClick={() => setDraft({ date: d.iso, startHour: null })}
-              className={`flex min-w-[70px] shrink-0 flex-col items-center gap-1 rounded-lg px-3 py-3 transition-colors ${
-                active ? 'bg-ink text-bone' : 'bg-surface-muted text-ink hover:bg-bone/60'
+              className={`flex min-w-[clamp(3.75rem,7vw,4.5rem)] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-[clamp(0.625rem,1.2vw,0.875rem)] transition-colors ${
+                active ? 'bg-ink text-white' : 'bg-surface-muted text-ink hover:bg-bone/60'
               }`}
             >
-              <span className={`text-[11px] ${active ? 'text-bone/60' : 'text-muted'}`}>{d.label}</span>
-              <span className="text-[17px] leading-none">{d.dayNum}</span>
-              <span className={`text-[10px] uppercase tracking-wide ${active ? 'text-bone/50' : 'text-muted'}`}>
+              <span className={`text-[11px] font-medium ${active ? 'text-white/60' : 'text-muted'}`}>{d.label}</span>
+              <span className="text-[clamp(1rem,1.4vw,1.0625rem)] font-bold leading-none">{d.dayNum}</span>
+              <span className={`text-[10px] font-medium uppercase tracking-wide ${active ? 'text-white/50' : 'text-muted'}`}>
                 {d.monthShort}
               </span>
             </button>
@@ -56,14 +56,14 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
         })}
       </div>
 
-      <div className="flex w-full flex-col gap-5 rounded-xl bg-white p-5">
+      <div className="flex w-full flex-col gap-5 rounded-2xl bg-white p-[clamp(1rem,2vw,1.375rem)]">
         {GROUPS.map((group) => {
           const rows = slots.filter((s) => s.hour >= group.from && s.hour < group.to)
           const free = rows.filter((s) => s.state === 'open').length
           return (
             <section key={group.id}>
               <div className="mb-2.5 flex items-baseline justify-between">
-                <p className="text-sm font-medium uppercase tracking-wide text-muted">{group.label}</p>
+                <p className="text-[clamp(0.8125rem,0.95vw,0.875rem)] font-semibold uppercase tracking-wide text-muted">{group.label}</p>
                 <span className="text-[11px] text-muted">{free} free</span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -76,12 +76,12 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
                       type="button"
                       disabled={disabled}
                       onClick={() => setDraft({ startHour: hour, hours: 1 })}
-                      className={`rounded-lg border px-3.5 py-2 text-sm transition-colors ${
+                      className={`rounded-xl px-3.5 py-2 text-[clamp(0.875rem,1vw,0.9375rem)] font-medium transition-colors ${
                         isSelected
-                          ? 'border-ink bg-ink text-bone'
+                          ? 'bg-ink text-white'
                           : state === 'open'
-                            ? 'border-border-card bg-surface text-ink hover:border-ink/40'
-                            : 'cursor-not-allowed border-border-card bg-surface-muted text-muted line-through'
+                            ? 'bg-surface text-ink hover:bg-border-input'
+                            : 'cursor-not-allowed bg-surface-muted text-muted line-through'
                       }`}
                     >
                       {slotChipLabel(hour)}
@@ -95,15 +95,15 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
       </div>
 
       {draft.startHour != null && (
-        <div className="flex w-full flex-col gap-3 rounded-xl bg-white p-5">
+        <div className="flex w-full flex-col gap-3 rounded-2xl bg-white p-[clamp(1rem,2vw,1.375rem)]">
           <div className="flex items-baseline justify-between">
             <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-muted">Your slot</p>
-              <p className="mt-1 text-[17px] text-ink">
+              <p className="text-[clamp(0.8125rem,0.95vw,0.875rem)] font-semibold uppercase tracking-wide text-muted">Your slot</p>
+              <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-ink">
                 {hour12(draft.startHour)} – {hour12(draft.startHour + draft.hours)}
               </p>
             </div>
-            <p className="text-[24px] font-semibold leading-none text-ink">{money(totals.slotTotal)}</p>
+            <p className="text-[clamp(1.375rem,2vw,1.5rem)] font-bold leading-none text-ink">{money(totals.slotTotal)}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-slate">Play for</span>
@@ -116,12 +116,12 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
                   type="button"
                   disabled={!allowed}
                   onClick={() => setDraft({ hours: h })}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                     active
-                      ? 'border-ink bg-ink text-bone'
+                      ? 'bg-ink text-white'
                       : allowed
-                        ? 'border-border-card bg-surface text-ink hover:border-ink/40'
-                        : 'cursor-not-allowed border-border-card bg-surface-muted text-muted'
+                        ? 'bg-surface text-ink hover:bg-border-input'
+                        : 'cursor-not-allowed bg-surface-muted text-muted'
                   }`}
                 >
                   {h} hr
