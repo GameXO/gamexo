@@ -9,7 +9,10 @@
     "typecheck": "turbo run typecheck",
     "generate:api": "turbo run generate:api",
     "deploy:build": "./deploy/build.sh",
-    "deploy:cf": "pnpm deploy:build && wrangler deploy --config deploy/wrangler.jsonc"
+    "deploy:cf": "pnpm deploy:build && wrangler deploy --config deploy/wrangler.jsonc",
+    "docs:dev": "pnpm --filter @gamexo/docs dev",
+    "docs:build": "pnpm --filter @gamexo/docs build",
+    "docs:deploy": "pnpm docs:build && wrangler deploy --config deploy/wrangler.docs.jsonc"
   },
   "devDependencies": {
     "turbo": "^2.5.6",

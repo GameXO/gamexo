@@ -1,0 +1,31 @@
+{
+  // The public developer documentation, as its own static-asset Worker.
+  //
+  // Separate from `wrangler.jsonc` on purpose. That Worker serves the venue-facing
+  // apps — the admin dashboard at / and the counter at /pos/ — behind whatever
+  // hostname academies sign in on. This one is for people outside the business:
+  // booking platforms integrating against the gateway, and venue admins reading up
+  // on payment gateways.
+  //
+  // Two different audiences, two different hostnames, two different release
+  // cadences. Folding the docs into the app Worker would mean a documentation typo
+  // redeploying the dashboard, and it would put partner-facing pages behind a
+  // hostname that reads as an internal tool.
+  //
+  // Point this at a `developers.` subdomain in the Cloudflare dashboard.
+  "name": "gamexo-docs",
+  "compatibility_date": "2026-08-11",
+
+  // Next.js `output: 'export'` writes here — see apps/docs/next.config.mjs. It is a
+  // real static export: no server, no Node runtime, no Worker script to invoke, so
+  // this stays on the free tier the same way the app Worker does.
+  "assets": {
+    "directory": "../apps/docs/out",
+
+    // Next has already emitted a 404.html, and its App Router handles unknown paths
+    // by rendering that page rather than by client-side routing. `none` therefore
+    // serves the real 404 instead of rewriting every miss to index.html — which on a
+    // docs site would answer a mistyped URL with the landing page and a 200.
+    "not_found_handling": "404-page"
+  }
+}

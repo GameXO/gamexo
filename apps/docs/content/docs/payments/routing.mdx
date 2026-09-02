@@ -1,0 +1,56 @@
+---
+title: Routing
+description: Which gateway collects online, and which collects at the counter. They do not have to be the same one.
+---
+
+A connected gateway does not collect anything until you route it to a surface. There
+are two:
+
+| Surface | Where it collects |
+| --- | --- |
+| **Web** | Your public booking site — customers paying online. |
+| **POS** | The counter tablet — walk-ins paying at the desk. |
+
+A gateway can collect for one, both, or neither.
+
+## Why two switches and not one "active" flag
+
+Because the two are genuinely different situations. A venue may take online payments
+through Razorpay while the counter stays on cash and UPI. Another may want a new
+gateway proven at the desk, where staff can watch it, before pointing the public site
+at it.
+
+One flag would force those to be the same decision.
+
+<Callout type="warn" title="Two gateways cannot claim the same surface">
+  At most one gateway collects for Web, and at most one for POS. This is enforced by
+  the database, not by the screen — if two could claim a surface, nothing could answer
+  *“which one charges this booking?”*, and that question has to have exactly one
+  answer at all times.
+
+  Routing a second gateway to a surface means moving it, not adding it.
+</Callout>
+
+## A safe rollout
+
+1. Connect the new gateway in **test** mode and verify it.
+2. Connect the **live** credentials.
+3. Route it to **POS** only. Take a few real payments at the desk, where staff are
+   watching and can fall back to cash if something is wrong.
+4. Once you trust it, route it to **Web** as well.
+
+Step 3 is the one people skip. A gateway misconfigured on the public site fails for
+customers you never speak to, at whatever hour they happened to be booking.
+
+## Neither surface routed
+
+A connected gateway with no surface is inert. That is a perfectly reasonable state —
+it is what a gateway looks like after you have connected and verified it but before
+you have committed to it.
+
+## What the counter is allowed to ask
+
+The counter tablet can ask which gateway it should be using, and nothing else. It
+cannot read credentials, cannot see the other surface's routing, and cannot change
+anything. The tablet login is shared and physically reachable by anyone standing in
+front of it, so it gets the answer to one question and no more.

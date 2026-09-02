@@ -4,7 +4,10 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      // `out/**` and `.next/**` are the docs app: Next.js writes its static export
+      // to out/, not dist/, and without it here Turbo caches a build whose artefacts
+      // it never restores — so a cache hit leaves nothing to deploy.
+      "outputs": ["dist/**", "out/**", ".next/**", "!.next/cache/**"]
     },
     "dev": {
       "cache": false,

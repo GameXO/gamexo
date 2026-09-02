@@ -1,0 +1,37 @@
+---
+title: All platforms
+description: Which booking platforms gamexo speaks to today, and what is coming.
+---
+
+Three platforms sell court time through gamexo. Each dictates its own integration
+contract, so each gets its own adapter — different paths, different field names,
+different response envelopes.
+
+| Platform | Status | Contract |
+| --- | --- | --- |
+| [Playo](/docs/integrations/third-party/playo) | **Live** | External Venue Integration v2.0 — theirs |
+| [Hudle](/docs/integrations/third-party/hudle) | Coming soon | Awaiting their spec |
+| [District](/docs/integrations/third-party/district) | Coming soon | Awaiting their spec |
+| [gamexo API](/docs/integrations/gamexo-api) | **Live** | Ours — the default |
+
+## Why separate adapters
+
+Folding every platform into one namespace would mean a single endpoint declaring one
+response schema while returning several shapes, and each new platform would deepen
+the ambiguity. So the adapters stay separate and honest.
+
+What they share is everything that matters. An adapter translates wire format and
+nothing else: no adapter decides anything about a booking. Availability, holds,
+confirmation, cancellation and every guarantee in
+[Core concepts](/docs/integrations/concepts) are one implementation, reached
+identically by all of them.
+
+The practical consequence for you: a platform integrated last week and one integrated
+today get the same atomicity, the same idempotency and the same expiry behaviour.
+There is no "mature" integration and no second-class one.
+
+## If you are not one of these three
+
+Use the [gamexo API](/docs/integrations/gamexo-api). It is the default contract, it is
+live, and integrating against it needs nothing built on our side — a venue issues you
+a key and you can start.

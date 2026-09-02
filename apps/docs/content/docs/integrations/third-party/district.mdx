@@ -1,0 +1,64 @@
+---
+title: District
+description: Coming soon. Registered as a platform, not yet built — we are waiting on District's integration spec.
+---
+
+<Callout type="warn" title="Coming soon — not yet available">
+  District is a platform gamexo knows about, but the integration is not built. There are
+  no endpoints, and **no API key can be issued for it**. Attempting to create one is
+  refused rather than quietly producing a key that cannot answer.
+</Callout>
+
+## What exists today
+
+District appears in a venue's integrations screen as a platform we are working towards,
+so a venue can see it is coming. That is the whole of it. Nothing guesses at field
+names or endpoint paths: an invented contract would be worse than an empty one,
+because it would look finished.
+
+## What is blocking it
+
+District's published integration contract. Once we have it, building the adapter is one
+module — the wire format, and nothing else.
+
+Everything underneath is already written and already running for
+[Playo](/docs/integrations/third-party/playo): availability, holds, atomic
+multi-slot writes, idempotent retries, 15-minute expiry, per-venue scoping, and an
+eight-scenario consistency suite. A new adapter inherits all of it without
+reimplementing any of it, which is why the estimate is short once the spec lands.
+
+## In the meantime
+
+If District can call our contract rather than dictating one, no waiting is needed. The
+[gamexo API](/docs/integrations/gamexo-api) is live today and a venue can issue a key
+for it now.
+
+<Cards>
+  <Card
+    title="gamexo API"
+    href="/docs/integrations/gamexo-api"
+    description="The default contract. Available immediately, no adapter required."
+  />
+  <Card
+    title="Playo"
+    href="/docs/integrations/third-party/playo"
+    description="A worked example of a platform-dictated contract."
+  />
+</Cards>
+
+## For the District team
+
+If you are reading this to scope an integration, what we need from you is:
+
+- The endpoints you expect the venue to host, with paths and methods.
+- Request and response bodies, including how you signal a business refusal versus a
+  transport fault.
+- How times are expressed — offset, venue-local, or UTC — and how date and time are
+  split, if they are.
+- The identifier you will send that is stable across your own retries. That value
+  becomes the idempotency key, and it is what stops a dropped response from
+  double-selling a court.
+- Whether you want a two-phase hold-then-confirm flow, or single-phase confirmed
+  bookings.
+
+Send that to your gamexo contact and the adapter follows.
