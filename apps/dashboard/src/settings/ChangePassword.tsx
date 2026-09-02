@@ -13,6 +13,7 @@
  *     running a counter tablet on the same admin login deserves to know.
  */
 import { useState, type FormEvent } from 'react'
+import { Lock } from 'lucide-react'
 import { ApiError, api } from '../api/client'
 import { setTokens } from '../api/auth'
 
@@ -63,11 +64,18 @@ export function ChangePassword() {
 
   return (
     <section className="rounded-2xl border border-border-card bg-surface p-6">
-      <h2 className="font-display text-lg font-semibold text-ink">Password</h2>
-      <p className="mt-1 text-sm leading-relaxed text-slate">
-        If you're still using the password from your welcome email, change it here.
-        Everyone signed in to this account on other devices will be signed out.
-      </p>
+      <div className="flex items-start gap-4">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-lime/20 text-lime-ink">
+          <Lock size={20} />
+        </div>
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink">Password</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate">
+            If you're still using the password from your welcome email, change it here.
+            Everyone signed in to this account on other devices will be signed out.
+          </p>
+        </div>
+      </div>
 
       {done && (
         <p

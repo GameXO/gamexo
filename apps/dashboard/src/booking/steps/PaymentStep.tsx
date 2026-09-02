@@ -34,7 +34,7 @@ export default function PaymentStep({
       <div className="flex w-full flex-col gap-4 lg:w-[380px] lg:shrink-0">
         <BookingTicket invoice={invoice} />
 
-        <div className="flex w-full flex-col gap-1 rounded-xl bg-white p-4">
+        <div className="flex w-full flex-col gap-1 rounded-2xl bg-white p-4">
           {STEPS.map((label, i) => {
             const step = i + 1
             const done = step < 5
@@ -59,7 +59,7 @@ export default function PaymentStep({
         </div>
 
         {error && (
-          <p role="alert" className="rounded-xl border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+          <p role="alert" className="rounded-2xl border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
             {error}
           </p>
         )}
@@ -68,7 +68,7 @@ export default function PaymentStep({
           <button
             type="button"
             onClick={() => onEditStep(1)}
-            className="flex h-12 shrink-0 items-center justify-center rounded-full border border-border-input bg-white px-6 text-sm font-medium text-ink"
+            className="flex h-12 shrink-0 items-center justify-center rounded-xl border border-border-input bg-white px-6 text-sm font-medium text-ink"
           >
             Edit
           </button>
@@ -78,8 +78,7 @@ export default function PaymentStep({
             // seen, so the button waits for the quote.
             disabled={processing || quoteLoading}
             onClick={onPay}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm text-[#fefefe] shadow-[0px_4px_10px_0px_rgba(0,0,0,0.05),0px_10px_120px_0px_rgba(15,73,106,0.1)] disabled:opacity-70"
-            style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-bold text-white disabled:opacity-70"
           >
             {processing
               ? 'Creating booking…'

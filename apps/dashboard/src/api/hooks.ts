@@ -29,12 +29,16 @@ import tableTennis from '../assets/figma/sports/table-tennis.png'
 
 type SportOut = components['schemas']['SportOut']
 type CourtWithStatus = components['schemas']['CourtWithStatus']
-type BookingOut = components['schemas']['BookingOut']
+/** Exported for the dashboard's aggregates — see `useBookingsInRange` below,
+ *  which hands out this raw shape rather than the counter UI's `Booking`. */
+export type BookingOut = components['schemas']['BookingOut']
 type EquipmentOut = components['schemas']['EquipmentOut']
 /** What `POST /bookings/quote` returns — the server's price for a draft. */
 export type BookingQuote = components['schemas']['QuoteOut']
 export type MovementOut = components['schemas']['MovementOut']
 export type MovementKind = MovementOut['kind']
+export type Kpis = components['schemas']['Kpis']
+export type RevenuePoint = components['schemas']['RevenuePoint']
 
 /**
  * The API has no sport imagery — it carries `icon`/`color`, while the UI is built
@@ -229,9 +233,14 @@ export const queryKeys = {
   courts: (sportId?: string) => ['courts', sportId ?? 'all'] as const,
   bookings: (page: number) => ['bookings', page] as const,
   bookingsForDay: (dayISO: string) => ['bookings', 'day', dayISO] as const,
+  bookingsRange: (fromISO: string, toISO: string) => ['bookings', 'range', fromISO, toISO] as const,
   invoices: (status?: string) => ['invoices', status ?? 'all'] as const,
   inventory: ['inventory'] as const,
   movements: (equipmentId: string) => ['movements', equipmentId] as const,
+  reports: {
+    kpis: (fromISO?: string, toISO?: string) => ['reports', 'kpis', fromISO ?? '', toISO ?? ''] as const,
+    revenue: (fromISO?: string) => ['reports', 'revenue', fromISO ?? ''] as const,
+  },
 }
 
 /** Everything POS touches, invalidated together. Issuing kit against a booking
@@ -252,12 +261,16 @@ function invalidatePos(qc: ReturnType<typeof useQueryClient>) {
  * arrived, which React Query correctly treats as a different query and fetches
  * again. Every screen mounting this paid for two `/sports` round trips.
  */
-export function useSports() {
+export function useSports(includeInactive = false) {
   const courts = useAllCourts()
 
   const sports = useQuery({
-    queryKey: queryKeys.sports,
-    queryFn: () => api.listSports(),
+    // Distinct key when including inactive sports — same endpoint, different
+    // result set, and both are legitimately cached at once: pickers want only
+    // what's bookable today, while a report labelling a six-month-old booking
+    // needs the sport even after it was retired.
+    queryKey: includeInactive ? [...queryKeys.sports, 'all'] : queryKeys.sports,
+    queryFn: () => api.listSports(includeInactive ? { include_inactive: true } : undefined),
   })
 
   const counts = new Map<string, number>()
@@ -334,6 +347,83 @@ export function useTodaysBookings() {
     // the reference data does.
     staleTime: 15_000,
     refetchInterval: 60_000,
+  })
+}
+
+/**
+ * Every booking in a window, unmapped.
+ *
+ * The dashboard's aggregates (revenue by sport, revenue by channel, prime hours)
+ * need `booking_type`/`source_platform`/`sport_id` as the API sends them —
+ * `toBooking` collapses those into the counter UI's own vocabulary and drops
+ * `source_platform` entirely, so this reads the raw page instead of going
+ * through it.
+ *
+ * Paginates to collect the whole window, capped at 5 pages (1000 bookings) so a
+ * venue's busiest month can't turn a dashboard load into an unbounded fetch loop
+ * — the aggregates below read as "top slice of the window", not the exact total,
+ * once a window is that busy.
+ */
+async function fetchAllBookings(dateFromISO: string, dateToISO: string): Promise<BookingOut[]> {
+  const size = 200
+  const maxPages = 5
+  const first = await api.listBookings({ date_from: dateFromISO, date_to: dateToISO, page: 1, size })
+  const items = [...(first.items ?? [])]
+  const pages = Math.min(first.pages ?? 1, maxPages)
+  for (let page = 2; page <= pages; page++) {
+    const next = await api.listBookings({ date_from: dateFromISO, date_to: dateToISO, page, size })
+    items.push(...(next.items ?? []))
+  }
+  // Held slots are excluded server-side already; cancelled bookings carry no
+  // revenue and would otherwise inflate booking counts for a slot nobody kept.
+  return items.filter((b) => b.status !== 'cancelled')
+}
+
+export function useBookingsInRange(dateFromISO: string, dateToISO: string) {
+  return useQuery({
+    queryKey: queryKeys.bookingsRange(dateFromISO, dateToISO),
+    queryFn: () => fetchAllBookings(dateFromISO, dateToISO),
+    staleTime: 60_000,
+  })
+}
+
+/** The live status of every court, folded into counts — powers the dashboard's
+ *  "Available Courts" stat. Kept separate from `useAllCourts`: that hook feeds
+ *  screens built around `Court`, whose mapping has no `status` field. */
+export function useCourtStatusSummary() {
+  return useQuery({
+    queryKey: ['courts', 'status-summary'],
+    queryFn: async () => {
+      const courts = await api.listCourts()
+      const available = courts.filter((c) => c.status === 'available').length
+      const occupied = courts.filter((c) => c.status === 'occupied').length
+      const maintenance = courts.filter((c) => c.status === 'maintenance').length
+      return { total: courts.length, available, occupied, maintenance }
+    },
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  })
+}
+
+/** Headline numbers for a window — total revenue, bookings, average booking
+ *  value, court utilisation, active members, outstanding dues. Omit both dates
+ *  for the server's own default window. */
+export function useKpis(dateFromISO?: string, dateToISO?: string) {
+  return useQuery({
+    queryKey: queryKeys.reports.kpis(dateFromISO, dateToISO),
+    queryFn: () => api.reportKpis({ date_from: dateFromISO, date_to: dateToISO }),
+    staleTime: 30_000,
+  })
+}
+
+/** Revenue collected and bookings taken, by month — powers the Revenue Trends
+ *  chart. `dateFromISO` bounds how far back it goes; leave it off for the
+ *  server's own 180-day default. */
+export function useRevenueTrend(dateFromISO?: string) {
+  return useQuery({
+    queryKey: queryKeys.reports.revenue(dateFromISO),
+    queryFn: () => api.reportRevenue({ date_from: dateFromISO }),
+    staleTime: 60_000,
   })
 }
 

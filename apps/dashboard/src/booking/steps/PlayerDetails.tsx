@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import type { Draft } from '../../data/booking'
 
 const inputClass =
-  'w-full rounded-lg border border-border-input bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none'
+  'w-full rounded-xl border-2 border-white bg-border-input px-4 py-[clamp(0.45rem,1.4dvh,1.05rem)] text-[clamp(0.9rem,1.3vw,1.0625rem)] text-ink placeholder:text-muted focus:border-ink focus:outline-none'
 
 function Field({
   label,
@@ -15,7 +15,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col items-start gap-1.5">
-      <span className="flex w-full items-center justify-between text-sm font-medium text-slate">
+      <span className="flex w-full items-center justify-between text-[clamp(0.8rem,1.15vw,1rem)] font-medium text-ink">
         {label}
         {hint && <span className="text-xs font-normal text-muted">{hint}</span>}
       </span>
@@ -33,12 +33,12 @@ export default function PlayerDetails({ draft, setDraft }: { draft: Draft; setDr
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <p className="text-xl text-ink">Who&apos;s playing?</p>
+      <p className="text-[clamp(1rem,1.3vw,1.125rem)] font-medium text-ink">Who&apos;s playing?</p>
 
-      <div className="flex w-full flex-col gap-4 rounded-xl bg-white p-5 sm:max-w-[520px]">
+      <div className="flex w-full flex-col gap-4 rounded-2xl bg-white p-5 sm:max-w-[520px]">
         <Field label="Phone number">
           <div className="relative w-full">
-            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">+91</span>
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[clamp(0.9rem,1.3vw,1.0625rem)] text-muted">+91</span>
             <input
               className={`${inputClass} pl-11`}
               inputMode="numeric"

@@ -53,6 +53,11 @@ export default function BookingFlow({
 
   const goContinue = () => setStep((s) => Math.min(5, s + 1))
 
+  const selectCourt = (courtId: string) => {
+    setDraft({ courtId })
+    setStep(2)
+  }
+
   const jumpToStep = (s: number) => {
     setStep(s)
     setCourtListOpen(s >= 2 ? false : courtListOpen)
@@ -117,8 +122,8 @@ export default function BookingFlow({
   const continueEnabled = canContinue(step, draft, courtListOpen)
 
   return (
-    <div className="flex flex-1 flex-col items-start justify-between gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <div className="flex w-full flex-col items-start gap-5">
+    <div className="flex flex-1 flex-col items-start justify-between gap-[clamp(1rem,2.5dvh,1.5rem)] overflow-y-auto px-4 py-[clamp(1rem,2.5dvh,1.5rem)] sm:px-6">
+      <div className="flex w-full flex-col items-start gap-[clamp(1rem,2.5dvh,1.5rem)]">
         <Stepper current={step} onSelect={jumpToStep} />
 
         {step === 1 && (
@@ -127,6 +132,7 @@ export default function BookingFlow({
             setDraft={setDraft}
             courtListOpen={courtListOpen}
             setCourtListOpen={setCourtListOpen}
+            onPickCourt={selectCourt}
           />
         )}
         {step === 2 && <DateTime draft={draft} setDraft={setDraft} />}
@@ -151,7 +157,7 @@ export default function BookingFlow({
             <button
               type="button"
               onClick={goBack}
-              className="flex items-center gap-2 rounded-full px-4 py-3 text-base text-ink shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05),0px_13px_161px_0px_rgba(15,73,106,0.1)]"
+              className="flex items-center gap-2 rounded-xl px-4 py-3 text-base text-ink"
             >
               <img src={arrowRight} alt="" className="size-[22px] rotate-180" />
               Back
@@ -160,16 +166,17 @@ export default function BookingFlow({
             <span />
           )}
 
-          <button
-            type="button"
-            disabled={!continueEnabled}
-            onClick={goContinue}
-            className="flex items-center gap-3 rounded-full py-3 pl-6 pr-4 text-base text-[#fefefe] shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05),0px_13px_161px_0px_rgba(15,73,106,0.1)] disabled:opacity-40"
-            style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-          >
-            Continue
-            <img src={arrowRight} alt="" className="size-[22px]" />
-          </button>
+          {step > 1 && (
+            <button
+              type="button"
+              disabled={!continueEnabled}
+              onClick={goContinue}
+              className="flex items-center gap-3 rounded-xl bg-ink py-3 pl-6 pr-4 text-base font-bold text-white disabled:opacity-40"
+            >
+              Continue
+              <img src={arrowRight} alt="" className="size-[22px]" />
+            </button>
+          )}
         </div>
       )}
     </div>
