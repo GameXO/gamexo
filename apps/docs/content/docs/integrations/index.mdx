@@ -1,0 +1,78 @@
+---
+title: Overview
+description: One gateway, one URL, one set of guarantees — and a wire format that matches whichever platform is calling.
+---
+
+If you sell court time and want gamexo venues in your inventory, this is the whole
+surface. You get availability, you hold slots while a customer pays, you confirm, and
+you cancel. Everything else in the product — the counter, reporting, memberships — is
+none of your concern and none of your risk.
+
+## One URL
+
+You are given a single base URL and an API key:
+
+```bash
+POST https://api.gamexo.app/api/v1/gateway/order/create
+X-API-Key: gx_playo_a1b2c3d4.iJ8p…
+```
+
+Nobody picks a base URL, so nobody picks the wrong one. Your key identifies which
+platform you are, and the gateway routes your request to the wire format you speak
+before it reads a single byte of the body.
+
+<Callout type="info" title="Your key names your dialect">
+  The key prefix is globally unique, so it names exactly one integration and therefore
+  exactly one contract. Routing happens on the prefix; authentication happens
+  afterwards, properly. A forged prefix gets routed somewhere and then refused.
+</Callout>
+
+## The same guarantees, whichever format you speak
+
+Every platform's adapter is a *translation layer only*. It converts your field names
+and your response envelope, then calls exactly the same code as every other platform.
+Nothing about atomicity, idempotency, holds or expiry is per-partner, so nothing about
+them can be weaker for you than for anyone else.
+
+| Guarantee | What it means for you |
+| --- | --- |
+| **All or nothing** | A multi-slot request either books every slot or none. There is no partial success to unwind. |
+| **Idempotent** | Retrying a create with the same booking id returns the original booking. It does not make a second one. |
+| **Holds expire** | A hold you never confirm is released after 15 minutes, automatically. Abandoned checkouts do not strand a court. |
+| **No double-selling** | Overlap is refused by a database constraint, not by application logic. It holds whichever client is asking and whether or not our code has a bug. |
+| **Scoped to one venue** | A key issued by one academy cannot read or write another's data. Presenting it against a different venue finds nothing. |
+
+Read [Core concepts](/docs/integrations/concepts) for how each of those behaves in
+practice. It is short and it is the part that matters.
+
+## Pick your contract
+
+<Cards>
+  <Card
+    title="Playo"
+    href="/docs/integrations/third-party/playo"
+    description="Live. Playo's External Venue Integration v2.0 — camelCase, requestStatus envelope, venue-local times."
+  />
+  <Card
+    title="Hudle"
+    href="/docs/integrations/third-party/hudle"
+    description="Coming soon. Registered, not yet built — we need Hudle's spec."
+  />
+  <Card
+    title="District"
+    href="/docs/integrations/third-party/district"
+    description="Coming soon. Registered, not yet built — we need District's spec."
+  />
+  <Card
+    title="gamexo API"
+    href="/docs/integrations/gamexo-api"
+    description="Our own REST contract. The default, and the one to use if you have no spec of your own."
+  />
+</Cards>
+
+<Callout title="No spec of your own? Use ours.">
+  If you do not dictate your own integration contract, point at the
+  [gamexo API](/docs/integrations/gamexo-api). It is available today, it is the
+  default, and it needs nothing built on our side — you can be taking bookings as soon
+  as a venue issues you a key.
+</Callout>

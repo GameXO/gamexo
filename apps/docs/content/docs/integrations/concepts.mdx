@@ -1,0 +1,134 @@
+---
+title: Core concepts
+description: Keys, idempotency, holds, atomicity and errors — the five things that decide whether your integration is safe under retry.
+---
+
+Five things behave the same way for every platform. Get these right and the endpoint
+list is mechanical.
+
+## Your API key
+
+A venue issues you a key from their dashboard. It looks like this:
+
+```
+gx_playo_a1b2c3d4.iJ8pQr…
+└──── prefix ────┘ └ secret ┘
+```
+
+Send it on every request:
+
+```bash
+X-API-Key: gx_playo_a1b2c3d4.iJ8pQr…
+```
+
+Three things worth knowing:
+
+- **You see the full key once**, when the venue creates it. Only a hash is stored, so
+  it cannot be recovered later — if it is lost, the venue rotates it and you get a new
+  one.
+- **The prefix identifies the integration** without a lookup, so a key found in a
+  config file or pasted into a bug report says what it is. Treat the whole string as
+  the secret regardless.
+- **One key, one venue.** A key issued by one academy presented against another finds
+  nothing and is refused. If you work with several gamexo venues you hold several keys.
+
+<Callout type="warn" title="A revoked key and a wrong key look identical">
+  Both answer `Invalid or revoked API key`. That is deliberate — the alternative lets
+  someone discover which keys exist by watching the error change. If you are getting
+  it unexpectedly, ask the venue rather than guessing.
+</Callout>
+
+## Idempotency
+
+Every create takes **your own booking id** and uses it as the idempotency key. Send
+the same id twice and you get the original booking back, not a second one.
+
+This is the single most important field in the integration. Without it, a request that
+times out on your side leaves you with no way to tell "it never arrived" from "it
+arrived and the response was lost" — and retrying blind sells the court twice.
+
+```json
+{ "externalBookingId": "PLY-88213", "…": "…" }
+```
+
+Retries are safe for confirm and cancel too: confirming an already-confirmed order
+succeeds, and cancelling an already-cancelled one succeeds. Neither is an error,
+because a dropped response must be safe to retry.
+
+## Holds, and why they expire
+
+A hold blocks the court while your customer is still paying. It is a real row against
+the same overlap constraint as any other booking, so the venue's own counter staff
+cannot sell it from underneath you.
+
+It is deliberately **not** a booking: no revenue is recognised, nothing shows on the
+counter board, and nobody is expected to arrive.
+
+<Callout type="warn" title="Holds last 15 minutes">
+  If confirmation never comes, the hold is released and the court goes back on sale.
+  Expired holds are cleared before every availability read, so a checkout abandoned
+  twenty minutes ago is not still showing a court as busy.
+</Callout>
+
+A lapsed hold still confirms *if the court is still free* — you are only refused once
+somebody else has actually taken the slot. Late is not automatically fatal.
+
+## All or nothing
+
+Multi-slot requests are atomic. If any slot in the batch fails, none are created.
+
+There is no partial-success state to reconcile and no half-booked order to unwind.
+This applies to creating, confirming and cancelling alike.
+
+## Availability reflects everything
+
+Availability is not "slots no platform has taken". It reflects **every** booking: the
+walk-in counter, the venue's own dashboard, other platforms, and unconfirmed orders
+still in checkout elsewhere.
+
+A slot you cannot see as taken is a slot you will sell twice, so nothing is filtered
+out for being someone else's.
+
+## Errors
+
+Genuine faults — a bad key, a malformed body, an outage — are real HTTP status codes
+with a JSON body:
+
+```json
+{
+  "error": {
+    "code": "authentication_error",
+    "message": "Invalid or revoked API key.",
+    "details": {}
+  }
+}
+```
+
+| Status | Means |
+| --- | --- |
+| `400` | The request was understood and is wrong. Details say how. |
+| `401` | Missing, malformed, revoked or wrong-venue API key. |
+| `403` | Valid key, but not permitted for this venue or this action. |
+| `404` | No such booking, court or reference. |
+| `409` | The slot is taken. Retrying will not change that. |
+| `422` | The body did not match the schema. |
+
+<Callout title="Playo is the exception, on purpose">
+  Playo's contract answers business refusals with `200 OK` and `requestStatus: 0`
+  rather than a 4xx, because their client treats a non-2xx as a transport fault and
+  retries it — and a sold court never becomes available by retrying. Genuine faults
+  stay real HTTP errors even there. See the
+  [Playo reference](/docs/integrations/third-party/playo#the-requeststatus-envelope).
+</Callout>
+
+## Times and money
+
+- **Times** carry an explicit timezone offset in the gamexo contract
+  (`2026-09-04T18:00:00+05:30`). A naive timestamp is refused rather than guessed at —
+  reading it as UTC would move an Indian booking by five and a half hours, into a slot
+  it then stops colliding with. Playo's contract splits date and local wall-clock time
+  instead, and is converted using the venue's own timezone.
+- **Money** is decimal, in the venue's currency. If you send a price that disagrees
+  with the venue's published rate by more than ₹1, the booking is taken at *your*
+  figure and flagged for the venue to reconcile. Anything you have not collected shows
+  as a balance the desk takes on arrival.

@@ -1,0 +1,88 @@
+---
+title: Connecting a gateway
+description: Paste your credentials, prove they work, and understand what happens if verification fails.
+---
+
+Manage → Integrations, as an admin. Pick a gateway, choose test or live, paste the
+credentials, save.
+
+## Test first
+
+Connect in **test** mode, put a booking through, then connect the live credentials as
+a separate connection. The two are stored independently, so switching does not
+overwrite anything and you can go back.
+
+<Callout type="info" title="Why we ask which mode it is">
+  Only some providers encode the mode in the credential. Razorpay does — `rzp_test_`
+  against `rzp_live_` — so a live key pasted into a test connection is caught. Cashfree
+  and PhonePe pick test versus live by which hostname you call, so nothing about the
+  key itself would tell us. Rather than guess for some providers and know for others,
+  we ask every time.
+</Callout>
+
+## What verification actually does
+
+Saving runs two checks, and they are not the same thing.
+
+**Format check** — catches typos, a truncated paste, a key from the wrong mode. Runs
+for every provider, instantly, without calling anyone.
+
+**Live check** — an authenticated read-only call to the provider, asking whether this
+credential is real, enabled, and belongs to an account that can take payments.
+Available for Razorpay, Cashfree and Stripe.
+
+Three rules the live check always obeys:
+
+1. **Read-only.** Every call either lists or fetches. Verifying a credential never
+   creates an order, a customer, or a charge.
+2. **Your secret is never echoed.** Not into the result message, not into a log.
+   Provider error bodies are summarised rather than passed through, because some
+   providers quote the offending value back at you.
+3. **A failure to verify is never a failure to save.** The network may be down, the
+   provider may be having an outage, we may be behind a firewall. None of those mean
+   your credential is wrong.
+
+<Callout type="warn" title="Saved and unverified is a real state">
+  If the live check cannot complete, the credential is still stored and the failure is
+  recorded against it. You will see what went wrong and can re-check later. What you
+  will not see is a green tick that was not earned.
+</Callout>
+
+## Re-checking later
+
+A credential that worked last month is not the same claim as a credential that works
+now — keys get rotated at the provider, accounts get suspended, and neither sends us a
+notification. The failure mode is silent until someone tries to pay on a Saturday
+evening.
+
+So the last verification result is stored and shown, and you can re-run the check at
+any time without re-entering anything.
+
+## What is kept
+
+| | |
+| --- | --- |
+| Public identifiers | Stored plainly. They reach the browser during checkout anyway. |
+| Secrets | Encrypted at rest, and never returned by any screen or endpoint. |
+| A masked hint | `••••3f9a`, enough to tell which key is stored. |
+| Last verified at, and the last error | So the state is legible without re-testing. |
+| Who last changed it | An email address, so the answer survives that person leaving. |
+
+## Rotating a credential
+
+Paste the new one over the old. There is no separate rotate action — replacing the
+credential *is* the rotation, and the previous secret is overwritten rather than kept
+alongside.
+
+Re-verify afterwards if the provider supports it.
+
+## Disconnecting
+
+Disconnecting removes the credentials and stops that gateway collecting on any
+surface. It does not touch payments already taken, and it does not refund anything.
+
+<Callout type="warn">
+  If you disconnect the gateway that was collecting for a surface, that surface has no
+  gateway until you route another one to it. Check
+  [Routing](/docs/payments/routing) before disconnecting the only live one.
+</Callout>

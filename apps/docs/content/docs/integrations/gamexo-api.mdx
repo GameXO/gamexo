@@ -1,0 +1,147 @@
+---
+title: gamexo API
+description: Our own REST contract — the default. Use this unless you dictate a spec of your own.
+---
+
+**Status: live, and the default.** If you do not have an integration contract of your
+own, this is the one to build against. It needs nothing written on our side, so a
+venue can issue you a key and you can start today.
+
+Snake_case fields, real HTTP status codes, ISO-8601 timestamps with offsets. No
+envelope — the status code means what it says.
+
+## Authentication
+
+```bash
+X-API-Key: gx_native_9f1e2d3c.kL4mN…
+```
+
+## Endpoints
+
+Relative to the base URL you were given, under `/api/v1/gateway`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/availability` | Free slots for a date |
+| `POST` | `/bookings` | Create confirmed bookings |
+| `POST` | `/bookings/hold` | Hold slots while a customer pays |
+| `POST` | `/bookings/confirm` | Turn holds into bookings |
+| `POST` | `/bookings/map` | Record your ids against ours |
+| `GET` | `/bookings` | List your bookings |
+| `GET` | `/bookings/{reference}` | Fetch one |
+| `POST` | `/bookings/{reference}/cancel` | Cancel one |
+
+### The slot object
+
+Creates and holds take a batch of up to 25 slots:
+
+```json
+{
+  "slots": [
+    {
+      "court_id": "5f2c8e1a-…",
+      "starts_at": "2026-09-04T18:00:00+05:30",
+      "duration_min": 60,
+      "customer_name": "Ana Rao",
+      "customer_phone": "+919000011111",
+      "external_ref": "YOUR-88213",
+      "price": "1200.00",
+      "amount_paid": "1200.00"
+    }
+  ]
+}
+```
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `court_id` | yes | UUID, from availability. |
+| `starts_at` | yes | **Must carry an offset.** A naive timestamp is refused, not guessed at. |
+| `duration_min` | yes | 15–1440. |
+| `customer_name` | yes | 1–200 characters. |
+| `customer_phone` | no | Up to 32 characters. |
+| `external_ref` | no, but do send it | Your own booking id, and the idempotency key. |
+| `price` | no | What you charged. Omit to use the venue's published rate. |
+| `amount_paid` | no | Defaults to 0. Any shortfall is collected at the desk. |
+
+<Callout type="warn" title="starts_at must include a timezone offset">
+  `2026-09-04T18:00:00+05:30`, not `2026-09-04T18:00:00`. A naive timestamp would be
+  read as UTC and silently move an Indian booking by five and a half hours — into a
+  slot it then stops colliding with. It is refused instead.
+</Callout>
+
+<Callout type="info" title="external_ref is optional but you should always send it">
+  It is what makes a retried create return the original booking instead of selling the
+  court twice, and what a reconciliation run matches on. Omitting it is only sensible
+  if you never retry, which is not a property most integrations have.
+</Callout>
+
+### Price disagreements
+
+Send a `price` that differs from the venue's published rate by more than ₹1 and the
+booking is taken **at your figure**, with a note left on it for the venue to
+reconcile. Your customer is never charged something different from what you quoted;
+the venue finds out rather than discovering it in a report next month.
+
+### Holds
+
+```http
+POST /bookings/hold
+```
+
+Same body as `/bookings`. Blocks the courts for **15 minutes**, then releases them if
+`/bookings/confirm` never arrives.
+
+```http
+POST /bookings/confirm
+{ "references": ["GX-4471", "GX-4472"] }
+```
+
+Up to 25 references, all or nothing, idempotent.
+
+### Cancelling
+
+```http
+POST /bookings/{reference}/cancel
+```
+
+Frees the court immediately. Idempotent — cancelling an already-cancelled booking
+succeeds.
+
+## Errors
+
+Real status codes, with a JSON body:
+
+```json
+{
+  "error": {
+    "code": "conflict",
+    "message": "That slot is no longer available.",
+    "details": { "court_id": "5f2c8e1a-…" }
+  }
+}
+```
+
+`409` means the slot is gone and retrying will not change that. See
+[Core concepts](/docs/integrations/concepts#errors) for the full table.
+
+## A typical flow
+
+<Steps>
+<Step>
+**Read availability.** `GET /availability?date=2026-09-04` → `200` with the free
+slots.
+</Step>
+<Step>
+**Hold the slots.** `POST /bookings/hold`, sending your own `external_ref`. You get
+back our references and a 15-minute expiry.
+</Step>
+<Step>
+**Customer pays.** Nothing is expected from us during this.
+</Step>
+<Step>
+**Confirm.** `POST /bookings/confirm` with those references. The hold becomes a real
+booking.
+</Step>
+</Steps>
+
+Selling without a checkout step? Skip the hold and post straight to `/bookings`.

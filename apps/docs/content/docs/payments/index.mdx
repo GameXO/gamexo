@@ -1,0 +1,69 @@
+---
+title: Overview
+description: Connect a payment gateway so your venue can take card and UPI payments online and at the counter.
+---
+
+gamexo does not process payments. It holds your gateway credentials and calls the
+gateway you already have an account with, so the money moves between your customer
+and your provider — never through us.
+
+This section is for **venue admins** connecting a gateway. It is not a public API:
+everything here is done from your own dashboard, under Manage → Integrations.
+
+<Cards>
+  <Card
+    title="Supported gateways"
+    href="/docs/payments/providers"
+    description="Five gateways, what each needs from you, and which can be verified."
+  />
+  <Card
+    title="Connecting a gateway"
+    href="/docs/payments/connecting"
+    description="Where to find your keys, how they are stored, and what verification proves."
+  />
+  <Card
+    title="Routing"
+    href="/docs/payments/routing"
+    description="Choosing which gateway collects online and which collects at the counter."
+  />
+</Cards>
+
+## How it fits together
+
+1. **Connect** a gateway by pasting its credentials. They are encrypted before they
+   are stored.
+2. **Verify** — for gateways that support it, gamexo makes a real read-only call and
+   tells you whether the credential actually works.
+3. **Route** it to a surface: the public booking site, the counter tablet, or both.
+
+<Callout type="info" title="Test and live are separate connections">
+  Each gateway is connected in either test or live mode, and the two are stored
+  independently. Some providers encode the mode in the key itself; others pick it by
+  which hostname you call, so nothing about the credential would tell us. You say
+  which one it is.
+</Callout>
+
+## Who can do this
+
+**Admins only.** Reception staff cannot see or change gateway credentials, and the
+shared counter tablet login cannot either — it is the most exposed credential in the
+venue, and payment keys are not something it should be able to read.
+
+The counter can ask *which* gateway it should use, and nothing more.
+
+## What is stored, and what is not
+
+| Stored | How |
+| --- | --- |
+| Public identifiers (Key ID, App ID, Merchant ID) | Plain — they reach the browser anyway. |
+| Secrets (Key Secret, Salt, Webhook Secret) | Encrypted at rest. Never returned by any endpoint. |
+| A masked hint (`••••3f9a`) | So you can tell which key is stored without revealing it. |
+| Who last changed it, and when | Recorded as an email address, so it still answers after that staff member leaves. |
+| Last verification result | Because "it worked when I pasted it" is a different claim from "it works now". |
+
+<Callout type="warn" title="Secrets are never readable again">
+  Once saved, no screen and no endpoint will show you a secret back. If you lose it,
+  regenerate it at the provider and paste the new one. This is deliberate: a
+  credential you can read out of a settings page is a credential anyone with a session
+  can read out of a settings page.
+</Callout>

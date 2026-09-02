@@ -1,0 +1,101 @@
+---
+title: Supported gateways
+description: Five gateways, the credentials each one needs, and which of them gamexo can verify against the provider.
+---
+
+Five gateways can be connected. Three of them can be **verified** — gamexo makes a
+real read-only call and confirms the credential works. Two cannot, for a reason worth
+understanding before you pick one.
+
+| Gateway | Credentials | Live verification |
+| --- | --- | --- |
+| [Razorpay](#razorpay) | Key ID, Key Secret, Webhook Secret *(optional)* | **Yes** |
+| [Cashfree](#cashfree-payments) | App ID, Secret Key | **Yes** |
+| [Stripe](#stripe) | Publishable Key, Secret Key, Webhook Secret *(optional)* | **Yes** |
+| [PhonePe](#phonepe-payment-gateway) | Merchant ID, Salt Key, Salt Index | Format only |
+| [PayU](#payu) | Merchant Key, Merchant Salt | Format only |
+
+<Callout type="warn" title="What “format only” means">
+  PhonePe and PayU have no authenticated read endpoint that answers *“are these
+  credentials valid?”*. Both sign every request with the salt, and the only way to
+  exercise them is to initiate a transaction — which verification must never do.
+
+  So for those two, gamexo checks that the credential is *shaped* correctly and says
+  so plainly. It will not show a green tick it has not earned. You find out the
+  credential is right the first time a real payment goes through.
+</Callout>
+
+## Razorpay
+
+Cards, UPI, netbanking and wallets. The default for most Indian academies.
+
+| Field | Notes |
+| --- | --- |
+| **Key ID** | `rzp_test_…` or `rzp_live_…`. Public half of the pair — safe to show, it reaches the browser anyway. |
+| **Key Secret** | Shown once by Razorpay when the key is generated. Regenerate there if lost. |
+| **Webhook Secret** | Optional. Set it if you have configured a webhook, so callbacks can be verified. |
+
+The key prefix tells us which mode it belongs to, so a live key pasted into a test
+connection is caught.
+
+Get your keys from the [Razorpay dashboard](https://dashboard.razorpay.com/app/website-app-settings/api-keys) ·
+[their docs](https://razorpay.com/docs/payments/dashboard/settings/api-keys/)
+
+## Cashfree Payments
+
+Payment gateway with same-day settlements and payouts.
+
+| Field | Notes |
+| --- | --- |
+| **App ID** | Sent as the `x-client-id` header. |
+| **Secret Key** | Sent as `x-client-secret`. Cashfree also signs its webhooks with this, so there is no separate webhook secret. |
+
+Cashfree picks test versus live by **which hostname you call**, not by the key, so
+nothing about the credential itself reveals the mode. You tell us which it is.
+
+Get your keys from the [Cashfree merchant dashboard](https://merchant.cashfree.com/merchants/pg/developers/api-keys) ·
+[their docs](https://docs.cashfree.com/docs/api-keys)
+
+## Stripe
+
+| Field | Notes |
+| --- | --- |
+| **Publishable Key** | Public. Reaches the browser. |
+| **Secret Key** | Server-side only. |
+| **Webhook Secret** | Optional, for verifying callbacks. |
+
+## PhonePe Payment Gateway
+
+UPI-first checkout with the widest UPI reach in India.
+
+| Field | Notes |
+| --- | --- |
+| **Merchant ID** | Issued by PhonePe. |
+| **Salt Key** | Used to sign every request. |
+| **Salt Index** | Which salt the key corresponds to. Usually `1`. |
+
+Like Cashfree, PhonePe selects test versus live by hostname.
+
+Verification is **format only** — see the callout above.
+
+Get your credentials from [PhonePe business settings](https://business.phonepe.com/developer-settings) ·
+[their docs](https://developer.phonepe.com/v1/reference/pay-api/)
+
+## PayU
+
+| Field | Notes |
+| --- | --- |
+| **Merchant Key** | Issued by PayU. |
+| **Merchant Salt** | Used to sign every request. |
+
+Verification is **format only** — see the callout above.
+
+## Choosing
+
+If you have no existing relationship, Razorpay is the path of least resistance for an
+Indian venue: broad payment-method coverage, and gamexo can prove the credential works
+before your first customer tries to pay.
+
+If you already have a gateway, use it. The routing rules in
+[Routing](/docs/payments/routing) let you run a new one on the counter first and point
+the public site at it later, once you trust it.

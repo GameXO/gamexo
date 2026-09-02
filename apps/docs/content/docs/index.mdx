@@ -1,0 +1,43 @@
+---
+title: gamexo for developers
+description: Sell courts through gamexo, and take payment for them. Integration reference for booking platforms and for venues connecting a payment gateway.
+---
+
+gamexo runs sports venues — bookings, a walk-in counter, memberships, an academy.
+Two parts of it are open to the outside world, and this is the reference for both.
+
+<Cards>
+  <Card
+    title="Booking integrations"
+    href="/docs/integrations"
+    description="For platforms that sell court time: availability, holds, bookings, cancellation."
+  />
+  <Card
+    title="Payments"
+    href="/docs/payments"
+    description="For venues connecting a payment gateway to collect online and at the counter."
+  />
+</Cards>
+
+## Which one are you?
+
+**You sell court time on your own app or site** — Playo, Hudle, District, or anyone
+else. You want [Booking integrations](/docs/integrations). You will be issued an API
+key by the venue, and everything you can do is in that section.
+
+**You run a venue and want card and UPI payments** — you want [Payments](/docs/payments).
+That is configured from your own dashboard, not through an API, and the pages there
+walk through connecting a gateway and proving the credentials work.
+
+## What is not here
+
+Anything an academy's own staff use — the dashboard, the counter tablet, staff
+management, reporting — is not a public API and is not documented here. If you are
+looking for those, you are looking for the product, not the developer reference.
+
+<Callout title="Read this before you build">
+  Every integration guarantee in this reference — all-or-nothing writes, idempotency,
+  expiring holds — is enforced in one place for every platform. Start with
+  [Core concepts](/docs/integrations/concepts) rather than the endpoint list; it is
+  short, and it is what stops a retry from selling the same court twice.
+</Callout>

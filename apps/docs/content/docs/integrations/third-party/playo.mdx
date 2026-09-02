@@ -1,0 +1,265 @@
+---
+title: Playo
+description: Playo External Venue Integration v2.0 — live. camelCase fields, a requestStatus envelope, and venue-local times.
+---
+
+**Status: live.** gamexo implements Playo's *External Venue Integration API
+Specifications v2.0*. Seven endpoints, exercised end to end by an automated
+consistency suite.
+
+Their spec lists the endpoints the *venue* must host, so everything below is what
+gamexo answers when Playo calls.
+
+## Three things that differ from the rest of this API
+
+Playo's contract is theirs, not ours, and three of its choices are load-bearing.
+
+### camelCase everywhere
+
+`courtId`, `startTime`, `paidAtPlayo`, `externalBookingId`. Not snake_case, which is
+what every other part of gamexo uses.
+
+### The `requestStatus` envelope
+
+Every response carries a status field instead of relying on the HTTP status code:
+
+```json
+{ "requestStatus": 1, "message": "Orders confirmed.", "bookingIds": [] }
+```
+
+| Value | Meaning |
+| --- | --- |
+| `1` | Success |
+| `0` | Failed — read `message` |
+
+<Callout type="warn" title="A taken slot is a 200, not a 409">
+  A slot that has just been sold answers `200 OK` with `requestStatus: 0`. This is
+  deliberate and it is Playo's design: their client treats any non-2xx as a transport
+  fault and retries it, and a court somebody else has bought never becomes available
+  by retrying.
+
+  Genuine faults — a bad API key, a malformed body, a crash — stay real HTTP errors.
+  **Check `requestStatus` on every 200.**
+</Callout>
+
+<Callout type="info" title="One ambiguity in the spec">
+  v2.0 documents `requestStatus` as `0 - failed, 1 - successful` in prose, while the
+  sample payloads type it as `"string"`. gamexo sends **integers**, which is what the
+  prose specifies and what the field means. Worth confirming before go-live.
+</Callout>
+
+### Local wall-clock time, split from the date
+
+`"2026-09-04"` plus `"18:00:00"`, with no offset anywhere. That means the **venue's**
+local time. Every conversion goes through the venue's own timezone, never the
+server's.
+
+## Authentication
+
+```bash
+X-API-Key: gx_playo_a1b2c3d4.iJ8pQr…
+```
+
+The key must have been issued for the `playo` dialect. A key issued for a different
+contract is refused even if it is otherwise valid.
+
+Requests carrying a `venueId` for a venue the key was not issued against are refused.
+
+## Endpoints
+
+All paths are relative to the base URL you were given, under `/api/v1/gateway`.
+
+### Fetch availability
+
+```http
+GET /availability?date=2026-09-04&venue_id=…&sport_id=…
+```
+
+`date` is `YYYY-MM-DD` in venue-local time. `venue_id` and `sport_id` are optional
+filters.
+
+Reflects every booking at the venue — counter, dashboard, other platforms, and Playo
+orders still in checkout. Expired holds are released before the read.
+
+```json
+{
+  "requestStatus": 1,
+  "message": "OK",
+  "courts": [
+    {
+      "courtId": "5f2c…",
+      "courtName": "Court 1",
+      "slots": [
+        {
+          "startTime": "18:00:00",
+          "endTime": "19:00:00",
+          "price": "1200.00",
+          "ticketsAvailable": 1
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Create an order (hold)
+
+```http
+POST /order/create
+```
+
+Blocks the courts while the customer pays on Playo. **Not** a booking: no revenue, no
+counter entry, nobody expected to arrive.
+
+```json
+{
+  "venueId": "…",
+  "userName": "Ana Rao",
+  "userMobile": "+919000011111",
+  "userEmail": "ana@example.com",
+  "orders": [
+    {
+      "courtId": "5f2c…",
+      "date": "2026-09-04",
+      "startTime": "18:00:00",
+      "endTime": "19:00:00",
+      "price": "1200.00",
+      "paidAtPlayo": "1200.00",
+      "playoOrderId": "PLY-88213"
+    }
+  ]
+}
+```
+
+`endTime` is optional — their spec marks it so, and every court here is sold by the
+hour, so it defaults accordingly.
+
+Responds with `orderIds`, pairing your id with ours:
+
+```json
+{
+  "requestStatus": 1,
+  "message": "Orders created.",
+  "orderIds": [{ "externalOrderId": "GX-4471", "playoOrderId": "PLY-88213" }]
+}
+```
+
+All or nothing: if any slot fails, none are created and `requestStatus` is `0`.
+Idempotent on `playoOrderId`.
+
+<Callout type="warn">
+  Holds expire after **15 minutes** if `/order/confirm` never arrives.
+</Callout>
+
+### Confirm an order
+
+```http
+POST /order/confirm
+```
+
+Turns held slots into real bookings once payment has cleared. Only after this do they
+appear in reports, on the counter board and in the takings.
+
+```json
+{ "orderIds": ["PLY-88213"] }
+```
+
+Returns `bookingIds` pairing `externalBookingId` with `playoOrderId`.
+
+All or nothing, and idempotent — confirming twice is a success, so a dropped response
+is safe to retry. A lapsed hold still confirms if the court is free; it is refused
+only once somebody else has taken the slot.
+
+### Create a booking directly
+
+```http
+POST /booking/create
+```
+
+The single-phase flow, for venues integrated without the order/confirm handshake. A
+confirmed booking straight away. Body is the same shape as `/order/create` with the
+slots under `bookings`.
+
+Same guarantees: all-or-nothing, idempotent on `playoOrderId`, same overlap
+constraint.
+
+### Cancel an order
+
+```http
+POST /order/cancel
+```
+
+```json
+{ "orderIds": ["PLY-88213"] }
+```
+
+Releases held slots — and confirmed bookings too, because the spec requires this
+endpoint to cancel a confirmed booking if one exists, so no order is left open on
+Playo's side with no counterpart here. Idempotent.
+
+### Cancel a booking
+
+```http
+POST /booking/cancel
+```
+
+```json
+{
+  "bookingIds": [
+    {
+      "externalBookingId": "GX-4471",
+      "playoOrderId": "PLY-88213",
+      "price": "1200.00",
+      "refundAtPlayo": "1200.00"
+    }
+  ]
+}
+```
+
+Frees the courts immediately. All or nothing, per the spec: *either all bookings
+should be cancelled or none of the requested bookings*.
+
+`price` and `refundAtPlayo` are recorded on the booking's timeline, not acted on — the
+refund has already been made on Playo's side.
+
+### Map booking ids
+
+```http
+POST /booking/map
+```
+
+Optional in the spec. Records Playo's own `playoBookingId`, which is a different value
+from the `playoOrderId` already held, so reconciliation can match on whichever id
+either side happens to be quoting.
+
+## A typical flow
+
+<Steps>
+<Step>
+**Read availability.** `GET /availability?date=2026-09-04` → `requestStatus: 1` with
+courts and their free slots.
+</Step>
+<Step>
+**Hold the slots.** `POST /order/create` with your `playoOrderId`. The courts are
+blocked for 15 minutes and cannot be sold at the counter underneath you.
+</Step>
+<Step>
+**Customer pays on Playo.** Nothing is expected from us during this.
+</Step>
+<Step>
+**Confirm.** `POST /order/confirm` with the same `playoOrderId`. The hold becomes a
+real booking and appears on the counter board and in the venue's takings.
+</Step>
+</Steps>
+
+If the customer abandons checkout, send `/order/cancel` — or send nothing and let the
+hold lapse after 15 minutes. Cancelling explicitly is better: it puts the court back
+on sale immediately.
+
+## Before go-live
+
+- Confirm the `requestStatus` type question above.
+- Confirm which flow you are using: order/confirm two-phase, or `/booking/create`
+  single-phase.
+- Make sure `playoOrderId` is stable across your own retries. It is the idempotency
+  key, and an id that changes on retry defeats it entirely.
