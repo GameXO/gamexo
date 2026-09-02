@@ -55,7 +55,10 @@ async def load_settings(session: AsyncSession) -> TenantSettings:
 
 # ── Booking references ──────────────────────────────────────────────────────
 #
-# `XC-B-0042`. The academy's own prefix, the booking series, then the counter.
+# `XCB0042`. The academy's own prefix, the booking series, then the counter, run
+# together with no separators — this is the one number a customer keys in
+# themselves, on a touchscreen keyboard with no hyphen, so the form we print is
+# the form that can be typed.
 
 #: Any leading letters, then the digits that carry the meaning. The letters are
 #: matched but discarded: on a kiosk the tenant is already fixed by the hostname,
@@ -82,9 +85,12 @@ def normalise_reference(raw: str, *, prefix: str) -> str | None:
 
     Forgiving on purpose. This value is keyed one character at a time on a
     touchscreen by someone who has just arrived, reading a phone screen or a
-    printed ticket, so every one of these resolves to `XC-B-0042`:
+    printed ticket, so every one of these resolves to `XCB0042`:
 
-        XC-B-0042   xc b 0042   XCB0042   B-42   0042   42
+        XCB0042   xcb0042   XC-B-0042   xc b 0042   B-42   0042   42
+
+    The hyphenated spellings are kept because references were printed that way
+    before, and a ticket from last month is still a ticket.
 
     What it will not do is guess. A string with no digits, or one that is all
     digits and too long to be a counter value, returns None rather than being
@@ -102,7 +108,9 @@ def normalise_reference(raw: str, *, prefix: str) -> str | None:
     if len(digits) > 8:
         return None
 
-    return f"{prefix}-B-{int(digits):04d}"
+    # Must stay in step with `next_number`'s BOOKING entries in INFIX, PAD and
+    # SEPARATOR — this rebuilds the string that allocator produces.
+    return f"{prefix}B{int(digits):04d}"
 
 
 async def find_by_reference(session: AsyncSession, raw: str) -> Booking | None:
@@ -431,7 +439,7 @@ def matches_booking_code(
     nothing). Our own booking id matches on any long-enough compacted substring,
     since the code on a ticket is deliberately only a piece of the full UUID.
 
-    `reference` is `XC-B-0042`, and it is the string the customer is most likely to
+    `reference` is `XCB0042`, and it is the string the customer is most likely to
     be holding: it is what the ticket prints, what the invoice shows and what the
     confirmation email calls the Booking ID. Matched in full once compacted, like a
     partner reference — a four-character substring of a counter would collide with

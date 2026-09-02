@@ -226,7 +226,7 @@ async def test_cancel_is_all_or_nothing(client: AsyncClient, tenant_a: TenantFix
         {
             "bookingIds": [
                 {"externalBookingId": reference, "price": "1200", "refundAtPlayo": "1200"},
-                {"externalBookingId": "XC-B-999999", "price": "0", "refundAtPlayo": "0"},
+                {"externalBookingId": "XCB999999", "price": "0", "refundAtPlayo": "0"},
             ]
         },
     )
