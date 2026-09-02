@@ -9,7 +9,7 @@ export type InvoiceData = {
   facility: typeof FACILITY_PROFILE
   invoiceNo: string | null
   bookingId: string | null
-  /** `XC-B-0042` — what the customer is asked for at the counter. Null until the
+  /** `XCB0042` — what the customer is asked for at the counter. Null until the
    *  booking is actually created, since the number is allocated server-side. */
   bookingRef: string | null
   confirmed: boolean

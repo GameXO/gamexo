@@ -182,7 +182,7 @@ async def owned(
     reach a walk-in, or another platform's booking, by quoting its reference — and
     references are printed on every customer's ticket, so they are not secret.
 
-    Accepts our booking reference (`XC-B-0042`, what we hand back), our UUID (for an
+    Accepts our booking reference (`XCB0042`, what we hand back), our UUID (for an
     integration that stored it), or the partner's own `external_ref`.
     """
     cleaned = (ref or "").strip().strip('"')

@@ -414,7 +414,7 @@ export type Customer = { name: string; phone: string; email: string; visits: num
 
 export type Booking = {
   id: string
-  /** `XC-B-0042` — the human reference. `id` stays the UUID the API is addressed
+  /** `XCB0042` — the human reference. `id` stays the UUID the API is addressed
    *  by; this is the one to put in front of a person, and the one a customer will
    *  quote when they ring up or arrive at the counter. */
   reference: string
@@ -519,7 +519,7 @@ export function demoBookings(): Booking[] {
       id: `NV${70000 + i * 137}`,
       // Demo rows only — real references come from the server's per-tenant counter.
       // Numbered high so they cannot be mistaken for a genuine early booking.
-      reference: `XC-B-9${String(900 + i).padStart(3, '0')}`,
+      reference: `XCB9${String(900 + i).padStart(3, '0')}`,
       sportId: court.sportId,
       courtId: p.courtId,
       date: iso,

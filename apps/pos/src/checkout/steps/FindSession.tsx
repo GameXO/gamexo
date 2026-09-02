@@ -53,7 +53,7 @@ export default function FindSession({
 
         <div className="flex w-full items-center overflow-hidden rounded-xl border-2 border-white bg-border-input px-[clamp(0.9rem,1.6vw,1.0625rem)] py-[clamp(0.9rem,1.8vw,1.5rem)] shadow-[0px_12px_17px_-9px_rgba(0,0,0,0.12)]">
           <span className="truncate text-[clamp(1.1rem,1.7vw,1.375rem)] font-medium tracking-wide text-ink">
-            {query || <span className="text-muted">XC-B-0042, Priya, or 98765…</span>}
+            {query || <span className="text-muted">XCB0042, Priya, or 98765…</span>}
           </span>
         </div>
 
