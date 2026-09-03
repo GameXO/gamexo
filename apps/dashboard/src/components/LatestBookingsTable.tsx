@@ -159,7 +159,7 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
   const totalShown = sortedRows.reduce((sum, row) => sum + row.total, 0)
 
   return (
-    <div className="flex w-full flex-col items-start gap-5 overflow-hidden rounded-xl border border-border-card bg-surface p-5">
+    <div className="flex w-full shrink-0 flex-col items-start gap-5 overflow-hidden rounded-xl border border-border-card bg-surface p-5">
       <div className="flex w-full items-center gap-2.5">
         <img src={calendar05} alt="" className="size-5" />
         <p className="flex-1 text-sm font-medium text-ink">Latest Bookings</p>

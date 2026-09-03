@@ -1,13 +1,12 @@
 import { useMemo } from 'react'
 import { useBookingsInRange, useSports } from '../api/hooks'
-import { formatINRCompact, monthRange, revenueBySport } from '../dashboard/insights'
+import { formatINRCompact, revenueBySport, type DashboardRange } from '../dashboard/insights'
 import discountTag from '../assets/figma/discount-tag.svg'
 
-/** Revenue by sport, this calendar month — summed straight off each booking's
- *  own `total`, not a booking-count proxy for it. */
-export default function SportPopularityCard() {
-  const { fromISO, toISO } = monthRange(0)
-  const bookings = useBookingsInRange(fromISO, toISO)
+/** Revenue by sport over the selected period — summed straight off each
+ *  booking's own `total`, not a booking-count proxy for it. */
+export default function SportPopularityCard({ range }: { range: DashboardRange }) {
+  const bookings = useBookingsInRange(range.fromISO, range.toISO)
   // Includes sports since retired — a booking made while one was still active
   // shouldn't lose its label the moment it's turned off.
   const sports = useSports(true)
@@ -27,13 +26,13 @@ export default function SportPopularityCard() {
           <img src={discountTag} alt="" className="size-5" />
           <p className="text-sm font-medium text-ink">Revenue by Sport</p>
         </div>
-        <span className="text-xs font-medium text-slate">This month</span>
+        <span className="text-xs font-medium text-slate">{range.label}</span>
       </div>
 
       {loading ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted">No bookings yet this month.</p>
+        <p className="text-sm text-muted">No bookings in this period.</p>
       ) : (
         <div className="flex w-full flex-col items-start justify-end gap-5">
           {rows.map((row) => (

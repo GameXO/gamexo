@@ -27,6 +27,7 @@ import { demoBookings } from './data/booking'
 import * as db from './lib/db'
 import { useAuth } from './auth/AuthProvider'
 import LoginPage from './auth/LoginPage'
+import { todayPreset, type DashboardRange } from './dashboard/insights'
 import dashboardSquareHeader from './assets/figma/dashboard-square-header.svg'
 import bolt from './assets/figma/bolt.svg'
 import calendar from './assets/figma/calendar.svg'
@@ -114,6 +115,9 @@ function Shell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [view, setView] = useState<View>('dashboard')
   const [prefillCourtId, setPrefillCourtId] = useState<string | null>(null)
+  // Lives here rather than in Dashboard because the control that changes it is
+  // in the header, which is Dashboard's sibling.
+  const [range, setRange] = useState<DashboardRange>(todayPreset)
 
   // Screens still on localStorage need their demo rows. Migrated screens read
   // the API instead and ignore this entirely.
@@ -138,8 +142,15 @@ function Shell() {
       <div className="flex h-screen flex-1 flex-col overflow-hidden border-l border-[#ebf0f4]">
         {view === 'dashboard' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Dashboard" icon={dashboardSquareHeader} />
-            <Dashboard onNavigate={navigate} />
+            <Header
+              onMenuClick={() => setSidebarOpen(true)}
+              onNavigate={navigate}
+              title="Dashboard"
+              icon={dashboardSquareHeader}
+              range={range}
+              onRangeChange={setRange}
+            />
+            <Dashboard onNavigate={navigate} range={range} />
           </>
         )}
         {view === 'booking' && (

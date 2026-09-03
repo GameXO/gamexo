@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import bookingImage from '@/assests/iamgebooking.png';
+import paymentsImage from '@/assests/payments.png';
 
 const entries = [
   {
@@ -6,12 +8,14 @@ const entries = [
     title: 'Booking integrations',
     body: 'Sell court time through gamexo. Availability, holds, bookings and cancellation, with the same guarantees whichever wire format you speak.',
     cta: 'Read the integration guide',
+    image: bookingImage,
   },
   {
     href: '/docs/payments',
     title: 'Payments',
     body: 'Connect a payment gateway to collect online and at the counter. Five providers, and an honest answer about which of them can be verified.',
     cta: 'Set up payments',
+    image: paymentsImage,
   },
 ];
 
@@ -34,15 +38,22 @@ export default function HomePage() {
             <Link
               key={entry.href}
               href={entry.href}
-              className="border-fd-border bg-fd-card hover:border-fd-primary/40 group rounded-xl border p-5 transition-colors"
+              className="border-fd-border bg-fd-card hover:border-fd-primary/40 group overflow-hidden border transition-colors"
             >
-              <h2 className="font-semibold">{entry.title}</h2>
-              <p className="text-fd-muted-foreground mt-2 text-sm leading-relaxed">
-                {entry.body}
-              </p>
-              <span className="text-fd-primary mt-4 inline-block text-sm font-medium">
-                {entry.cta} →
-              </span>
+              <img
+                src={entry.image.src}
+                alt=""
+                className="aspect-video w-full object-cover"
+              />
+              <div className="p-5">
+                <h2 className="font-semibold">{entry.title}</h2>
+                <p className="text-fd-muted-foreground mt-2 text-sm leading-relaxed">
+                  {entry.body}
+                </p>
+                {/* <span className="text-fd-primary mt-4 inline-block text-sm font-medium">
+                  {entry.cta} →
+                </span> */}
+              </div>
             </Link>
           ))}
         </div>

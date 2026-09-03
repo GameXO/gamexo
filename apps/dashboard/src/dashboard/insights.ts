@@ -18,15 +18,6 @@ export function todayRange(): DateRange {
   return { fromISO: start.toISOString(), toISO: end.toISOString() }
 }
 
-export function yesterdayRange(): DateRange {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() - 1)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-  return { fromISO: start.toISOString(), toISO: end.toISOString() }
-}
-
 /** Calendar month, `offset` months from the current one (0 = this month,
  *  -1 = last month). Bounds are the first-of-month instants the API's
  *  `date_from`/`date_to` (half-open) expect. */
@@ -41,6 +32,72 @@ export function monthRange(offset = 0): DateRange & { label: string } {
     // so a report row can be looked up by this string.
     label: start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
   }
+}
+
+/* ── The dashboard's selected period ───────────────────────────────────────
+ * One range, chosen in the header, that every "current period" card reads. The
+ * preset is carried alongside the instants because it is what decides the
+ * comparison a stat card makes and the wording it uses — a calendar month
+ * compares against the previous calendar month, not the preceding 30 days.
+ */
+export type RangePreset = 'today' | 'month' | 'custom'
+export type DashboardRange = DateRange & { label: string; preset: RangePreset }
+
+export function todayPreset(): DashboardRange {
+  return { ...todayRange(), label: 'Today', preset: 'today' }
+}
+
+export function monthPreset(): DashboardRange {
+  const { fromISO, toISO } = monthRange(0)
+  return { fromISO, toISO, label: 'This Month', preset: 'month' }
+}
+
+const dayLabel = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
+/** Builds a range from two inclusive `YYYY-MM-DD` values, as the half-open
+ *  instants `date_from`/`date_to` expect — so the end day is included in full
+ *  rather than cut off at midnight. Parsed without a `Z` so the bounds land on
+ *  the viewer's own midnight, matching every other range builder here. */
+export function customPreset(fromDate: string, toDate: string): DashboardRange {
+  const start = new Date(`${fromDate}T00:00:00`)
+  const lastDay = new Date(`${toDate}T00:00:00`)
+  const end = new Date(lastDay)
+  end.setDate(end.getDate() + 1)
+  return {
+    fromISO: start.toISOString(),
+    toISO: end.toISOString(),
+    label: fromDate === toDate ? dayLabel(start) : `${dayLabel(start)} – ${dayLabel(lastDay)}`,
+    preset: 'custom',
+  }
+}
+
+/** The window a card compares the selected period against: the previous
+ *  calendar month for a month, otherwise the equal-length span immediately
+ *  before it — which for "today" is exactly yesterday. */
+export function previousPeriod(range: DashboardRange): DateRange {
+  if (range.preset === 'month') {
+    const { fromISO, toISO } = monthRange(-1)
+    return { fromISO, toISO }
+  }
+  const from = new Date(range.fromISO).getTime()
+  const span = new Date(range.toISO).getTime() - from
+  return { fromISO: new Date(from - span).toISOString(), toISO: range.fromISO }
+}
+
+/** How the two halves of a period-over-period comparison are named. Kept short
+ *  — these sit under the bars of the comparison chart, in a column as wide as
+ *  one bar. A calendar month keeps its own name ("Aug 2026") rather than
+ *  "Previous", since that is what the chart used to read and it is more use. */
+export function periodLabels(range: DashboardRange): { current: string; previous: string } {
+  if (range.preset === 'month') return { current: monthRange(0).label, previous: monthRange(-1).label }
+  if (range.preset === 'today') return { current: 'Today', previous: 'Yesterday' }
+  return { current: 'Selected', previous: 'Previous' }
+}
+
+export function comparisonCaption(preset: RangePreset): string {
+  if (preset === 'today') return 'vs yesterday'
+  if (preset === 'month') return 'vs last month'
+  return 'vs previous period'
 }
 
 /** First-of-month instant `n` months back — the left edge of a rolling
