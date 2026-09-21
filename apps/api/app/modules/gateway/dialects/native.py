@@ -110,7 +110,7 @@ class MapRequest(BaseModel):
 
     pairs: dict[str, str] = Field(
         description="Our reference → your booking id",
-        json_schema_extra={"example": {"XC-B-0042": "YOUR-BOOKING-991"}},
+        json_schema_extra={"example": {"XCB0042": "YOUR-BOOKING-991"}},
     )
 
 
@@ -327,7 +327,7 @@ async def list_bookings(
     response_model=PartnerBookingOut,
     summary="One of your bookings",
     description=(
-        "By our reference (`XC-B-0042`) or your own `external_ref`.\n\n"
+        "By our reference (`XCB0042`) or your own `external_ref`.\n\n"
         "**404** for a booking your integration did not create, including walk-ins "
         "and other platforms' bookings — a 403 would confirm the id exists, turning "
         "this into an oracle for enumerating the venue's bookings."

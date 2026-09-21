@@ -465,7 +465,7 @@ class Booking(TenantScoped):
         Index("ix_booking_tenant_customer", "tenant_id", "customer_id"),
         Index("ix_booking_tenant_status", "tenant_id", "status"),
         # The check-in lookup. Unique per academy, not globally: the reference is a
-        # per-tenant counter, so two academies both reaching XC-B-0042 is expected.
+        # per-tenant counter, so two academies both reaching XCB0042 is expected.
         # Uniqueness is what lets the kiosk resolve a typed code to exactly one
         # booking instead of asking the customer which of two they meant.
         Index("uq_booking_tenant_reference", "tenant_id", "reference", unique=True),
@@ -473,7 +473,7 @@ class Booking(TenantScoped):
         CheckConstraint("amount_paid >= 0 AND total >= 0", name="amounts_non_negative"),
     )
 
-    #: What the customer reads off their ticket and types at the kiosk: `XC-B-0042`.
+    #: What the customer reads off their ticket and types at the kiosk: `XCB0042`.
     #: Allocated from the same per-tenant DocumentCounter series as invoices, so it
     #: is short, gapless and never collides.
     #:

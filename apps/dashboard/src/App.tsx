@@ -139,7 +139,7 @@ function Shell() {
         {view === 'dashboard' && (
           <>
             <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Dashboard" icon={dashboardSquareHeader} />
-            <Dashboard />
+            <Dashboard onNavigate={navigate} />
           </>
         )}
         {view === 'booking' && (

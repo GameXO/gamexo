@@ -23,7 +23,7 @@ export default function AddOns({ draft, setDraft }: { draft: Draft; setDraft: (p
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <p className="text-xl text-ink">Need any kit?</p>
+      <p className="text-[clamp(1rem,1.3vw,1.125rem)] font-medium text-ink">Need any kit?</p>
 
       {items.length === 0 ? (
         <p className="text-sm text-muted">No equipment configured for sale yet.</p>
@@ -57,12 +57,12 @@ export default function AddOns({ draft, setDraft }: { draft: Draft; setDraft: (p
                     addFirst()
                   }
                 }}
-                className={`group relative flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-all ${
-                  active ? 'border-ink bg-lime/10 shadow-sm' : 'border-border-card bg-surface hover:border-ink/25'
+                className={`group relative flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all ${
+                  active ? 'border-lime bg-lime/10 shadow-sm' : 'border-border-card bg-surface hover:border-ink/25'
                 } ${soldOut ? 'cursor-not-allowed opacity-50' : qty === 0 ? 'cursor-pointer' : ''}`}
               >
                 {active && (
-                  <span className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-lime text-xs font-semibold text-lime-ink shadow-[0px_2px_6px_rgba(0,0,0,0.15)]">
+                  <span className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-lime text-xs font-bold text-lime-ink shadow-[0px_2px_6px_rgba(0,0,0,0.15)]">
                     {qty}
                   </span>
                 )}
@@ -79,7 +79,7 @@ export default function AddOns({ draft, setDraft }: { draft: Draft; setDraft: (p
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-semibold text-ink">{item.name}</p>
                     <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                         offer.mode === 'rent' ? 'bg-surface-muted text-slate' : 'bg-lime/30 text-lime-ink'
                       }`}
                     >
@@ -137,7 +137,7 @@ export default function AddOns({ draft, setDraft }: { draft: Draft; setDraft: (p
       )}
 
       {trayCount > 0 && (
-        <div className="flex w-full items-center justify-between rounded-xl bg-white p-4">
+        <div className="flex w-full items-center justify-between rounded-2xl bg-surface p-4">
           <p className="text-sm text-slate">
             {trayCount} item{trayCount > 1 ? 's' : ''} added
           </p>

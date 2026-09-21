@@ -6720,7 +6720,7 @@
             },
             "description": "Our reference \u2192 your booking id",
             "example": {
-              "XC-B-0042": "YOUR-BOOKING-991"
+              "XCB0042": "YOUR-BOOKING-991"
             },
             "title": "Pairs",
             "type": "object"
@@ -18255,7 +18255,7 @@
     },
     "/api/v1/gateway/native/bookings/{reference}": {
       "get": {
-        "description": "By our reference (`XC-B-0042`) or your own `external_ref`.\n\n**404** for a booking your integration did not create, including walk-ins and other platforms' bookings \u2014 a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.",
+        "description": "By our reference (`XCB0042`) or your own `external_ref`.\n\n**404** for a booking your integration did not create, including walk-ins and other platforms' bookings \u2014 a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.",
         "operationId": "gateway_getBooking",
         "parameters": [
           {

@@ -244,6 +244,34 @@ export const api = {
   platformMe: () =>
     request<Ok<'/api/v1/platform/me', 'get'>>('/api/v1/platform/me'),
 
+  /* ── Reporting — the dashboard's headline numbers and charts ─────────────── */
+
+  /** Revenue, bookings, utilisation, active members, outstanding dues for a
+   *  window. Omit both dates for the server's own default (last 180 days). */
+  reportKpis: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/reports/kpis', 'get'>>('/api/v1/reports/kpis', { query }),
+
+  /** Revenue collected and bookings taken, bucketed by month. */
+  reportRevenue: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/reports/revenue', 'get'>>('/api/v1/reports/revenue', { query }),
+
+  /** Booking count and share per sport. */
+  reportSportPopularity: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/reports/sport-popularity', 'get'>>('/api/v1/reports/sport-popularity', {
+      query,
+    }),
+
+  /** Booking count by hour of day, in the tenant's own timezone. */
+  reportPeakHours: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/reports/peak-hours', 'get'>>('/api/v1/reports/peak-hours', { query }),
+
+  /** Booked minutes against each court's own operating hours. */
+  reportCourtUtilization: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/reports/court-utilization', 'get'>>(
+      '/api/v1/reports/court-utilization',
+      { query },
+    ),
+
   /** Every academy on the platform. `ops@gamexo` only — 401 for anyone else. */
   listAllTenants: () =>
     request<Ok<'/api/v1/platform/tenants', 'get'>>('/api/v1/platform/tenants'),

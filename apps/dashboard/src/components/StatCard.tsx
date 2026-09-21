@@ -1,4 +1,4 @@
-import type { Trend } from '../data/mockData'
+import type { Trend } from '../dashboard/insights'
 import dotSeparator from '../assets/figma/dot-separator.svg'
 
 export default function StatCard({

@@ -9,7 +9,7 @@ export default function Stepper({
 }) {
   return (
     <div className="flex w-full justify-center">
-      <div className="flex max-w-full items-center gap-[clamp(0.75rem,2.5vw,2rem)] overflow-x-auto rounded-xl bg-white px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vw,0.75rem)]">
+      <div className="flex max-w-full items-center gap-[clamp(0.75rem,2.5vw,2rem)] overflow-x-auto rounded-2xl bg-white px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vw,0.75rem)]">
         {STEPS.map((label, i) => {
           const step = i + 1
           const active = step === current

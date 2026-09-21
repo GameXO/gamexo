@@ -11,6 +11,7 @@
  * as broken. See the rollback in `toggle` for the honest half of that bargain.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { Monitor } from 'lucide-react'
 import { ApiError, api } from '../api/client'
 import { POS_SERVICES, isEnabled, type PosServiceKey } from './services'
 
@@ -60,12 +61,19 @@ export function ServicesPicker() {
 
   return (
     <section className="rounded-2xl border border-border-card bg-surface p-6">
-      <h2 className="font-display text-lg font-semibold text-ink">Counter services</h2>
-      <p className="mt-1 text-sm leading-relaxed text-slate">
-        What your front desk can do on the POS tablet. Switching one off removes its
-        tile from the counter — it does not delete anything, and turning it back on
-        restores it.
-      </p>
+      <div className="flex items-start gap-4">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-lime/20 text-lime-ink">
+          <Monitor size={20} />
+        </div>
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink">Counter services</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate">
+            What your front desk can do on the POS tablet. Switching one off removes its
+            tile from the counter — it does not delete anything, and turning it back on
+            restores it.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <p role="alert" className="mt-4 rounded-lg bg-negative/5 px-4 py-3 text-sm text-negative">
