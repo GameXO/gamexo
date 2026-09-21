@@ -10,3 +10,56 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+/* ── No letterboxing ──────────────────────────────────────────────────────
+ *
+ * DocsLayout's grid (fumadocs-ui/.../layouts/docs/slots/container.js) sizes
+ * itself as:
+ *
+ *   minmax(min-content,1fr) sidebar minmax(0, LAYOUT_WIDTH - sidebar - toc) toc minmax(min-content,1fr)
+ *
+ * `LAYOUT_WIDTH` is `var(--fd-layout-width, 97rem)` — a hard cap on sidebar +
+ * main + toc combined. Below that cap the two outer `1fr` tracks are 0, as
+ * intended. Above it — any window wider than 1552px, i.e. most laptop and
+ * external displays at 100% zoom — the excess splits evenly into those two
+ * outer tracks, and because the *sidebar* and *toc* grid-template-areas each
+ * span their outer track too, the extra space renders as a gap of empty
+ * background before the sidebar's nav list and after the toc, rather than as
+ * neutral page margin. That reads as a stray left margin on the sidebar.
+ *
+ * Raising the cap to the viewport itself removes it at every width: the main
+ * column simply becomes `100vw - sidebar - toc`, so nothing is ever left over
+ * to hand to the outer tracks. Prose still has its own `max-w-[900px]` cap
+ * inside `main` (fumadocs-ui/.../docs/page/slots/container.js), so the actual
+ * reading column doesn't stretch — only the dead margin goes away.
+ */
+#nd-docs-layout {
+  --fd-layout-width: 100vw;
+}
+
+/* ── Lime accent, Mintlify-style ──────────────────────────────────────────
+ *
+ * `neutral.css` (imported above) leaves every accent black-on-white / white-
+ * on-black — `--color-fd-primary` is just the foreground colour. That one
+ * variable is what colours a link's underline, the active sidebar item's
+ * indicator bar and background tint, and focus rings (see
+ * @fumadocs/tailwind's typography plugin and the sidebar's
+ * `data-[active=true]:bg-fd-primary/10`) — never body text itself, so this
+ * doesn't touch readability. Overriding just this one, the way Mintlify uses
+ * a single green accent over an otherwise monochrome UI, is enough to carry
+ * the effect through every one of those without rewriting the layout.
+ *
+ * Tailwind's `lime` swatch, one step apart in each mode for the same reason
+ * `emerald.css` does: a mid-tone reads on white, a lit one pops on near-black.
+ */
+:root {
+  --color-fd-primary: #65a30d; /* lime-600 */
+  --color-fd-primary-foreground: #14210a; /* dark enough for lime-tinted fills */
+  --color-fd-ring: #65a30d;
+}
+
+.dark {
+  --color-fd-primary: #a3e635; /* lime-400 */
+  --color-fd-primary-foreground: #14210a;
+  --color-fd-ring: #a3e635;
+}
