@@ -84,7 +84,7 @@ class PartnerBookingOut(BaseModel):
     model_config = ORM
 
     id: uuid.UUID
-    #: Our reference, `XC-B-0042`. Put it on the customer's confirmation — it is
+    #: Our reference, `XCB0042`. Put it on the customer's confirmation — it is
     #: what the counter will ask them for when they arrive.
     reference: str
     external_ref: str | None

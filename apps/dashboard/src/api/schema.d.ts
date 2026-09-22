@@ -1072,7 +1072,7 @@ export interface paths {
         };
         /**
          * One of your bookings
-         * @description By our reference (`XC-B-0042`) or your own `external_ref`.
+         * @description By our reference (`XCB0042`) or your own `external_ref`.
          *
          *     **404** for a booking your integration did not create, including walk-ins and other platforms' bookings — a 403 would confirm the id exists, turning this into an oracle for enumerating the venue's bookings.
          */
@@ -4819,7 +4819,7 @@ export interface components {
              * Pairs
              * @description Our reference → your booking id
              * @example {
-             *       "XC-B-0042": "YOUR-BOOKING-991"
+             *       "XCB0042": "YOUR-BOOKING-991"
              *     }
              */
             pairs: {

@@ -233,6 +233,10 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
           <div className="absolute bottom-0 left-0">{renderBar(lastLayout, labels.previous, 'left')}</div>
           <div className="absolute bottom-0 right-0">{renderBar(thisLayout, labels.current, 'right')}</div>
         </div>
+        <p className="text-xs font-medium text-slate">
+          {formatINRCompact(Math.abs(diff))} {diff >= 0 ? 'more' : 'less'} than {lastMonth.label}
+        </p>
+      </div>
 
         <div className="flex justify-between" style={{ width: CHART_WIDTH }}>
           <span className="text-center text-xs font-medium text-muted" style={{ width: BAR_WIDTH }}>

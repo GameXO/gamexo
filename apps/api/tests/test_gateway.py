@@ -759,7 +759,7 @@ async def test_one_url_reaches_each_platforms_own_contract(
     )
     assert mine.status_code == 201, mine.text
     # Our envelope: a bare list, snake_case, and a reference rather than their id.
-    assert one(mine)["reference"].startswith("XC-B-")
+    assert one(mine)["reference"].startswith("XCB")
 
     playo = await client.post(
         "/api/v1/gateway/order/create",

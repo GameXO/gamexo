@@ -19,7 +19,7 @@ from app.modules.finance.models import CounterKind, DocumentCounter
 from app.tenancy.context import require_current_tenant_id
 
 # Zero-padding per series, matching the frontend's existing strings:
-# XC-2024-0001, XC-M-0001, XC-C-001, XC-S-001.
+# XC-2024-0001, XC-M-0001, XC-C-001, XC-S-001, XCB0042.
 PAD: dict[CounterKind, int] = {
     CounterKind.INVOICE: 4,
     CounterKind.MEMBER: 4,
@@ -34,6 +34,19 @@ INFIX: dict[CounterKind, str] = {
     CounterKind.COACH: "C",
     CounterKind.STUDENT: "S",
     CounterKind.BOOKING: "B",
+}
+
+#: What joins the three parts. Every series here is a filed document that gets read
+#: off a screen, and keeps its hyphens — except the booking reference, which is the
+#: one number a *customer* has to key in, on a counter touchscreen whose keyboard has
+#: no hyphen. Running it together makes the printed form and the typeable form the
+#: same string, so nobody has to work out which punctuation to leave out.
+SEPARATOR: dict[CounterKind, str] = {
+    CounterKind.INVOICE: "-",
+    CounterKind.MEMBER: "-",
+    CounterKind.COACH: "-",
+    CounterKind.STUDENT: "-",
+    CounterKind.BOOKING: "",
 }
 
 
@@ -88,7 +101,7 @@ async def allocate(session: AsyncSession, kind: CounterKind, *, period: str) -> 
 async def next_number(
     session: AsyncSession, kind: CounterKind, *, prefix: str = "XC", on: date | None = None
 ) -> str:
-    """The formatted document number, e.g. `XC-2024-0001` or `XC-M-0001`.
+    """The formatted document number, e.g. `XC-2024-0001`, `XC-M-0001` or `XCB0042`.
 
     `prefix` comes from the tenant's settings, so a white-label customer's invoices
     carry their own initials rather than mine.
@@ -98,4 +111,5 @@ async def next_number(
     value = await allocate(session, kind, period=period)
 
     middle = period or INFIX[kind]
-    return f"{prefix}-{middle}-{value:0{PAD[kind]}d}"
+    sep = SEPARATOR[kind]
+    return f"{prefix}{sep}{middle}{sep}{value:0{PAD[kind]}d}"
