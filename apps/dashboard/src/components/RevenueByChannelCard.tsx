@@ -1,6 +1,11 @@
 import { useMemo } from 'react'
 import { useBookingsInRange } from '../api/hooks'
-import { formatINRCompact, monthRange, revenueByChannel, type ChannelKey } from '../dashboard/insights'
+import {
+  formatINRCompact,
+  revenueByChannel,
+  type ChannelKey,
+  type DashboardRange,
+} from '../dashboard/insights'
 import storeManagement from '../assets/figma/store-management.svg'
 
 const CHANNEL_GRADIENT: Record<ChannelKey, string> = {
@@ -9,12 +14,12 @@ const CHANNEL_GRADIENT: Record<ChannelKey, string> = {
   third_party: 'linear-gradient(to right, #b5581a, #f58161)',
 }
 
-/** How this month's revenue arrived: counter walk-ins, the venue's own online
- *  gateway, or a partner platform (Playo, Hudle, …) — split on `booking_type`
- *  and `source_platform`, the same fields the booking record itself carries. */
-export default function RevenueByChannelCard() {
-  const { fromISO, toISO } = monthRange(0)
-  const bookings = useBookingsInRange(fromISO, toISO)
+/** How the selected period's revenue arrived: counter walk-ins, the venue's own
+ *  online gateway, or a partner platform (Playo, Hudle, …) — split on
+ *  `booking_type` and `source_platform`, the same fields the booking record
+ *  itself carries. */
+export default function RevenueByChannelCard({ range }: { range: DashboardRange }) {
+  const bookings = useBookingsInRange(range.fromISO, range.toISO)
 
   const rows = useMemo(() => revenueByChannel(bookings.data ?? []), [bookings.data])
   const total = rows.reduce((sum, r) => sum + r.revenue, 0)
@@ -27,13 +32,13 @@ export default function RevenueByChannelCard() {
           <img src={storeManagement} alt="" className="size-5" />
           <p className="text-sm font-medium text-ink">Revenue by Booking Type</p>
         </div>
-        <span className="text-xs font-medium text-slate">This month</span>
+        <span className="text-xs font-medium text-slate">{range.label}</span>
       </div>
 
       {bookings.isPending ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted">No bookings yet this month.</p>
+        <p className="text-sm text-muted">No bookings in this period.</p>
       ) : (
         <div className="flex w-full flex-col items-start justify-end gap-5">
           {rows.map((row) => (
@@ -50,7 +55,7 @@ export default function RevenueByChannelCard() {
               </p>
             </div>
           ))}
-          <p className="w-full text-right text-xs text-muted">{formatINRCompact(total)} total this month</p>
+          <p className="w-full text-right text-xs text-muted">{formatINRCompact(total)} total</p>
         </div>
       )}
     </div>

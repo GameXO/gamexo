@@ -1,6 +1,8 @@
 import { Menu } from 'lucide-react'
 import HeaderSearch from './HeaderSearch'
+import DateRangePicker from './DateRangePicker'
 import type { View } from '../App'
+import type { DashboardRange } from '../dashboard/insights'
 
 import dashboardSquareHeader from '../assets/figma/dashboard-square-header.svg'
 import bell from '../assets/figma/bell.svg'
@@ -18,12 +20,18 @@ export default function Header({
   title = 'Dashboard',
   icon = dashboardSquareHeader,
   dateIcon = calendarPlus,
+  range,
+  onRangeChange,
 }: {
   onMenuClick: () => void
   onNavigate: (view: View) => void
   title?: string
   icon?: string
   dateIcon?: string
+  /** Given only by a screen that reads a selected period. Without it the date
+   *  sits there as a plain label, which is all every other screen wants. */
+  range?: DashboardRange
+  onRangeChange?: (next: DashboardRange) => void
 }) {
   return (
     <header className="flex h-[72px] w-full shrink-0 items-center gap-2 border-b-[1.5px] border-border-soft px-4 py-4 sm:gap-3 sm:px-6">
@@ -51,13 +59,14 @@ export default function Header({
         <span className="absolute -top-0.5 right-[7px] size-2 rounded-full border border-white/10 bg-notify shadow-[0px_2px_5px_-1px_rgba(0,0,0,0.12)]" />
       </button>
 
-      <button
-        type="button"
-        className="hidden h-9 shrink-0 items-center gap-2.5 rounded-lg border border-border-input bg-white px-3.5 py-2.5 md:flex"
-      >
-        <span className="whitespace-nowrap text-sm text-ink">{today}</span>
-        <img src={dateIcon} alt="" className="size-[18px]" />
-      </button>
+      {range && onRangeChange ? (
+        <DateRangePicker range={range} onChange={onRangeChange} icon={dateIcon} />
+      ) : (
+        <div className="hidden h-9 shrink-0 items-center gap-2.5 rounded-lg border border-border-input bg-white px-3.5 py-2.5 md:flex">
+          <span className="whitespace-nowrap text-sm text-ink">{today}</span>
+          <img src={dateIcon} alt="" className="size-[18px]" />
+        </div>
+      )}
     </header>
   )
 }

@@ -7,21 +7,30 @@ import RevenueByChannelCard from './RevenueByChannelCard'
 import PrimeHoursCard from './PrimeHoursCard'
 import LatestBookingsTable from './LatestBookingsTable'
 import { useDashboardStatCards, type StatCardData } from '../dashboard/useDashboardStats'
+import type { DashboardRange } from '../dashboard/insights'
 import type { View } from '../App'
 
 const LOADING_CARDS: StatCardData[] = [
-  "Today's Revenue",
-  'Bookings Today',
+  'Revenue',
+  'Bookings',
   'Available Courts',
   'Outstanding Dues',
 ].map((label) => ({ label, value: '—', trend: { value: '—', sentiment: 'up', caption: 'loading…' } }))
 
-export default function Dashboard({ onNavigate }: { onNavigate?: (view: View) => void }) {
-  const statCards = useDashboardStatCards()
+export default function Dashboard({
+  onNavigate,
+  range,
+}: {
+  onNavigate?: (view: View) => void
+  range: DashboardRange
+}) {
+  const statCards = useDashboardStatCards(range)
 
   return (
     <div className="flex flex-1 flex-col items-start gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <p className="w-full text-lg text-ink">Today's Overview</p>
+      <p className="w-full text-lg text-ink">
+        {range.preset === 'custom' ? `Overview · ${range.label}` : `${range.label}’s Overview`}
+      </p>
 
       <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {(statCards ?? LOADING_CARDS).map((card) => (
@@ -30,16 +39,16 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (view: View) =>
       </div>
 
       <div className="flex w-full flex-col items-stretch gap-5 lg:flex-row">
-        <MonthlyRevenueCard />
-        <SportPopularityCard />
-        <QuickStatsCard />
+        <MonthlyRevenueCard range={range} />
+        <SportPopularityCard range={range} />
+        <QuickStatsCard range={range} />
       </div>
 
       <RevenueTrendChart />
 
       <div className="flex w-full flex-col items-stretch gap-5 lg:flex-row">
-        <RevenueByChannelCard />
-        <PrimeHoursCard />
+        <RevenueByChannelCard range={range} />
+        <PrimeHoursCard range={range} />
       </div>
 
       <LatestBookingsTable onNavigate={onNavigate} />

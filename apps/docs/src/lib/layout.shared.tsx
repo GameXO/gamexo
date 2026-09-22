@@ -1,12 +1,16 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { appName, gitConfig } from './shared';
+import logoMark from '@/assests/logo-mark.svg';
+import { appName } from './shared';
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      // JSX supported
-      title: appName,
+      title: (
+        <>
+          <img src={logoMark.src} alt="" className="size-6 rounded-md" />
+          {appName}
+        </>
+      ),
     },
-    githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }

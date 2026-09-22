@@ -1,14 +1,13 @@
 import { useMemo } from 'react'
 import { useBookingsInRange, useSports } from '../api/hooks'
-import { formatHourRange, monthRange, primeHoursBySport } from '../dashboard/insights'
+import { formatHourRange, primeHoursBySport, type DashboardRange } from '../dashboard/insights'
 import bolt from '../assets/figma/bolt.svg'
 
-/** The single busiest hour of day per sport, this month — the slot a turf
- *  prices its peak rate around. Read straight off each booking's own
+/** The single busiest hour of day per sport over the selected period — the slot
+ *  a turf prices its peak rate around. Read straight off each booking's own
  *  `starts_at`, not a guess. */
-export default function PrimeHoursCard() {
-  const { fromISO, toISO } = monthRange(0)
-  const bookings = useBookingsInRange(fromISO, toISO)
+export default function PrimeHoursCard({ range }: { range: DashboardRange }) {
+  const bookings = useBookingsInRange(range.fromISO, range.toISO)
   // Includes sports since retired — see SportPopularityCard.
   const sports = useSports(true)
 
@@ -26,13 +25,13 @@ export default function PrimeHoursCard() {
           <img src={bolt} alt="" className="size-5" />
           <p className="text-sm font-medium text-ink">Prime Hours by Sport</p>
         </div>
-        <span className="text-xs font-medium text-slate">This month</span>
+        <span className="text-xs font-medium text-slate">{range.label}</span>
       </div>
 
       {loading ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted">No bookings yet this month.</p>
+        <p className="text-sm text-muted">No bookings in this period.</p>
       ) : (
         <div className="flex w-full flex-col gap-3">
           {rows.map((row) => (
@@ -42,7 +41,9 @@ export default function PrimeHoursCard() {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{row.sport}</p>
-                <p className="text-xs text-muted">{row.totalBookings} bookings this month</p>
+                <p className="text-xs text-muted">
+                  {row.totalBookings} booking{row.totalBookings === 1 ? '' : 's'}
+                </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-ink">{formatHourRange(row.hour)}</p>
