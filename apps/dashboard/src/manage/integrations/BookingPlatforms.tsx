@@ -35,8 +35,8 @@ const dialectLabel = (all: DialectOut[] | undefined, slug: string) =>
  *  tells the gateway which contract to route to, so there is nothing to choose and
  *  no wrong choice to make. Read from the registry rather than hardcoded so a
  *  change to the API prefix cannot leave this screen handing out a dead URL. */
-const gatewayUrl = (all: DialectOut[] | undefined) =>
-  `${apiOrigin}${all?.[0]?.base_path ?? '/api/v1/gateway'}`
+// const gatewayUrl = (all: DialectOut[] | undefined) =>
+//   `${apiOrigin}${all?.[0]?.base_path ?? '/api/v1/gateway'}`
 
 const slugify = (name: string) =>
   name
@@ -161,15 +161,15 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
         )}
       </div>
 
-      {rows.length > 0 && <GatewayUrl url={gatewayUrl(dialects.data)} />}
+      {/* {rows.length > 0 && <GatewayUrl url={gatewayUrl(dialects.data)} />} */}
 
-      {freshKey && (
+      {/* {freshKey && (
         <FreshKeyPanel
           partner={freshKey}
           url={gatewayUrl(dialects.data)}
           onDone={() => setFreshKey(null)}
         />
-      )}
+      )} */}
 
       {adding && (
         <div className="mt-4 rounded-2xl border border-border-card bg-white p-4">
@@ -409,28 +409,28 @@ function useCopy(value: string) {
  * all of them and repeating it would imply otherwise. Which contract a request
  * reaches is decided by its API key, so this is genuinely the whole address.
  */
-function GatewayUrl({ url }: { url: string }) {
-  const { copied, copy } = useCopy(url)
+// function GatewayUrl({ url }: { url: string }) {
+//   const { copied, copy } = useCopy(url)
 
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border-card bg-surface-muted/50 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold tracking-wide text-slate uppercase">
-          Base URL — give this to every platform
-        </p>
-        <code className="mt-1 block truncate font-mono text-xs text-ink">{url}</code>
-      </div>
-      <button
-        type="button"
-        onClick={() => void copy()}
-        className="flex items-center gap-1.5 rounded-lg border border-border-input bg-white px-3 py-2 text-xs font-semibold text-ink"
-      >
-        {copied ? <Check size={12} /> : <Copy size={12} />}
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-    </div>
-  )
-}
+//   return (
+//     <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border-card bg-surface-muted/50 px-4 py-3">
+//       <div className="min-w-0 flex-1">
+//         <p className="text-[11px] font-semibold tracking-wide text-slate uppercase">
+//           Base URL — give this to every platform
+//         </p>
+//         <code className="mt-1 block truncate font-mono text-xs text-ink">{url}</code>
+//       </div>
+//       <button
+//         type="button"
+//         onClick={() => void copy()}
+//         className="flex items-center gap-1.5 rounded-lg border border-border-input bg-white px-3 py-2 text-xs font-semibold text-ink"
+//       >
+//         {copied ? <Check size={12} /> : <Copy size={12} />}
+//         {copied ? 'Copied' : 'Copy'}
+//       </button>
+//     </div>
+//   )
+// }
 
 /**
  * The one render in which the key exists.

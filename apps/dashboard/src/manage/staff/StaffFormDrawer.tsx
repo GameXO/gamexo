@@ -4,33 +4,43 @@ import Drawer from '../../ui/Drawer'
 
 const ROLES: StaffRole[] = ['admin', 'staff', 'coach']
 
+/** The editable slice of a staff record — everything else is filled by the caller. */
+export type StaffFormFields = {
+  name: string
+  phone: string
+  email: string
+  role: StaffRole
+  specialty: string
+  sportsAssigned: string[]
+}
+
 export default function StaffFormDrawer({
   member,
+  fixedRole,
   onClose,
   onSave,
 }: {
   member: StaffMember | null
+  /**
+   * Pins the role and hides the picker. The Coaches page creates coaches and
+   * nothing else, so offering the dropdown there would let a "coach" be filed
+   * as an admin from a screen that would then stop listing them.
+   */
+  fixedRole?: StaffRole
   onClose: () => void
-  onSave: (fields: {
-    name: string
-    phone: string
-    email: string
-    role: StaffRole
-    specialty: string
-    sportsAssigned: string[]
-  }) => void
+  onSave: (fields: StaffFormFields) => void
 }) {
   const [name, setName] = useState(member?.name ?? '')
   const [phone, setPhone] = useState(member?.phone ?? '')
   const [email, setEmail] = useState(member?.email ?? '')
-  const [role, setRole] = useState<StaffRole>(member?.role ?? 'staff')
+  const [role, setRole] = useState<StaffRole>(fixedRole ?? member?.role ?? 'staff')
   const [specialty, setSpecialty] = useState(member?.specialty ?? '')
 
   const canSave = name.trim().length > 1 && /^\d{10}$/.test(phone)
 
   return (
     <Drawer
-      title={member ? 'Edit staff' : 'Add staff'}
+      title={`${member ? 'Edit' : 'Add'} ${fixedRole ?? 'staff'}`}
       subtitle={member ? member.name : undefined}
       onClose={onClose}
       footer={
@@ -79,20 +89,22 @@ export default function StaffFormDrawer({
           className="rounded-lg border border-border-input bg-surface px-3 py-2.5 text-ink outline-none focus:border-ink"
         />
       </label>
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="text-slate">Role</span>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as StaffRole)}
-          className="rounded-lg border border-border-input bg-surface px-3 py-2.5 capitalize text-ink outline-none focus:border-ink"
-        >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!fixedRole && (
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-slate">Role</span>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as StaffRole)}
+            className="rounded-lg border border-border-input bg-surface px-3 py-2.5 capitalize text-ink outline-none focus:border-ink"
+          >
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {role === 'coach' && (
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-slate">Specialty</span>
