@@ -314,6 +314,9 @@ const DEFAULT_PERMISSIONS: Record<StaffRole, Permission[]> = {
   coach: ['dashboard', 'bookings'],
 }
 
+/** What a role can reach the moment its member is created. */
+export const defaultPermissionsFor = (role: StaffRole): Permission[] => DEFAULT_PERMISSIONS[role]
+
 const DEFAULT_STAFF: StaffMember[] = [
   {
     id: 'ST1',
