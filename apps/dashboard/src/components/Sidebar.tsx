@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { LogOut } from 'lucide-react'
 import { isManageView, manageItems, opsItems, primaryItems } from '../data/navigation'
 import { canManageAcademy, identityFrom } from '../auth/identity'
 import { setImpersonatedTenant } from '../auth/platform'
@@ -10,7 +11,6 @@ import bolt from '../assets/figma/bolt.svg'
 import chevronRight from '../assets/figma/chevron-right.svg'
 import helpSquareRounded from '../assets/figma/help-square-rounded.svg'
 import settings from '../assets/figma/settings.svg'
-import selectorChevron from '../assets/figma/selector-chevron.svg'
 
 export default function Sidebar({
   open,
@@ -23,7 +23,7 @@ export default function Sidebar({
   view: View
   onNavigate: (view: View) => void
 }) {
-  const { me } = useAuth()
+  const { me, logout } = useAuth()
   const identity = useMemo(() => identityFrom(me), [me])
   const [manageOpen, setManageOpen] = useState(isManageView(view))
 
@@ -190,10 +190,7 @@ export default function Sidebar({
 
             <div className="h-px w-full bg-border-soft" />
 
-            <button
-              type="button"
-              className="flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-left hover:bg-white/60"
-            >
+            <div className="flex w-full items-center gap-3 rounded-lg p-3">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-ink text-[12px] font-semibold text-lime">
                 {identity.initials}
               </div>
@@ -211,8 +208,18 @@ export default function Sidebar({
                   {identity.username || identity.roleLabel}
                 </p>
               </div>
-              <img src={selectorChevron} alt="" className="h-3 w-auto shrink-0" />
-            </button>
+              {/* Its own control rather than the whole chip: at a counter tablet a
+                  stray tap on your own name should not end the shift's session. */}
+              <button
+                type="button"
+                onClick={logout}
+                title="Sign out"
+                aria-label="Sign out"
+                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate transition-colors hover:bg-white hover:text-ink"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </nav>
       </aside>

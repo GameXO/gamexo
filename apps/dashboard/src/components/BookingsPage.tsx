@@ -29,6 +29,16 @@ const formatDate = (iso: string) =>
     year: 'numeric',
   })
 
+/**
+ * Whether the slot has already started. `startHour` is local wall-clock, so the
+ * date is composed from local parts — parsing `${date}T${hour}` as a string would
+ * read the same digits as UTC and misjudge every evening booking by the offset.
+ */
+const hasStarted = (booking: Booking) => {
+  const [y, mo, d] = booking.date.split('-').map(Number)
+  return new Date(y, mo - 1, d, booking.startHour).getTime() < Date.now()
+}
+
 export default function BookingsPage() {
   const bookingsQuery = useBookings()
   const recordPayment = useRecordPayment()
@@ -51,6 +61,8 @@ export default function BookingsPage() {
     return bookings.filter((booking) => booking.date >= lower && booking.date <= upper)
   }, [bookings, endDate, startDate, today])
 
+  // Selection only ever comes from the table now, so it always sits inside the
+  // range: narrowing the dates past the selected row re-points at the new first.
   useEffect(() => {
     if (visibleBookings.length === 0) {
       setSelectedId(null)
@@ -63,18 +75,14 @@ export default function BookingsPage() {
 
   const selectedBooking = visibleBookings.find((booking) => booking.id === selectedId) || null
 
-  const previousBookings = useMemo(() => {
-    if (!selectedBooking) return []
-    return bookings
-      .filter((booking) => booking.customer.phone === selectedBooking.customer.phone && booking.id !== selectedBooking.id)
-      .slice(0, 5)
-  }, [bookings, selectedBooking])
-
   // Customer profiles are not migrated yet, so the membership tier below still
   // comes from the local visit counter.
   const customerProfile = selectedBooking ? db.findCustomer(selectedBooking.customer.phone) : undefined
   const membershipStatus = customerProfile && customerProfile.visits >= 8 ? 'Platinum' : customerProfile && customerProfile.visits >= 4 ? 'Gold' : customerProfile && customerProfile.visits >= 2 ? 'Silver' : 'Basic'
   const outstanding = selectedBooking ? balanceOf(selectedBooking) : 0
+  // Read at render rather than on a timer: a slot that starts while this sits
+  // open locks on the next render, which any refetch or selection change brings.
+  const isPast = selectedBooking ? hasStarted(selectedBooking) : false
 
   const settleDue = () => {
     if (!selectedBooking || outstanding <= 0) return
@@ -138,9 +146,11 @@ export default function BookingsPage() {
               No bookings match the selected dates.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full overflow-hidden rounded-xl text-left text-sm">
-                <thead className="border-b border-border-card bg-surface-muted text-xs uppercase tracking-wide text-muted">
+            // Capped so a long range scrolls the list rather than stretching the
+            // card and pushing the customer panel beside it off-screen.
+            <div className="max-h-[60vh] overflow-auto rounded-xl">
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 z-10 border-b border-border-card bg-surface-muted text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-3 py-3">UID</th>
                     <th className="px-3 py-3">Name</th>
@@ -153,12 +163,22 @@ export default function BookingsPage() {
                   {visibleBookings.map((booking) => {
                     const court = courtById(booking.courtId)
                     return (
-                      <tr key={booking.id} className={`border-b border-border-card/80 last:border-none transition-colors ${rowAccent(selectedId === booking.id)}`}>
-                        <td className="px-3 py-3">
-                          <button type="button" className="text-left font-semibold text-ink" onClick={() => setSelectedId(booking.id)}>
-                            {booking.reference}
-                          </button>
-                        </td>
+                      <tr
+                        key={booking.id}
+                        onClick={() => setSelectedId(booking.id)}
+                        // The row is the target, so it also has to answer the
+                        // keyboard — it replaced a real button, which came with
+                        // focus and Enter for free.
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          setSelectedId(booking.id)
+                        }}
+                        aria-current={selectedId === booking.id ? 'true' : undefined}
+                        className={`cursor-pointer border-b border-border-card/80 last:border-none transition-colors ${rowAccent(selectedId === booking.id)}`}
+                      >
+                        <td className="px-3 py-3 font-semibold text-ink">{booking.reference}</td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col">
                             <span className="font-semibold text-ink">{booking.customer.name}</span>
@@ -206,8 +226,9 @@ export default function BookingsPage() {
                   <button
                     type="button"
                     onClick={() => setEditing(true)}
-                    title="Edit booking"
-                    className="flex size-8 items-center justify-center rounded-lg border border-border-input bg-white text-ink"
+                    disabled={isPast}
+                    title={isPast ? 'This booking has already started and can no longer be edited' : 'Edit booking'}
+                    className="flex size-8 items-center justify-center rounded-lg border border-border-input bg-white text-ink disabled:cursor-not-allowed disabled:border-border-card disabled:bg-surface-muted disabled:text-muted"
                   >
                     <Pencil size={14} />
                   </button>
@@ -261,26 +282,6 @@ export default function BookingsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
-                <p className="text-sm font-semibold text-ink">Previous bookings</p>
-                {previousBookings.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border-card px-3 py-4 text-sm text-muted">No prior bookings yet.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {previousBookings.map((booking) => (
-                      <div key={booking.id} className="rounded-lg border border-border-card bg-white px-3 py-3 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-ink">{booking.reference}</span>
-                          <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusTone(booking.payment)}`}>
-                            {paymentLabel(booking)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-slate">{formatDate(booking.date)} · {courtById(booking.courtId)?.name || booking.courtId}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-border-card px-4 py-10 text-center text-sm text-muted">

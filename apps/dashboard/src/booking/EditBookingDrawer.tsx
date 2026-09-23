@@ -37,30 +37,43 @@ export default function EditBookingDrawer({
 
   const courts = courtsQuery.data ?? []
 
+  /**
+   * Null while the schedule is half-typed. Both inputs report `value === ''`
+   * mid-edit — typing over the hour empties the whole time field for a
+   * keystroke — and parsing that yields an Invalid Date, which `toISOString`
+   * throws on rather than returning something the form could recover from.
+   */
+  const startsAt = useMemo(() => {
+    const [y, mo, d] = date.split('-').map(Number)
+    const [hh, mm] = time.split(':').map(Number)
+    if (![y, mo, d, hh, mm].every(Number.isFinite)) return null
+    // Built from local parts, then serialised with the browser's offset. Composing
+    // the string by hand would send a local wall-clock time as if it were UTC and
+    // silently move every evening booking by the timezone offset.
+    const at = new Date(y, mo - 1, d, hh, mm)
+    return Number.isNaN(at.getTime()) ? null : at.toISOString()
+  }, [date, time])
+
   /** Only what actually changed, so untouched fields are never sent. */
   const changes = useMemo(() => {
     const out: Parameters<typeof update.mutateAsync>[0] = { bookingId: booking.id }
     if (courtId !== booking.courtId) out.courtId = courtId
 
     const originalTime = `${String(booking.startHour).padStart(2, '0')}:00`
-    if (date !== booking.date || time !== originalTime) {
-      // Built from local parts, then serialised with the browser's offset. Composing
-      // the string by hand would send a local wall-clock time as if it were UTC and
-      // silently move every evening booking by the timezone offset.
-      const [hh, mm] = time.split(':').map(Number)
-      const [y, mo, d] = date.split('-').map(Number)
-      out.startsAt = new Date(y, mo - 1, d, hh, mm).toISOString()
-    }
+    if (startsAt && (date !== booking.date || time !== originalTime)) out.startsAt = startsAt
     if (durationMin !== Math.round(booking.hours * 60)) out.durationMin = durationMin
     if (name.trim() !== booking.customer.name) out.customerName = name.trim()
     if (phone.trim() !== booking.customer.phone) out.customerPhone = phone.trim()
     return out
     // `update.mutateAsync` appears above only inside a `typeof`, which is erased at
     // compile time — it is not a runtime dependency of this memo.
-  }, [booking, courtId, date, time, durationMin, name, phone])
+  }, [booking, courtId, date, time, startsAt, durationMin, name, phone])
 
   const dirty = Object.keys(changes).length > 1 // bookingId is always present
   const nameOk = name.trim().length > 0
+  // Saving past a half-typed schedule would quietly drop the reschedule and
+  // write the other edits, so the whole form waits for it.
+  const scheduleOk = startsAt !== null
   const reprices = ['courtId', 'startsAt', 'durationMin'].some((k) => k in changes)
 
   const save = async () => {
@@ -99,7 +112,7 @@ export default function EditBookingDrawer({
             <button
               type="button"
               onClick={save}
-              disabled={!dirty || !nameOk || update.isPending}
+              disabled={!dirty || !nameOk || !scheduleOk || update.isPending}
               className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-ink text-sm font-medium text-bone disabled:opacity-40"
             >
               {update.isPending && <Loader2 size={15} className="animate-spin" />}
@@ -147,6 +160,7 @@ export default function EditBookingDrawer({
           />
         </Field>
       </div>
+      {!scheduleOk && <p className="text-xs text-amber-700">Enter a date and a start time.</p>}
 
       <Field label="Duration">
         <select
