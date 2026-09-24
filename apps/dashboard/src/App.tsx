@@ -139,7 +139,21 @@ function Shell() {
       <SportCourtBridge />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} view={view} onNavigate={navigate} />
 
-      <div className="flex h-screen flex-1 flex-col overflow-hidden border-l border-[#ebf0f4]">
+      {/* `[&>*]:min-h-0` is load-bearing, not tidying.
+       *
+       * Every page in here is `flex-1 … overflow-y-auto` and expects to scroll
+       * inside this fixed-height, overflow-hidden column. A flex item defaults to
+       * `min-height: auto`, which refuses to shrink below its content — so a page
+       * taller than the viewport grows instead of scrolling, `overflow-y-auto`
+       * never activates, and this container simply clips whatever did not fit.
+       * The bottom of a long table just disappears, with no scrollbar to say so.
+       *
+       * Applied here rather than as `min-h-0` on each of the twenty-odd page
+       * roots, because the constraint that causes it — `h-screen` plus
+       * `overflow-hidden` — lives here, and a per-page fix is one every new page
+       * has to remember. The Header is `h-[72px] shrink-0`, so this is inert on it.
+       */}
+      <div className="flex h-screen flex-1 flex-col overflow-hidden border-l border-[#ebf0f4] [&>*]:min-h-0">
         {view === 'dashboard' && (
           <>
             <Header

@@ -1,304 +1,402 @@
-import { useEffect, useState } from 'react'
-import { Banknote, Check, CreditCard, Smartphone, Wallet, X } from 'lucide-react'
-import { PAYMENT_METHODS, SPORTS, money, toISO } from '../data/booking'
-import { batchesForProgram, coachesForSport, programsForSport, type Student } from '../data/academy'
-import * as db from '../lib/db'
-
-const METHOD_ICON: Record<string, typeof Smartphone> = { upi: Smartphone, card: CreditCard, cash: Banknote, wallet: Wallet }
+/**
+ * Enrol a student in a batch, against the API.
+ *
+ * Three things this screen has to get right, all of them about being refused:
+ *
+ *   **A payer is required.** The API allows a student with no linked customer,
+ *   and the fee invoice then belongs to nobody and never shows on a family's
+ *   balance. Rather than loosening the server, the wizard insists here — find
+ *   the customer by phone or create one.
+ *
+ *   **Date of birth is required** whenever the chosen programme has an age band,
+ *   because the server refuses without it. Asked for up front, not discovered at
+ *   submit.
+ *
+ *   **An age refusal is not a generic error.** It comes back as a 400 carrying
+ *   `student_age`, `age_min` and `age_max`, and it means "this is the wrong
+ *   batch for this child" — so it is rendered as guidance with the programmes
+ *   that *would* fit, not as a red toast that leaves staff stuck.
+ */
+import { useEffect, useMemo, useState } from 'react'
+import { Check, Loader2, X } from 'lucide-react'
+import {
+  DURATION_LABEL,
+  PLAN_DURATIONS,
+  ageBoundsFor,
+  useBatches,
+  useCreateCustomer,
+  useCreateStudent,
+  useCustomers,
+  useEnrolStudent,
+  useProgramsList,
+  useSports,
+  useStudents,
+  type PlanDuration,
+  type ProgramOut,
+} from '../api/hooks'
+import { ApiError } from '../api/client'
 
 const inputClass =
   'w-full rounded-lg border border-border-input bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none'
 
-export default function EnrollWizard({ onClose, onEnrolled }: { onClose: () => void; onEnrolled: () => void }) {
-  const [step, setStep] = useState(1)
+const rupees = (n: number) =>
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+
+/** Age on a given day, computed the same way the server does it. */
+function ageOn(dob: string, on: Date): number | null {
+  if (!dob) return null
+  const born = new Date(dob)
+  if (Number.isNaN(born.getTime())) return null
+  let age = on.getFullYear() - born.getFullYear()
+  const before =
+    on.getMonth() < born.getMonth() ||
+    (on.getMonth() === born.getMonth() && on.getDate() < born.getDate())
+  return before ? age - 1 : age
+}
+
+export default function EnrollWizard({
+  onClose,
+  onEnrolled,
+}: {
+  onClose: () => void
+  onEnrolled: () => void
+}) {
+  // Includes retired sports: this filters programmes that already exist, and a
+  // programme for a retired sport is still enrollable.
+  const { data: sports } = useSports(true)
+  const { data: programs } = useProgramsList()
+  const { data: batches } = useBatches()
+  const { data: studentPage } = useStudents()
+
   const [phone, setPhone] = useState('')
+  const { data: customerPage } = useCustomers(phone.length >= 4 ? phone : undefined)
+
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [sportId, setSportId] = useState(SPORTS[0].id)
+  const [dob, setDob] = useState('')
+  const [parentName, setParentName] = useState('')
+  const [sportId, setSportId] = useState('')
   const [programId, setProgramId] = useState('')
   const [batchId, setBatchId] = useState('')
-  const [coachId, setCoachId] = useState('')
-  const [method, setMethod] = useState('upi')
-  const [success, setSuccess] = useState<Student | null>(null)
+  const [duration, setDuration] = useState<PlanDuration>('3m')
+
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [ageRefusal, setAgeRefusal] = useState<{ age: number; min: number; max: number } | null>(null)
+  const [done, setDone] = useState<{ invoiceNo: string; total: string; warning: string | null } | null>(
+    null,
+  )
 
   const phoneOk = /^\d{10}$/.test(phone)
-  const modes = db.getPaymentModes()
-  const availableMethods = PAYMENT_METHODS.filter((m) => modes[m.id] !== false)
+  const match = (customerPage?.items ?? []).find((c) => c.phone === phone)
 
   useEffect(() => {
-    if (!phoneOk) return
-    const match = db.findCustomer(phone)
-    if (match) {
-      setName(match.name)
-      setEmail(match.email)
+    if (match) setName((prev) => prev || match.name)
+  }, [match])
+
+  const sportPrograms = useMemo(
+    () => (programs ?? []).filter((p) => !sportId || p.sport_id === sportId),
+    [programs, sportId],
+  )
+  const program = sportPrograms.find((p) => p.id === programId) ?? null
+  const programBatches = (batches ?? []).filter((b) => b.program_id === program?.id)
+  const batch = programBatches.find((b) => b.id === batchId) ?? programBatches[0] ?? null
+
+  const bounds = program ? ageBoundsFor(program) : null
+  const age = ageOn(dob, new Date())
+  /** Warn before submitting, but never block — the server is the authority, and
+   *  the term may start after a birthday that changes the answer. */
+  const ageLooksWrong = bounds && age != null && (age < bounds[0] || age > bounds[1])
+
+  const sellable = program
+    ? PLAN_DURATIONS.filter((d) => Number(program[`fee_${d}` as keyof ProgramOut] ?? 0) > 0)
+    : []
+
+  /** Programmes that would admit this child, for when one refuses them. */
+  const alternatives = useMemo(() => {
+    if (age == null) return []
+    return (programs ?? []).filter((p) => {
+      if (sportId && p.sport_id !== sportId) return false
+      const b = ageBoundsFor(p)
+      return b === null || (age >= b[0] && age <= b[1])
+    })
+  }, [programs, sportId, age])
+
+  const createCustomer = useCreateCustomer()
+  const createStudent = useCreateStudent()
+  const enrol = useEnrolStudent()
+
+  const submit = async () => {
+    if (!batch) return
+    setError(null)
+    setAgeRefusal(null)
+    setBusy(true)
+    try {
+      // A payer first, so the fee invoice always lands on somebody's account.
+      const customer = match ?? (await createCustomer.mutateAsync({ name: name.trim(), phone }))
+
+      // Reuse a student record for this customer if one already exists, rather
+      // than creating a duplicate every term.
+      const existing = (studentPage?.items ?? []).find(
+        (s) => s.name.toLowerCase() === name.trim().toLowerCase(),
+      )
+      const student =
+        existing ??
+        (await createStudent.mutateAsync({
+          name: name.trim(),
+          parent_name: parentName.trim() || null,
+          phone,
+          date_of_birth: dob || null,
+          customer_id: customer.id,
+        }))
+
+      const result = await enrol.mutateAsync({
+        student_id: student.id,
+        batch_id: batch.id,
+        duration,
+      })
+      setDone({
+        invoiceNo: result.invoice_no,
+        total: String(result.invoice_total),
+        warning: result.level_warning ?? null,
+      })
+      onEnrolled()
+    } catch (err) {
+      const details = err instanceof ApiError ? (err.details as Record<string, unknown>) : undefined
+      if (details && typeof details.student_age === 'number') {
+        setAgeRefusal({
+          age: details.student_age as number,
+          min: details.age_min as number,
+          max: details.age_max as number,
+        })
+      } else if (details && details.field === 'date_of_birth') {
+        setError('This programme has an age limit, so it needs the student’s date of birth.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not complete this enrolment.')
+      }
+    } finally {
+      setBusy(false)
     }
-  }, [phone, phoneOk])
-
-  const programs = programsForSport(sportId)
-  const program = programs.find((p) => p.id === programId) || programs[0]
-  const batches = program ? batchesForProgram(program.id) : []
-  const batch = batches.find((b) => b.id === batchId) || batches[0]
-  const coaches = coachesForSport(sportId)
-  const coach = coaches.find((c) => c.id === coachId) || coaches[0]
-
-  const canNext = step === 1 ? phoneOk && name.trim().length > 1 : step === 2 ? !!program : step === 3 ? !!batch : true
-
-  const confirm = () => {
-    if (!program || !batch) return
-    const id = `AC${Math.floor(10000 + Math.random() * 89999)}`
-    const record: Student = {
-      id,
-      customer: { name: name.trim(), phone, email },
-      sportId,
-      programId: program.id,
-      batchId: batch.id,
-      coachId: coach?.id || '',
-      startDate: toISO(new Date()),
-      fee: program.fee,
-      gst: program.gst,
-      total: program.total,
-      paidTotal: program.total,
-      status: 'active',
-      sessionsAttended: 0,
-      createdAt: new Date().toISOString(),
-    }
-    db.saveStudent(record)
-    db.upsertCustomer({ name: record.customer.name, phone, email })
-    setSuccess(record)
   }
 
+  const ready = phoneOk && name.trim().length > 1 && !!batch && sellable.length > 0
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
+      <aside
+        className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-[520px] flex-col gap-5 overflow-y-auto rounded-2xl bg-white p-6"
       >
-        {success ? (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-lime">
-              <Check size={24} className="text-lime-ink" />
+        <header className="flex items-start justify-between gap-4 border-b border-border-card px-5 py-4">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-ink">Enrol a student</h2>
+            <p className="mt-0.5 text-sm text-slate">Creates the place and its fee invoice together.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-muted">
+            <X size={18} />
+          </button>
+        </header>
+
+        {done ? (
+          <div className="flex flex-col gap-4 px-5 py-6">
+            <div className="flex items-center gap-2 text-positive">
+              <Check size={18} />
+              <p className="font-medium">Enrolled</p>
             </div>
-            <div>
-              <p className="text-lg font-semibold text-ink">Enrolled</p>
-              <p className="mt-1 text-sm text-slate">
-                {program?.name} · {batch?.days} · {batch?.time}
-              </p>
-            </div>
+            <p className="text-sm text-slate">
+              Invoice <span className="font-medium text-ink">{done.invoiceNo}</span> raised for{' '}
+              {rupees(Number(done.total))}.
+            </p>
+            {done.warning && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {done.warning}
+              </div>
+            )}
             <button
               type="button"
-              onClick={() => {
-                onEnrolled()
-                onClose()
-              }}
-              className="flex h-11 items-center justify-center rounded-full px-8 text-sm text-[#fefefe]"
-              style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+              onClick={onClose}
+              className="mt-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white"
             >
               Done
             </button>
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <p className="text-lg font-semibold text-ink">Enroll student</p>
-              <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
-                <X size={20} />
-              </button>
-            </div>
+          <div className="flex flex-col gap-5 px-5 py-5">
+            <section className="flex flex-col gap-3">
+              <p className="text-[13px] font-medium text-ink">Who is paying</p>
+              <input
+                className={inputClass}
+                placeholder="Phone (10 digits)"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              />
+              {match && (
+                <p className="text-xs text-positive">
+                  Existing customer — {match.name}. The fee will go on their account.
+                </p>
+              )}
+              <input
+                className={inputClass}
+                placeholder="Student's full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <input
+                className={inputClass}
+                placeholder="Parent / guardian (optional)"
+                value={parentName}
+                onChange={(e) => setParentName(e.target.value)}
+              />
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs text-slate">
+                  Date of birth
+                  {bounds && <span className="text-amber-700"> — required for this programme</span>}
+                </span>
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                />
+                {age != null && <span className="text-xs text-muted">{age} years old today</span>}
+              </label>
+            </section>
 
-            <div className="flex items-center gap-2">
-              {['Student', 'Program', 'Batch', 'Payment'].map((label, i) => (
-                <div key={label} className="flex flex-1 items-center gap-2">
-                  <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                      i + 1 <= step ? 'bg-lime text-lime-ink' : 'bg-surface-muted text-muted'
-                    }`}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className={`hidden text-xs sm:inline ${i + 1 === step ? 'text-ink' : 'text-muted'}`}>{label}</span>
-                  {i < 3 && <span className="h-px flex-1 bg-border-card" />}
-                </div>
-              ))}
-            </div>
+            <section className="flex flex-col gap-3">
+              <p className="text-[13px] font-medium text-ink">Programme</p>
+              <select
+                className={inputClass}
+                value={sportId}
+                onChange={(e) => {
+                  setSportId(e.target.value)
+                  setProgramId('')
+                  setBatchId('')
+                }}
+              >
+                <option value="">All sports</option>
+                {(sports ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
 
-            {step === 1 && (
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Phone number</span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">+91</span>
-                    <input
-                      className={`${inputClass} pl-11`}
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="90000 00000"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    />
-                  </div>
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Name</span>
-                  <input className={inputClass} placeholder="Student's name" value={name} onChange={(e) => setName(e.target.value)} />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Email (optional)</span>
-                  <input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
-              </div>
-            )}
+              <select
+                className={inputClass}
+                value={programId}
+                onChange={(e) => {
+                  setProgramId(e.target.value)
+                  setBatchId('')
+                }}
+              >
+                <option value="">Choose a programme…</option>
+                {sportPrograms.map((p) => {
+                  const b = ageBoundsFor(p)
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {b ? ` (ages ${b[0]}–${b[1]})` : ''}
+                    </option>
+                  )
+                })}
+              </select>
 
-            {step === 2 && (
-              <div className="flex flex-col gap-4">
+              {ageLooksWrong && bounds && (
+                <p className="text-xs text-amber-700">
+                  {name || 'This student'} is {age}. This programme takes {bounds[0]}–{bounds[1]}.
+                </p>
+              )}
+
+              {program && (
+                <select
+                  className={inputClass}
+                  value={batch?.id ?? ''}
+                  onChange={(e) => setBatchId(e.target.value)}
+                >
+                  {programBatches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {[b.name, b.schedule, b.time_label].filter(Boolean).join(' · ')} — {b.enrolled ?? 0}/
+                      {b.capacity}
+                    </option>
+                  ))}
+                  {programBatches.length === 0 && <option value="">No batches scheduled</option>}
+                </select>
+              )}
+
+              {program && sellable.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {SPORTS.map((s) => (
+                  {sellable.map((d) => (
                     <button
-                      key={s.id}
+                      key={d}
                       type="button"
-                      onClick={() => {
-                        setSportId(s.id)
-                        setProgramId('')
-                      }}
-                      className={`rounded-full px-4 py-2 text-sm transition-colors ${
-                        sportId === s.id ? 'bg-ink text-bone' : 'bg-surface-muted text-slate'
+                      onClick={() => setDuration(d)}
+                      className={`rounded-full px-3 py-1.5 text-sm ${
+                        duration === d ? 'bg-ink text-white' : 'border border-border-card text-slate'
                       }`}
                     >
-                      {s.name}
+                      {DURATION_LABEL[d]}{' '}
+                      {rupees(Number(program[`fee_${d}` as keyof ProgramOut]))}
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {programs.map((p) => {
-                    const active = program?.id === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setProgramId(p.id)}
-                        className={`flex flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-colors ${
-                          active ? 'border-ink bg-ink text-bone' : 'border-border-card bg-white text-ink'
-                        }`}
-                      >
-                        <span className="text-sm font-semibold">{p.name}</span>
-                        <span className="text-lg font-semibold">{money(p.total)}/mo</span>
-                        <span className={`text-xs ${active ? 'text-bone/70' : 'text-muted'}`}>
-                          {p.sessionsPerWeek}x/week · {p.blurb}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+              )}
 
-            {step === 3 && (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate">Batch</span>
-                  {batches.map((b) => {
-                    const active = batch?.id === b.id
-                    const enrolled = db.studentsInBatch(b.id).length
-                    return (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={() => setBatchId(b.id)}
-                        className={`flex items-center justify-between rounded-lg border px-3.5 py-2.5 text-left transition-colors ${
-                          active ? 'border-ink bg-surface-muted' : 'border-border-card bg-white'
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm text-ink">{b.days}</p>
-                          <p className="text-xs text-muted">{b.time}</p>
-                        </div>
-                        <span className="text-xs text-muted">
-                          {enrolled}/{b.capacity}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+              {program && sellable.length === 0 && (
+                <p className="text-xs text-amber-700">
+                  This programme has no term priced, so it can't be enrolled into.
+                </p>
+              )}
+            </section>
 
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate">Coach</span>
-                  <div className="flex flex-wrap gap-2">
-                    {coaches.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setCoachId(c.id)}
-                        className={`rounded-full px-4 py-2 text-sm transition-colors ${
-                          (coach?.id || coaches[0]?.id) === c.id ? 'bg-ink text-bone' : 'bg-surface-muted text-slate'
-                        }`}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                    {coaches.length === 0 && <p className="text-sm text-muted">No coach on staff yet.</p>}
+            {ageRefusal && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-medium text-amber-900">Wrong age group</p>
+                <p className="mt-1 text-sm text-amber-900">
+                  {name || 'This student'} is {ageRefusal.age} at the start of this term, and this
+                  programme takes {ageRefusal.min}–{ageRefusal.max}.
+                </p>
+                {alternatives.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-amber-900">These would fit:</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {alternatives.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setProgramId(p.id)
+                            setBatchId('')
+                            setAgeRefusal(null)
+                          }}
+                          className="rounded-full border border-amber-400 bg-white px-2.5 py-1 text-xs text-amber-900"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
-            {step === 4 && (
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {availableMethods.map((m) => {
-                    const Icon = METHOD_ICON[m.id]
-                    const active = method === m.id
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMethod(m.id)}
-                        className={`flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                          active ? 'border-ink bg-ink text-bone' : 'border-border-card bg-white text-ink'
-                        }`}
-                      >
-                        <Icon size={16} /> {m.name}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center justify-between border-t border-border-card pt-3">
-                  <span className="text-sm text-slate">First month due</span>
-                  <span className="text-lg font-semibold text-ink">{money(program?.total || 0)}</span>
-                </div>
+            {error && (
+              <div className="rounded-lg border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+                {error}
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2">
-              {step > 1 ? (
-                <button type="button" onClick={() => setStep((s) => s - 1)} className="text-sm text-slate hover:text-ink">
-                  Back
-                </button>
-              ) : (
-                <span />
-              )}
-              {step < 4 ? (
-                <button
-                  type="button"
-                  disabled={!canNext}
-                  onClick={() => setStep((s) => s + 1)}
-                  className="flex h-10 items-center justify-center rounded-full px-6 text-sm text-[#fefefe] disabled:opacity-40"
-                  style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={confirm}
-                  className="flex h-10 items-center justify-center rounded-full px-6 text-sm text-[#fefefe]"
-                  style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-                >
-                  Confirm &amp; charge {money(program?.total || 0)}
-                </button>
-              )}
-            </div>
-          </>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!ready || busy}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+            >
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              Enrol and raise fee
+            </button>
+          </div>
         )}
-      </div>
+      </aside>
     </div>
   )
 }

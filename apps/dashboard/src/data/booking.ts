@@ -16,6 +16,10 @@ export type Sport = {
   fieldsLabel: string
   from: number
   image: string
+  /** Undefined for the static mock rows below, which are all offered. Carried
+   *  from the API so a picker can label a retired sport rather than omitting it
+   *  and silently blanking whatever was attached to it. */
+  isActive?: boolean
 }
 
 export const SPORTS: Sport[] = [

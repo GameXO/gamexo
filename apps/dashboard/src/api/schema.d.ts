@@ -89,6 +89,10 @@ export interface paths {
         /**
          * Enrol a student in a batch
          * @description Creates the enrolment and its fee invoice in one transaction, and refuses with **409** if the batch is already at capacity. Occupancy is counted from live enrolments, not a stored column that could disagree.
+         *
+         *     Refuses with **400** if the student's age at the start of the term falls outside the programme's band, or if the programme is age-banded and the student has no date of birth on file. Programmes with no band set admit any age.
+         *
+         *     A batch above the student's assessed level is **allowed** and comes back with `level_warning` set — that call belongs to the coach, not to us.
          */
         post: operations["academy_createEnrollment"];
         delete?: never;
@@ -159,7 +163,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List sessions */
+        /**
+         * List sessions
+         * @description Readable by the **counter tablet**, which needs today's classes in order to take a register. Deliberately the weakest guard in this module — see `POST /sessions/{session_id}/attendance` for why the register, and only the register, is reachable from the kiosk.
+         */
         get: operations["academy_listSessions"];
         put?: never;
         /** Schedule a session */
@@ -200,8 +207,34 @@ export interface paths {
         /**
          * Mark attendance for a session
          * @description Marks a whole batch in one call, the way a register is actually taken. Re-marking a student updates their existing row rather than adding a second one — a duplicate would double-count them in every percentage.
+         *
+         *     **Reachable by the counter tablet.** Taking a register is the one academy action that genuinely belongs on a shared device at the door, and the worst a leaked kiosk credential does here is mis-mark a child present. Enrolling students, moving them up a level and anything touching fees stay at reception and above, where the login names a person.
          */
         post: operations["academy_markAttendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/sessions/{session_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone in this class, and how they are marked
+         * @description What the counter tablet needs to take a register: every student actively enrolled in the session's batch, each with their mark if one has been recorded and `null` if not.
+         *
+         *     Distinct from `GET /sessions/{session_id}/attendance`, which returns only the rows that exist — empty for a class nobody has marked yet, and therefore useless as the thing you tick down.
+         *
+         *     Readable by the **kiosk**, and scoped to one class: it gives the tablet the names of the children in front of it and nothing else. Listing the academy's students stays at reception and above.
+         */
+        get: operations["academy_sessionRoster"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -261,6 +294,52 @@ export interface paths {
         get: operations["academy_studentEnrollments"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/students/{student_id}/levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a student stands, per sport
+         * @description One row per sport the student has been assessed in. A sport that is missing has simply never been assessed — it is not the same as beginner.
+         */
+        get: operations["academy_listStudentLevels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/students/{student_id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A student's movements on the ladder
+         * @description Newest first. Includes demotions and re-assessments at the same level.
+         */
+        get: operations["academy_listStudentPromotions"];
+        put?: never;
+        /**
+         * Assess a student at a level
+         * @description Records the new standing and the move that produced it, in one write. Works for a first assessment (`from_level` comes back null), a promotion, a demotion, and a re-assessment at the level they are already at — a review that confirms the status quo is still a review worth keeping.
+         *
+         *     Manager and above: moving a child up a level changes who they train with.
+         */
+        post: operations["academy_promoteStudent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1470,6 +1549,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/memberships/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Is this person a member?
+         * @description The counter's question, and the only membership endpoint the **kiosk** can reach. Matches a member number or the customer's phone, and answers with status and expiry — never with money, and never with a list.
+         *
+         *     Selling and renewing stay at reception and above: the shared tablet login is the most exposed credential in the venue, and taking payment for a twelve-month membership is not something it should be able to do. A **404** here means no membership, which is a complete answer.
+         */
+        get: operations["finance_checkMembership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/memberships/{subscription_id}": {
         parameters: {
             query?: never;
@@ -1513,7 +1614,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pause a membership */
+        /**
+         * Pause a membership
+         * @description Parks the membership without consuming the paid term: the days spent paused are given back on resume, so the expiry moves out by however long it was parked. Reversible with `POST /memberships/{id}/resume`.
+         */
         post: operations["finance_pauseMembership"];
         delete?: never;
         options?: never;
@@ -1535,6 +1639,26 @@ export interface paths {
          * @description A membership renewed before it lapses continues from its current expiry date, so an early renewer does not forfeit days they already paid for.
          */
         post: operations["finance_renewMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memberships/{subscription_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume a paused membership
+         * @description Returns a paused membership to active and extends its expiry by the number of days it spent paused. The running total is on `paused_days_total`, so a member asking why their year now ends in February can be shown the answer.
+         */
+        post: operations["finance_resumeMembership"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2967,6 +3091,18 @@ export interface components {
             total_spots: number;
         };
         /**
+         * AgeBand
+         * @description Who a programme is for. Enforced at enrolment against the student's DOB.
+         *
+         *     Two states, not a spectrum: an academy runs a kids' programme and an adults'
+         *     programme, and the thing staff need at the counter is which of the two a child
+         *     belongs in. The actual boundary lives in `age_min`/`age_max` beside this,
+         *     because "kids" is 5–16 at one academy and 4–12 at another — this names the
+         *     group, those enforce it.
+         * @enum {string}
+         */
+        AgeBand: "kids" | "adults";
+        /**
          * AttendanceBulkMark
          * @description Reception marks a whole batch at once, not one student at a time.
          */
@@ -4286,6 +4422,8 @@ export interface components {
             invoice_no: string;
             /** Invoice Total */
             invoice_total: string;
+            /** Level Warning */
+            level_warning?: string | null;
         };
         /**
          * EquipmentCondition
@@ -4840,6 +4978,30 @@ export interface components {
          * @enum {string}
          */
         MemberType: "member" | "non-member";
+        /**
+         * MembershipCheck
+         * @description What the counter is allowed to learn about a membership.
+         *
+         *     Status and dates, never money. The question at the door is "is this person a
+         *     member today", and answering it needs nothing about what they paid — so the
+         *     shared tablet credential cannot read that even if it is leaked.
+         */
+        MembershipCheck: {
+            /** Customer Name */
+            customer_name: string;
+            /** Days Left */
+            days_left: number;
+            /**
+             * Expiry Date
+             * Format: date
+             */
+            expiry_date: string;
+            /** Member No */
+            member_no: string;
+            /** Plan Name */
+            plan_name: string;
+            status: components["schemas"]["SubscriptionStatus"];
+        };
         /** MembershipPlanCreate */
         MembershipPlanCreate: {
             /** Benefits */
@@ -5807,8 +5969,13 @@ export interface components {
         };
         /** ProgramCreate */
         ProgramCreate: {
+            age_band?: components["schemas"]["AgeBand"] | null;
             /** Age Group */
             age_group?: string | null;
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
             /** Coach Id */
@@ -5857,13 +6024,19 @@ export interface components {
             session_duration?: string | null;
             /** Session Freq */
             session_freq?: string | null;
+            skill_level?: components["schemas"]["SkillLevel"] | null;
             /** Sport Id */
             sport_id?: string | null;
         };
         /** ProgramOut */
         ProgramOut: {
+            age_band?: components["schemas"]["AgeBand"] | null;
             /** Age Group */
             age_group?: string | null;
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
             /** Coach Id */
@@ -5917,13 +6090,19 @@ export interface components {
             session_duration?: string | null;
             /** Session Freq */
             session_freq?: string | null;
+            skill_level?: components["schemas"]["SkillLevel"] | null;
             /** Sport Id */
             sport_id?: string | null;
         };
         /** ProgramUpdate */
         ProgramUpdate: {
+            age_band?: components["schemas"]["AgeBand"] | null;
             /** Age Group */
             age_group?: string | null;
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
             /** Coach Id */
@@ -5954,8 +6133,53 @@ export interface components {
             session_duration?: string | null;
             /** Session Freq */
             session_freq?: string | null;
+            skill_level?: components["schemas"]["SkillLevel"] | null;
             /** Sport Id */
             sport_id?: string | null;
+        };
+        /** PromotionCreate */
+        PromotionCreate: {
+            /** Assessed By */
+            assessed_by?: string | null;
+            /** Assessed On */
+            assessed_on?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Sport Id
+             * Format: uuid
+             */
+            sport_id: string;
+            to_level: components["schemas"]["SkillLevel"];
+        };
+        /** PromotionOut */
+        PromotionOut: {
+            /** Assessed By */
+            assessed_by: string | null;
+            /**
+             * Assessed On
+             * Format: date
+             */
+            assessed_on: string;
+            from_level: components["schemas"]["SkillLevel"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Sport Id
+             * Format: uuid
+             */
+            sport_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            to_level: components["schemas"]["SkillLevel"];
         };
         /**
          * ProviderConfigOut
@@ -6196,6 +6420,27 @@ export interface components {
          * @enum {string}
          */
         Role: "admin" | "manager" | "reception" | "kiosk";
+        /**
+         * RosterEntry
+         * @description One student on a session's register, with their mark if one exists.
+         *
+         *     Built for the counter tablet, which needs the *roster* — everyone enrolled in
+         *     the batch — not the attendance rows, which only exist for students already
+         *     marked. A fresh session has no attendance rows at all, so a register built
+         *     from those would show an empty class.
+         */
+        RosterEntry: {
+            /** Note */
+            note?: string | null;
+            status?: components["schemas"]["AttendanceStatus"] | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+        };
         /**
          * RoutingUpdate
          * @description Which surfaces this gateway collects for.
@@ -6512,6 +6757,16 @@ export interface components {
          * @enum {string}
          */
         SignupStatus: "draft" | "awaiting_payment" | "provisioning" | "completed" | "failed";
+        /**
+         * SkillLevel
+         * @description The progression ladder a student climbs, per sport.
+         *
+         *     Ordered — `LEVEL_ORDER` below turns it into something comparable, so "is this a
+         *     promotion or a demotion" is a question the code can answer rather than a label
+         *     someone types.
+         * @enum {string}
+         */
+        SkillLevel: "beginner" | "intermediate" | "advanced";
         /** SkillScore */
         SkillScore: {
             /** Name */
@@ -6858,6 +7113,23 @@ export interface components {
              */
             total_fee?: string;
         };
+        /**
+         * StudentLevelOut
+         * @description A student's standing in one sport.
+         */
+        StudentLevelOut: {
+            /**
+             * Assessed On
+             * Format: date
+             */
+            assessed_on: string;
+            level: components["schemas"]["SkillLevel"];
+            /**
+             * Sport Id
+             * Format: uuid
+             */
+            sport_id: string;
+        };
         /** StudentOut */
         StudentOut: {
             /** Achievements */
@@ -6974,8 +7246,15 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Joined On
+             * Format: date
+             */
+            joined_on: string;
             /** Member No */
             member_no: string;
+            /** Paused Days Total */
+            paused_days_total: number;
             /** Plan Color */
             plan_color: string | null;
             /**
@@ -7786,6 +8065,37 @@ export interface operations {
             };
         };
     };
+    academy_sessionRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RosterEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     academy_listStudents: {
         parameters: {
             query?: {
@@ -7940,6 +8250,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnrollmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_listStudentLevels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentLevelOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_listStudentPromotions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_promoteStudent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionOut"];
                 };
             };
             /** @description Validation Error */
@@ -10417,6 +10824,38 @@ export interface operations {
             };
         };
     };
+    finance_checkMembership: {
+        parameters: {
+            query: {
+                /** @description Member number or phone */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     finance_getMembership: {
         parameters: {
             query?: never;
@@ -10532,6 +10971,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionWithInvoice"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finance_resumeMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subscription_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
                 };
             };
             /** @description Validation Error */

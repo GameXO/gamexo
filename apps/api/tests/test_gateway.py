@@ -14,9 +14,37 @@ from httpx import AsyncClient
 from sqlalchemy import text
 
 from tests.conftest import TenantFixture
-from tests.test_booking import at, book, setup_academy
+from tests.test_booking import book, setup_academy
 
 IST = ZoneInfo("Asia/Kolkata")
+
+
+def _next_month() -> tuple[int, int]:
+    """The month after this one, so every day-of-month below is still ahead."""
+    today = datetime.now(IST).date()
+    return (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
+
+
+_YEAR, _MONTH = _next_month()
+
+
+def at(day: int, hour: int, minute: int = 0) -> str:
+    """`test_booking.at()`, shifted into next month.
+
+    Same signature and the same day-numbering, so the tests below keep using
+    distinct days to stay out of each other's way — only the month moves. The
+    booking suite pins its calendar to September 2026 because it asserts on
+    specific weekdays and peak windows; nothing in this file does, and every
+    partner call here creates a hold or a booking, which the gateway correctly
+    refuses for a slot that has already happened. Pinned, these tests passed
+    until the wall clock caught up with them and then failed on an empty
+    response body.
+    """
+    return datetime(_YEAR, _MONTH, day, hour, minute, tzinfo=IST).isoformat()
+
+
+#: The same month, as a bare date, for availability queries.
+DAY = f"{_YEAR:04d}-{_MONTH:02d}-04"
 
 
 async def make_partner(
@@ -638,7 +666,7 @@ async def test_a_key_used_against_another_dialects_canonical_path_is_refused(
 
     wrong_way = await client.get(
         "/api/v1/gateway/playo/availability",
-        params={"date": "2026-09-04"},
+        params={"date": DAY},
         headers=native_partner["headers"],
     )
     assert wrong_way.status_code == 401
@@ -767,7 +795,7 @@ async def test_one_url_reaches_each_platforms_own_contract(
             "userName": "Theirs",
             "orders": [
                 {
-                    "date": "2026-09-04",
+                    "date": DAY,
                     "courtId": ctx["court_2"],
                     "startTime": "07:00:00",
                     "endTime": "08:00:00",
@@ -810,7 +838,7 @@ async def test_the_one_shared_path_still_answers_in_each_platforms_shape(
 
     theirs_response = await client.get(
         "/api/v1/gateway/availability",
-        params={"date": "2026-09-11"},
+        params={"date": f"{_YEAR:04d}-{_MONTH:02d}-11"},
         headers=theirs["headers"],
     )
     assert theirs_response.status_code == 200, theirs_response.text
@@ -883,7 +911,7 @@ async def test_repointing_a_partner_takes_effect_on_the_next_call(
         "userName": "Theirs",
         "orders": [
             {
-                "date": "2026-09-04",
+                "date": DAY,
                 "courtId": ctx["court_1"],
                 "startTime": "11:00:00",
                 "endTime": "12:00:00",
@@ -927,7 +955,7 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
     partner = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
 
     warmed = await client.get(
-        "/api/v1/gateway/availability", params={"date": "2026-09-13"},
+        "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"},
         headers=partner["headers"],
     )
     assert warmed.json()["requestStatus"] == 1
@@ -939,13 +967,13 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
     new_headers = {"X-API-Key": rotated.json()["api_key"], **tenant_a.headers}
 
     stale = await client.get(
-        "/api/v1/gateway/availability", params={"date": "2026-09-13"},
+        "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"},
         headers=partner["headers"],
     )
     assert stale.status_code == 401
 
     fresh = await client.get(
-        "/api/v1/gateway/availability", params={"date": "2026-09-13"}, headers=new_headers
+        "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"}, headers=new_headers
     )
     assert fresh.status_code == 200, fresh.text
     assert fresh.json()["requestStatus"] == 1

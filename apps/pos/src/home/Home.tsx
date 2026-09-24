@@ -115,8 +115,8 @@ export default function Home({ onNavigate }: { onNavigate: (view: View) => void 
             <Tile
               image={membershipIllustration}
               title="Membership"
-              detail="Passes, packages and renewals"
-              onClick={() => onNavigate('academy')}
+              detail="Check a member's status"
+              onClick={() => onNavigate('membership')}
             />
           )}
         </div>

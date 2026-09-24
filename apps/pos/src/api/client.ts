@@ -312,6 +312,41 @@ export const api = {
     customer_id?: string
     notes?: string
   }) => request<unknown>('/api/v1/payments', { method: 'POST', body }),
+
+  /* ── Academy register ─────────────────────────────────────────────────────
+   *
+   * The only academy endpoints the kiosk role can reach. Taking a register is
+   * what a shared tablet at the door is for; enrolling students, moving them
+   * between levels and anything touching fees stay at reception and above. */
+
+  academySessions: (query?: { date_from?: string; date_to?: string }) =>
+    request<Ok<'/api/v1/academy/sessions', 'get'>>('/api/v1/academy/sessions', { query }),
+
+  /** Status and expiry for one member, by member number or phone. The only
+   *  membership endpoint the kiosk can reach: no money, and no list. A 404 is a
+   *  complete answer — it means no membership. */
+  checkMembership: (code: string) =>
+    request<Ok<'/api/v1/memberships/check', 'get'>>('/api/v1/memberships/check', {
+      query: { code },
+    }),
+
+  /** Everyone enrolled in this class, with their mark if one exists. Not the
+   *  attendance rows — those are empty for a class nobody has marked yet. */
+  sessionRoster: (sessionId: string) =>
+    request<Ok<'/api/v1/academy/sessions/{session_id}/roster', 'get'>>(
+      `/api/v1/academy/sessions/${sessionId}/roster`,
+    ),
+
+  /** Marks a whole batch at once. Re-marking a student updates their row rather
+   *  than adding a second one, so a corrected mistake does not double-count. */
+  markAttendance: (
+    sessionId: string,
+    marks: { student_id: string; status: 'present' | 'absent' | 'late'; note?: string | null }[],
+  ) =>
+    request<Ok<'/api/v1/academy/sessions/{session_id}/attendance', 'post'>>(
+      `/api/v1/academy/sessions/${sessionId}/attendance`,
+      { method: 'POST', body: { marks } },
+    ),
 }
 
 export { request, BASE_URL, TENANT }

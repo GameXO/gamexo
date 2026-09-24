@@ -9,12 +9,14 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.modules.academy.models import (
+    AgeBand,
     AttendanceStatus,
     BatchStatus,
     CoachStatus,
     CoachType,
     EnrollmentStatus,
     SessionStatus,
+    SkillLevel,
     StudentStatus,
 )
 
@@ -85,6 +87,15 @@ class CoachOut(CoachBase):
 class ProgramBase(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     sport_id: uuid.UUID | None = None
+
+    #: Where this sits on the ladder. None means mixed-ability.
+    skill_level: SkillLevel | None = None
+    #: None means the programme admits any age. Setting a band switches enforcement
+    #: on at enrolment; explicit bounds override the band's defaults.
+    age_band: AgeBand | None = None
+    age_min: int | None = Field(default=None, ge=0, le=120)
+    age_max: int | None = Field(default=None, ge=0, le=120)
+
     level: str | None = None
     age_group: str | None = None
     duration_label: str | None = None
@@ -109,6 +120,10 @@ class ProgramCreate(ProgramBase):
 class ProgramUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     sport_id: uuid.UUID | None = None
+    skill_level: SkillLevel | None = None
+    age_band: AgeBand | None = None
+    age_min: int | None = Field(default=None, ge=0, le=120)
+    age_max: int | None = Field(default=None, ge=0, le=120)
     level: str | None = None
     age_group: str | None = None
     duration_label: str | None = None
@@ -227,6 +242,35 @@ class StudentOut(StudentBase):
     age: int | None = None
 
 
+class StudentLevelOut(BaseModel):
+    """A student's standing in one sport."""
+
+    model_config = ORM
+    sport_id: uuid.UUID
+    level: SkillLevel
+    assessed_on: date
+
+
+class PromotionCreate(BaseModel):
+    sport_id: uuid.UUID
+    to_level: SkillLevel
+    assessed_on: date | None = None
+    assessed_by: str | None = Field(default=None, max_length=200)
+    note: str | None = None
+
+
+class PromotionOut(BaseModel):
+    model_config = ORM
+    id: uuid.UUID
+    student_id: uuid.UUID
+    sport_id: uuid.UUID
+    from_level: SkillLevel | None
+    to_level: SkillLevel
+    assessed_on: date
+    assessed_by: str | None
+    note: str | None
+
+
 class StudentDetail(StudentOut):
     """Flattens the current enrolment back into the shape Coaching.tsx renders."""
 
@@ -266,11 +310,31 @@ class EnrollmentOut(BaseModel):
     status: EnrollmentStatus
 
 
+class RosterEntry(BaseModel):
+    """One student on a session's register, with their mark if one exists.
+
+    Built for the counter tablet, which needs the *roster* — everyone enrolled in
+    the batch — not the attendance rows, which only exist for students already
+    marked. A fresh session has no attendance rows at all, so a register built
+    from those would show an empty class.
+    """
+
+    student_id: uuid.UUID
+    student_name: str
+    #: None until somebody marks them.
+    status: AttendanceStatus | None = None
+    note: str | None = None
+
+
 class EnrollmentWithInvoice(BaseModel):
     enrollment: EnrollmentOut
     invoice_id: uuid.UUID
     invoice_no: str
     invoice_total: Decimal
+    #: Set when the batch sits above the student's assessed level for that sport.
+    #: A note, not a refusal — stretching a strong student is how coaching works,
+    #: and the person at the desk is better placed to judge it than this endpoint.
+    level_warning: str | None = None
 
 
 # ── Sessions & attendance ───────────────────────────────────────────────────

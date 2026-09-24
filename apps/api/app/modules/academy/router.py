@@ -11,7 +11,7 @@ from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
 from app.api_utils import Page, Params, get_or_404, paginate
-from app.auth.deps import RequireManager, RequireStaff
+from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
 from app.core.errors import ConflictError
 from app.modules.academy import service
 from app.modules.academy.models import (
@@ -28,6 +28,8 @@ from app.modules.academy.models import (
     SessionStatus,
     Student,
     StudentEnrollment,
+    StudentPromotion,
+    StudentSportLevel,
     StudentStatus,
 )
 from app.modules.academy.schemas import (
@@ -46,11 +48,15 @@ from app.modules.academy.schemas import (
     ProgramCreate,
     ProgramOut,
     ProgramUpdate,
+    PromotionCreate,
+    PromotionOut,
+    RosterEntry,
     SessionCreate,
     SessionOut,
     SessionUpdate,
     StudentCreate,
     StudentDetail,
+    StudentLevelOut,
     StudentOut,
     StudentUpdate,
 )
@@ -397,6 +403,79 @@ async def update_student(
     )
 
 
+# ── Progression ─────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/students/{student_id}/levels",
+    response_model=list[StudentLevelOut],
+    summary="Where a student stands, per sport",
+    description=(
+        "One row per sport the student has been assessed in. A sport that is "
+        "missing has simply never been assessed — it is not the same as beginner."
+    ),
+)
+async def list_student_levels(
+    student_id: uuid.UUID, db: Db, _: RequireStaff
+) -> list[StudentLevelOut]:
+    await get_or_404(db, Student, student_id, label="Student")
+    rows = (
+        await db.execute(
+            select(StudentSportLevel).where(StudentSportLevel.student_id == student_id)
+        )
+    ).scalars()
+    return [StudentLevelOut.model_validate(row) for row in rows]
+
+
+@router.get(
+    "/students/{student_id}/promotions",
+    response_model=list[PromotionOut],
+    summary="A student's movements on the ladder",
+    description="Newest first. Includes demotions and re-assessments at the same level.",
+)
+async def list_student_promotions(
+    student_id: uuid.UUID, db: Db, _: RequireStaff
+) -> list[PromotionOut]:
+    await get_or_404(db, Student, student_id, label="Student")
+    rows = (
+        await db.execute(
+            select(StudentPromotion)
+            .where(StudentPromotion.student_id == student_id)
+            .order_by(StudentPromotion.assessed_on.desc(), StudentPromotion.created_at.desc())
+        )
+    ).scalars()
+    return [PromotionOut.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/students/{student_id}/promotions",
+    response_model=PromotionOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Assess a student at a level",
+    description=(
+        "Records the new standing and the move that produced it, in one write. "
+        "Works for a first assessment (`from_level` comes back null), a promotion, "
+        "a demotion, and a re-assessment at the level they are already at — a "
+        "review that confirms the status quo is still a review worth keeping.\n\n"
+        "Manager and above: moving a child up a level changes who they train with."
+    ),
+)
+async def promote_student(
+    student_id: uuid.UUID, payload: PromotionCreate, db: Db, _: RequireManager
+) -> PromotionOut:
+    student = await get_or_404(db, Student, student_id, label="Student")
+    promotion = await service.set_level(
+        db,
+        student=student,
+        sport_id=payload.sport_id,
+        level=payload.to_level,
+        assessed_on=payload.assessed_on or date.today(),
+        assessed_by=payload.assessed_by,
+        note=payload.note,
+    )
+    return PromotionOut.model_validate(promotion)
+
+
 # ── Enrolment ───────────────────────────────────────────────────────────────
 
 
@@ -408,7 +487,13 @@ async def update_student(
     description=(
         "Creates the enrolment and its fee invoice in one transaction, and refuses "
         "with **409** if the batch is already at capacity. Occupancy is counted from "
-        "live enrolments, not a stored column that could disagree."
+        "live enrolments, not a stored column that could disagree.\n\n"
+        "Refuses with **400** if the student's age at the start of the term falls "
+        "outside the programme's band, or if the programme is age-banded and the "
+        "student has no date of birth on file. Programmes with no band set admit "
+        "any age.\n\n"
+        "A batch above the student's assessed level is **allowed** and comes back "
+        "with `level_warning` set — that call belongs to the coach, not to us."
     ),
 )
 async def create_enrollment(
@@ -416,20 +501,36 @@ async def create_enrollment(
 ) -> EnrollmentWithInvoice:
     student = await get_or_404(db, Student, payload.student_id, label="Student")
     batch = await get_or_404(db, Batch, payload.batch_id, label="Batch")
+    start_date = payload.start_date or date.today()
 
     enrollment, invoice = await service.enrol_student(
         db,
         student=student,
         batch=batch,
         duration=payload.duration,
-        start_date=payload.start_date or date.today(),
+        start_date=start_date,
         discount=payload.discount,
     )
+
+    warning: str | None = None
+    program = await db.get(Program, enrollment.program_id)
+    if program is not None and program.sport_id is not None:
+        levels = await service.levels_for(db, student.id)
+        gap = service.level_gap(levels.get(program.sport_id), program.skill_level)
+        if gap is not None and gap > 0:
+            standing = levels[program.sport_id].value
+            rungs = "a level" if gap == 1 else f"{gap} levels"
+            warning = (
+                f"{student.name} is assessed at {standing} in this sport — "
+                f"'{program.name}' is {rungs} above that."
+            )
+
     return EnrollmentWithInvoice(
         enrollment=EnrollmentOut.model_validate(enrollment),
         invoice_id=invoice.id,
         invoice_no=invoice.invoice_no,
         invoice_total=invoice.total,
+        level_warning=warning,
     )
 
 
@@ -479,10 +580,20 @@ async def _session_out(db, rows: list[CoachingSession]) -> list[SessionOut]:
     return out
 
 
-@router.get("/sessions", response_model=list[SessionOut], summary="List sessions")
+@router.get(
+    "/sessions",
+    response_model=list[SessionOut],
+    summary="List sessions",
+    description=(
+        "Readable by the **counter tablet**, which needs today's classes in order "
+        "to take a register. Deliberately the weakest guard in this module — see "
+        "`POST /sessions/{session_id}/attendance` for why the register, and only "
+        "the register, is reachable from the kiosk."
+    ),
+)
 async def list_sessions(
     db: Db,
-    _: RequireStaff,
+    _: RequireKiosk,
     batch_id: uuid.UUID | None = None,
     coach_id: uuid.UUID | None = None,
     session_status: Annotated[SessionStatus | None, Query(alias="status")] = None,
@@ -550,11 +661,16 @@ async def update_session(
     description=(
         "Marks a whole batch in one call, the way a register is actually taken. "
         "Re-marking a student updates their existing row rather than adding a "
-        "second one — a duplicate would double-count them in every percentage."
+        "second one — a duplicate would double-count them in every percentage.\n\n"
+        "**Reachable by the counter tablet.** Taking a register is the one academy "
+        "action that genuinely belongs on a shared device at the door, and the "
+        "worst a leaked kiosk credential does here is mis-mark a child present. "
+        "Enrolling students, moving them up a level and anything touching fees "
+        "stay at reception and above, where the login names a person."
     ),
 )
 async def mark_attendance(
-    session_id: uuid.UUID, payload: AttendanceBulkMark, db: Db, principal: RequireStaff
+    session_id: uuid.UUID, payload: AttendanceBulkMark, db: Db, principal: RequireKiosk
 ) -> list[AttendanceOut]:
     coaching_session = await get_or_404(db, CoachingSession, session_id, label="Session")
 
@@ -588,11 +704,62 @@ async def mark_attendance(
 
 
 @router.get(
+    "/sessions/{session_id}/roster",
+    response_model=list[RosterEntry],
+    summary="Everyone in this class, and how they are marked",
+    description=(
+        "What the counter tablet needs to take a register: every student "
+        "actively enrolled in the session's batch, each with their mark if one "
+        "has been recorded and `null` if not.\n\n"
+        "Distinct from `GET /sessions/{session_id}/attendance`, which returns "
+        "only the rows that exist — empty for a class nobody has marked yet, and "
+        "therefore useless as the thing you tick down.\n\n"
+        "Readable by the **kiosk**, and scoped to one class: it gives the tablet "
+        "the names of the children in front of it and nothing else. Listing the "
+        "academy's students stays at reception and above."
+    ),
+)
+async def session_roster(session_id: uuid.UUID, db: Db, _: RequireKiosk) -> list[RosterEntry]:
+    coaching_session = await get_or_404(db, CoachingSession, session_id, label="Session")
+
+    rows = (
+        await db.execute(
+            select(Student, StudentEnrollment.id)
+            .join(StudentEnrollment, StudentEnrollment.student_id == Student.id)
+            .where(
+                StudentEnrollment.batch_id == coaching_session.batch_id,
+                StudentEnrollment.status == EnrollmentStatus.ACTIVE,
+            )
+            .order_by(Student.name)
+        )
+    ).all()
+
+    marked = {
+        row.student_id: row
+        for row in (
+            await db.execute(select(Attendance).where(Attendance.session_id == session_id))
+        )
+        .scalars()
+        .all()
+    }
+
+    return [
+        RosterEntry(
+            student_id=student.id,
+            student_name=student.name,
+            status=marked[student.id].status if student.id in marked else None,
+            note=marked[student.id].note if student.id in marked else None,
+        )
+        for student, _ in rows
+    ]
+
+
+@router.get(
     "/sessions/{session_id}/attendance",
     response_model=list[AttendanceOut],
     summary="A session's register",
 )
-async def session_attendance(session_id: uuid.UUID, db: Db, _: RequireStaff) -> list[AttendanceOut]:
+async def session_attendance(session_id: uuid.UUID, db: Db, _: RequireKiosk) -> list[AttendanceOut]:
     await get_or_404(db, CoachingSession, session_id, label="Session")
     rows = (
         (await db.execute(select(Attendance).where(Attendance.session_id == session_id)))

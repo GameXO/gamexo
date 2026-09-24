@@ -8,7 +8,7 @@
  * UUIDs, decimal strings and no sport imagery.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './client'
+import { api, type MembershipPlanBody } from './client'
 import type { components } from './schema'
 import {
   addOnKey,
@@ -65,6 +65,7 @@ export function toSport(s: SportOut, courtCount?: number): Sport {
     fieldsLabel: courtCount === undefined ? '' : `${courtCount} ${courtCount === 1 ? 'Court' : 'Courts'}`,
     from: money(s.price_base),
     image: SPORT_IMAGES[s.slug] ?? '',
+    isActive: s.is_active ?? true,
   }
 }
 
@@ -241,6 +242,15 @@ export const queryKeys = {
     kpis: (fromISO?: string, toISO?: string) => ['reports', 'kpis', fromISO ?? '', toISO ?? ''] as const,
     revenue: (fromISO?: string) => ['reports', 'revenue', fromISO ?? ''] as const,
   },
+  membershipPlans: (includeInactive: boolean) => ['membership-plans', includeInactive] as const,
+  memberships: (status?: string, search?: string) =>
+    ['memberships', status ?? 'all', search ?? ''] as const,
+  programs: (includeInactive: boolean) => ['programs', includeInactive] as const,
+  batches: (programId?: string) => ['batches', programId ?? 'all'] as const,
+  students: (search?: string) => ['students', search ?? ''] as const,
+  coaches: ['coaches'] as const,
+  studentLevels: (studentId: string) => ['student-levels', studentId] as const,
+  studentPromotions: (studentId: string) => ['student-promotions', studentId] as const,
 }
 
 /** Everything POS touches, invalidated together. Issuing kit against a booking
@@ -864,5 +874,294 @@ export function useMovementHistory(equipmentId: string | null) {
     queryKey: queryKeys.movements(equipmentId ?? ''),
     queryFn: async () => (await api.listMovements(equipmentId!, { size: 20 })).items,
     enabled: !!equipmentId,
+  })
+}
+
+/* ── Memberships ───────────────────────────────────────────────────────────
+ *
+ * Selling or renewing raises an invoice, so every mutation here invalidates
+ * `invoices` alongside its own list — otherwise the money appears on the
+ * Finance screen only after a manual refresh, and staff reasonably conclude
+ * the payment did not register.
+ */
+
+export type MembershipPlanOut = components['schemas']['MembershipPlanOut']
+export type SubscriptionOut = components['schemas']['SubscriptionOut']
+
+/** The four term lengths, in the order an academy sells them. `6m` is included
+ *  because the schema has it; a plan that leaves it at 0 simply does not offer
+ *  it, and `sellableDurations` below is what the UI should actually render. */
+export const PLAN_DURATIONS = ['1m', '3m', '6m', '12m'] as const
+export type PlanDuration = (typeof PLAN_DURATIONS)[number]
+
+export const DURATION_LABEL: Record<PlanDuration, string> = {
+  '1m': 'Monthly',
+  '3m': 'Quarterly',
+  '6m': 'Half-yearly',
+  '12m': 'Yearly',
+}
+
+const PRICE_FIELD: Record<PlanDuration, keyof MembershipPlanOut> = {
+  '1m': 'price_1m',
+  '3m': 'price_3m',
+  '6m': 'price_6m',
+  '12m': 'price_12m',
+}
+
+export function planPrice(plan: MembershipPlanOut, duration: PlanDuration): number {
+  return Number(plan[PRICE_FIELD[duration]] ?? 0)
+}
+
+/**
+ * The terms this plan is actually sold by.
+ *
+ * Zero is the API's way of saying "not offered" — `POST /memberships` refuses a
+ * duration priced at 0 rather than issuing a free membership. Filtering here
+ * means the picker never shows a term that would be rejected on submit, which
+ * is the difference between a plan that sells yearly only and one that looks
+ * broken.
+ */
+export function sellableDurations(plan: MembershipPlanOut): PlanDuration[] {
+  return PLAN_DURATIONS.filter((d) => planPrice(plan, d) > 0)
+}
+
+export function useMembershipPlans(includeInactive = false) {
+  return useQuery({
+    queryKey: queryKeys.membershipPlans(includeInactive),
+    queryFn: () => api.membershipPlans({ include_inactive: includeInactive }),
+  })
+}
+
+/**
+ * Create or update, as one mutation.
+ *
+ * A union rather than one optional-everything body: creating needs a name,
+ * updating must be able to send `{is_active: false}` alone. Collapsing the two
+ * into `Partial<...>` would make a create with no name a type-check away from
+ * shipping, and the server's 422 is a worse place to find out.
+ */
+export function useSaveMembershipPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (
+      vars:
+        | { planId: string; body: Partial<MembershipPlanBody> }
+        | { planId?: undefined; body: MembershipPlanBody },
+    ) =>
+      vars.planId !== undefined
+        ? api.updateMembershipPlan(vars.planId, vars.body)
+        : api.createMembershipPlan(vars.body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['membership-plans'] })
+      // A renamed or repriced plan changes how the member list reads.
+      qc.invalidateQueries({ queryKey: ['memberships'] })
+    },
+  })
+}
+
+export function useMemberships(status?: string, search?: string) {
+  return useQuery({
+    queryKey: queryKeys.memberships(status, search),
+    queryFn: () =>
+      api.memberships({
+        size: 100,
+        ...(status && status !== 'all' ? { status: status as 'active' } : {}),
+        ...(search ? { search } : {}),
+      }),
+  })
+}
+
+function invalidateMemberships(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['memberships'] })
+  qc.invalidateQueries({ queryKey: ['invoices'] })
+  // `active_count` on every plan is derived from live subscriptions.
+  qc.invalidateQueries({ queryKey: ['membership-plans'] })
+}
+
+export function useCreateMembership() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createMembership>[0]) => api.createMembership(body),
+    onSuccess: () => invalidateMemberships(qc),
+  })
+}
+
+export function useRenewMembership() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; duration: PlanDuration }) =>
+      api.renewMembership(vars.id, vars.duration),
+    onSuccess: () => invalidateMemberships(qc),
+  })
+}
+
+/** Pause, resume and cancel share a hook because the screen treats them as one
+ *  control with three positions, and all three invalidate identically. */
+export function useMembershipLifecycle() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; action: 'pause' | 'resume' | 'cancel' }) =>
+      vars.action === 'pause'
+        ? api.pauseMembership(vars.id)
+        : vars.action === 'resume'
+          ? api.resumeMembership(vars.id)
+          : api.cancelMembership(vars.id),
+    onSuccess: () => invalidateMemberships(qc),
+  })
+}
+
+/* ── Academy ───────────────────────────────────────────────────────────────── */
+
+export type ProgramOut = components['schemas']['ProgramOut']
+export type BatchOut = components['schemas']['BatchOut']
+export type StudentOut = components['schemas']['StudentOut']
+export type CoachOut = components['schemas']['CoachOut']
+export type StudentLevelOut = components['schemas']['StudentLevelOut']
+export type PromotionOut = components['schemas']['PromotionOut']
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced'
+export type AgeBand = 'kids' | 'adults'
+
+export const SKILL_LEVELS: SkillLevel[] = ['beginner', 'intermediate', 'advanced']
+export const AGE_BANDS: AgeBand[] = ['kids', 'adults']
+
+/** Mirrors `DEFAULT_AGE_BOUNDS` in app/modules/academy/models.py. Shown as
+ *  placeholder text in the programme editor so an admin can see what a band
+ *  means before deciding whether to override it. */
+export const DEFAULT_AGE_BOUNDS: Record<AgeBand, [number, number]> = {
+  kids: [5, 16],
+  adults: [17, 99],
+}
+
+export function ageBoundsFor(program: Pick<ProgramOut, 'age_band' | 'age_min' | 'age_max'>) {
+  if (!program.age_band && program.age_min == null && program.age_max == null) return null
+  const [lo, hi] = program.age_band ? DEFAULT_AGE_BOUNDS[program.age_band as AgeBand] : [0, 200]
+  return [program.age_min ?? lo, program.age_max ?? hi] as const
+}
+
+export function useProgramsList(includeInactive = false) {
+  return useQuery({
+    queryKey: queryKeys.programs(includeInactive),
+    queryFn: () => api.programs({ include_inactive: includeInactive }),
+  })
+}
+
+export function useSaveProgram() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { programId?: string; body: Parameters<typeof api.createProgram>[0] }) =>
+      vars.programId ? api.updateProgram(vars.programId, vars.body) : api.createProgram(vars.body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['programs'] })
+      // A batch reads its programme's band and fees, so both lists move together.
+      qc.invalidateQueries({ queryKey: ['batches'] })
+    },
+  })
+}
+
+export function useBatches(programId?: string) {
+  return useQuery({
+    queryKey: queryKeys.batches(programId),
+    queryFn: () => api.batches(programId ? { program_id: programId } : undefined),
+  })
+}
+
+export function useCreateBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createBatch>[0]) => api.createBatch(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['batches'] }),
+  })
+}
+
+export function useStudents(search?: string) {
+  return useQuery({
+    queryKey: queryKeys.students(search),
+    queryFn: () => api.students({ size: 100, ...(search ? { search } : {}) }),
+  })
+}
+
+export function useCoaches() {
+  return useQuery({ queryKey: queryKeys.coaches, queryFn: () => api.coaches({ size: 100 }) })
+}
+
+export function useCreateStudent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createStudent>[0]) => api.createStudent(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['students'] }),
+  })
+}
+
+/**
+ * Enrol a student, which also raises the term's fee invoice.
+ *
+ * Two refusals worth handling distinctly at the call site, both 400s carrying
+ * `details`: an age outside the programme's band (`student_age`, `age_min`,
+ * `age_max`) and a banded programme meeting a student with no date of birth
+ * (`field: "date_of_birth"`). Neither is retryable — they need a different
+ * batch or a corrected record — so a generic "try again" toast is the wrong
+ * response to both.
+ */
+export function useEnrolStudent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.enrolStudent>[0]) => api.enrolStudent(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] })
+      qc.invalidateQueries({ queryKey: ['batches'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+    },
+  })
+}
+
+export function useStudentLevels(studentId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.studentLevels(studentId ?? ''),
+    queryFn: () => api.studentLevels(studentId!),
+    enabled: Boolean(studentId),
+  })
+}
+
+export function useStudentPromotions(studentId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.studentPromotions(studentId ?? ''),
+    queryFn: () => api.studentPromotions(studentId!),
+    enabled: Boolean(studentId),
+  })
+}
+
+export function usePromoteStudent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { studentId: string; body: Parameters<typeof api.promoteStudent>[1] }) =>
+      api.promoteStudent(vars.studentId, vars.body),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.studentLevels(vars.studentId) })
+      qc.invalidateQueries({ queryKey: queryKeys.studentPromotions(vars.studentId) })
+    },
+  })
+}
+
+/* ── Customers ─────────────────────────────────────────────────────────────
+ *
+ * The payer behind a membership, and behind a student's fees. Enrolment and
+ * membership sales both need to find one or make one, so it lives alongside
+ * both rather than inside either.
+ */
+
+export type CustomerOut = components['schemas']['CustomerOut']
+
+export function useCustomers(search?: string) {
+  return useQuery({
+    queryKey: ['customers', search ?? ''],
+    queryFn: () => api.customers({ size: 100, ...(search ? { search } : {}) }),
+  })
+}
+
+export function useCreateCustomer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createCustomer>[0]) => api.createCustomer(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
   })
 }

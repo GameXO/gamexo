@@ -4,12 +4,13 @@ import BookingFlow from './booking/BookingFlow'
 import StorePage from './store/StorePage'
 import CheckInFlow from './checkin/CheckInFlow'
 import CheckoutFlow from './checkout/CheckoutFlow'
-import AcademyPlaceholder from './academy/AcademyPlaceholder'
+import AcademyRegister from './academy/AcademyRegister'
+import MembershipCounter from './academy/MembershipCounter'
 import { useAuth } from './auth/AuthProvider'
 import LoginPage from './auth/LoginPage'
 import { useViewportHeight } from './ui/useViewportHeight'
 
-export type View = 'home' | 'booking' | 'store' | 'checkin' | 'academy' | 'checkout'
+export type View = 'home' | 'booking' | 'store' | 'checkin' | 'academy' | 'membership' | 'checkout'
 
 function App() {
   const { status } = useAuth()
@@ -34,7 +35,8 @@ function Shell() {
       {view === 'checkin' && (
         <CheckInFlow onHome={() => setView('home')} onBookNow={() => setView('booking')} onStore={() => setView('store')} />
       )}
-      {view === 'academy' && <AcademyPlaceholder onHome={() => setView('home')} />}
+      {view === 'academy' && <AcademyRegister onHome={() => setView('home')} />}
+      {view === 'membership' && <MembershipCounter onHome={() => setView('home')} />}
       {view === 'booking' && <BookingFlow onDone={() => setView('home')} />}
       {view === 'store' && <StorePage onHome={() => setView('home')} />}
       {view === 'checkout' && <CheckoutFlow onHome={() => setView('home')} />}

@@ -1,200 +1,297 @@
+/**
+ * Members — every membership this academy has sold, and what to do with each.
+ *
+ * Reads the API, not localStorage. Pricing is not editable here: plans are
+ * defined once in Settings → Membership Plans and only *applied* on this screen.
+ * That split is deliberate — a price field beside a customer's name is how one
+ * receptionist ends up repricing the whole academy while signing somebody up.
+ *
+ * Four lifecycle actions, and the two worth knowing:
+ *
+ *   **Renew** continues from the current expiry while the membership is still
+ *   running, so renewing early never costs the member the days they have left.
+ *
+ *   **Pause** parks the term rather than consuming it. Every paused day is given
+ *   back on resume and the expiry moves out to match, which is why a resumed
+ *   membership can run past the anniversary of its start — `paused_days_total`
+ *   is shown so staff can explain that without having to work it out.
+ */
 import { useState } from 'react'
-import { Search } from 'lucide-react'
-import { money, sportById } from '../data/booking'
-import { MEMBERSHIP_PLANS, membershipStatus, planById } from '../data/membership'
-import { listMemberDirectory, type CustomerProfile } from '../data/customers'
-import * as db from '../lib/db'
-import MemberDrawer from './MemberDrawer'
+import { Loader2, Pause, Play, RotateCw, Search, X } from 'lucide-react'
+import {
+  DURATION_LABEL,
+  sellableDurations,
+  useMembershipPlans,
+  useMembershipLifecycle,
+  useMemberships,
+  useRenewMembership,
+  type PlanDuration,
+  type SubscriptionOut,
+} from '../api/hooks'
 import NewMembershipWizard from './NewMembershipWizard'
 
-const TIER_COLOR: Record<string, string> = {
-  gold: 'bg-lime text-lime-ink',
-  silver: 'bg-surface-muted text-ink',
-  bronze: 'bg-flame/15 text-flame',
-}
+const rupees = (n: number) =>
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
 
 const STATUS_COLOR: Record<string, string> = {
   active: 'bg-positive/15 text-positive',
-  expiring: 'bg-flame/15 text-flame',
+  paused: 'bg-surface-muted text-muted',
   expired: 'bg-negative/15 text-negative',
-  frozen: 'bg-surface-muted text-muted',
+  cancelled: 'bg-surface-muted text-muted',
+}
+
+const FILTERS = ['all', 'active', 'paused', 'expired', 'cancelled'] as const
+
+function whenLabel(row: SubscriptionOut): string {
+  if (row.status === 'cancelled') return 'Cancelled'
+  if (row.status === 'paused') return 'Paused'
+  const days = row.days_left ?? 0
+  if (days < 0) return `Expired ${Math.abs(days)}d ago`
+  if (days === 0) return 'Expires today'
+  return `${days}d left`
 }
 
 export default function Members() {
-  db.useDbVersion()
-  const [tab, setTab] = useState<'directory' | 'plans'>('directory')
   const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<CustomerProfile | null>(null)
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [renewing, setRenewing] = useState<SubscriptionOut | null>(null)
 
-  const directory = listMemberDirectory().filter((p) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return p.name.toLowerCase().includes(q) || p.phone.includes(q)
-  })
+  const { data, isLoading } = useMemberships(filter, query.trim() || undefined)
+  const { data: plans } = useMembershipPlans(true)
+  const lifecycle = useMembershipLifecycle()
+  const renew = useRenewMembership()
 
-  const memberships = db.getMemberships()
+  const rows = data?.items ?? []
+
+  const act = async (row: SubscriptionOut, action: 'pause' | 'resume' | 'cancel') => {
+    setError(null)
+    setBusyId(row.id)
+    try {
+      await lifecycle.mutateAsync({ id: row.id, action })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That did not go through.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const doRenew = async (row: SubscriptionOut, duration: PlanDuration) => {
+    setError(null)
+    setBusyId(row.id)
+    try {
+      await renew.mutateAsync({ id: row.id, duration })
+      setRenewing(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not renew this membership.')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-lg bg-surface-muted p-1">
-          <button
-            type="button"
-            onClick={() => setTab('directory')}
-            className={`rounded-md px-4 py-2 text-sm transition-colors ${tab === 'directory' ? 'bg-white text-ink shadow-sm' : 'text-slate'}`}
-          >
-            Directory
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('plans')}
-            className={`rounded-md px-4 py-2 text-sm transition-colors ${tab === 'plans' ? 'bg-white text-ink shadow-sm' : 'text-slate'}`}
-          >
-            Membership plans
-          </button>
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-md px-3.5 py-2 text-sm capitalize transition-colors ${
+                filter === f ? 'bg-white text-ink shadow-sm' : 'text-slate'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
         </div>
 
-        {tab === 'plans' && (
-          <button
-            type="button"
-            onClick={() => setWizardOpen(true)}
-            className="flex h-10 items-center justify-center rounded-full px-5 text-sm text-[#fefefe]"
-            style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-          >
-            New membership
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setWizardOpen(true)}
+          className="flex h-10 items-center justify-center rounded-full px-5 text-sm text-[#fefefe]"
+          style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+        >
+          New membership
+        </button>
       </div>
 
-      {tab === 'directory' ? (
-        <>
-          <div className="relative max-w-sm">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              className="w-full rounded-lg border border-border-input bg-white py-2.5 pl-9 pr-3.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-              placeholder="Search name or phone"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
+      <div className="relative max-w-sm">
+        <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+        <input
+          className="w-full rounded-lg border border-border-input bg-white py-2.5 pl-9 pr-3.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+          placeholder="Search member or number"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
-          <div className="overflow-hidden rounded-xl border border-border-card bg-white">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">Membership</th>
-                  <th className="px-4 py-3 font-medium">Bookings</th>
-                  <th className="px-4 py-3 font-medium">Spent</th>
-                  <th className="px-4 py-3 font-medium">Dues</th>
-                </tr>
-              </thead>
-              <tbody>
-                {directory.map((p) => (
-                  <tr
-                    key={p.phone}
-                    onClick={() => setSelected(p)}
-                    className="cursor-pointer border-b border-border-card last:border-0 hover:bg-surface-muted"
-                  >
-                    <td className="px-4 py-3 font-medium text-ink">{p.name}</td>
-                    <td className="px-4 py-3 text-slate">{p.phone}</td>
-                    <td className="px-4 py-3">
-                      {p.membershipTier ? (
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${TIER_COLOR[p.membershipTier]}`}>
-                          {p.membershipTier}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted">Non-member</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate">{p.totalBookings}</td>
-                    <td className="px-4 py-3 text-slate">{money(p.totalSpent)}</td>
-                    <td className="px-4 py-3">
-                      {p.outstandingDues > 0 ? (
-                        <span className="font-medium text-negative">{money(p.outstandingDues)}</span>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {directory.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
-                      No customers match.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {['football', 'cricket', 'tennis', 'badminton', 'pickleball', 'tabletennis'].map((sportId) => {
-            const plans = MEMBERSHIP_PLANS.filter((p) => p.sportId === sportId)
-            return (
-              <div key={sportId} className="flex flex-col gap-3">
-                <p className="text-sm font-semibold text-ink">{sportById(sportId)?.name}</p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {plans.map((plan) => (
-                    <div key={plan.id} className="flex flex-col gap-1.5 rounded-xl border border-border-card bg-white p-4">
-                      <p className="text-sm font-semibold text-ink">{plan.name}</p>
-                      <p className="text-xl font-semibold text-ink">{money(plan.total)}</p>
-                      <p className="text-xs text-muted">
-                        {plan.months} mo · {Math.round(plan.discount * 100)}% off court hire · {plan.sessionsPerMonth}{' '}
-                        sessions/mo
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-
-          <div className="overflow-hidden rounded-xl border border-border-card bg-white">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                  <th className="px-4 py-3 font-medium">Member</th>
-                  <th className="px-4 py-3 font-medium">Plan</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Expires</th>
-                  <th className="px-4 py-3 font-medium">Sessions used</th>
-                </tr>
-              </thead>
-              <tbody>
-                {memberships.map((m) => {
-                  const status = membershipStatus(m)
-                  return (
-                    <tr key={m.id} className="border-b border-border-card last:border-0">
-                      <td className="px-4 py-3 font-medium text-ink">{m.customer.name}</td>
-                      <td className="px-4 py-3 text-slate">{planById(m.planId)?.name}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_COLOR[status]}`}>{status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-slate">{m.endDate}</td>
-                      <td className="px-4 py-3 text-slate">{m.sessionsUsed}</td>
-                    </tr>
-                  )
-                })}
-                {memberships.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
-                      No memberships sold yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+      {error && (
+        <div className="rounded-lg border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+          {error}
         </div>
       )}
 
-      {selected && <MemberDrawer profile={selected} onClose={() => setSelected(null)} />}
-      {wizardOpen && <NewMembershipWizard onClose={() => setWizardOpen(false)} onCreated={() => {}} />}
+      <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
+              <th className="px-4 py-3 font-medium">Member</th>
+              <th className="px-4 py-3 font-medium">Plan</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Expires</th>
+              <th className="px-4 py-3 font-medium">Paid</th>
+              <th className="px-4 py-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const plan = (plans ?? []).find((p) => p.id === row.plan_id)
+              const busy = busyId === row.id
+              return (
+                <tr key={row.id} className="border-b border-border-card last:border-0">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-ink">{row.member_no}</p>
+                    {(row.paused_days_total ?? 0) > 0 && (
+                      <p className="text-xs text-muted">
+                        {row.paused_days_total} paused day
+                        {row.paused_days_total === 1 ? '' : 's'} added
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate">
+                    {row.plan_name}
+                    <span className="ml-1.5 text-xs text-muted">
+                      {DURATION_LABEL[row.duration as PlanDuration]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
+                        STATUS_COLOR[row.status ?? 'active']
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-slate">{row.expiry_date}</p>
+                    <p className="text-xs text-muted">{whenLabel(row)}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate">{rupees(Number(row.total_paid ?? 0))}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {busy && <Loader2 size={15} className="animate-spin text-muted" />}
+
+                      {row.status !== 'cancelled' && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setRenewing(row)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
+                        >
+                          <RotateCw size={13} />
+                          Renew
+                        </button>
+                      )}
+
+                      {row.status === 'active' && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => act(row, 'pause')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
+                        >
+                          <Pause size={13} />
+                          Pause
+                        </button>
+                      )}
+
+                      {row.status === 'paused' && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => act(row, 'resume')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
+                        >
+                          <Play size={13} />
+                          Resume
+                        </button>
+                      )}
+
+                      {row.status !== 'cancelled' && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => act(row, 'cancel')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-negative disabled:opacity-40"
+                        >
+                          <X size={13} />
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+
+                    {renewing?.id === row.id && (
+                      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                        <span className="text-xs text-muted">Renew for</span>
+                        {(plan ? sellableDurations(plan) : []).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            disabled={busy}
+                            onClick={() => doRenew(row, d)}
+                            className="rounded-lg bg-ink px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
+                          >
+                            {DURATION_LABEL[d]}
+                          </button>
+                        ))}
+                        {plan && sellableDurations(plan).length === 0 && (
+                          <span className="text-xs text-amber-700">
+                            This plan no longer prices any term.
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setRenewing(null)}
+                          className="text-xs text-muted underline"
+                        >
+                          cancel
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+
+            {isLoading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+                  Loading memberships…
+                </td>
+              </tr>
+            )}
+
+            {!isLoading && rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+                  {query || filter !== 'all'
+                    ? 'No memberships match.'
+                    : 'No memberships sold yet. Define a plan in Settings → Membership Plans, then sell one here.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {wizardOpen && (
+        <NewMembershipWizard onClose={() => setWizardOpen(false)} onCreated={() => setWizardOpen(false)} />
+      )}
     </div>
   )
 }

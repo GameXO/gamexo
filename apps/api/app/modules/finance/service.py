@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from typing import Any, Sequence
 
@@ -319,6 +320,16 @@ async def create_subscription(
 
     settings = await _settings(session)
     base_price = plan.price_for(duration)
+
+    # A zero price is how a plan says "we don't sell this term length" — every
+    # price column defaults to 0, so without this a plan priced only by the year
+    # would happily sell a free month to anyone who picked the wrong radio button.
+    if base_price <= 0:
+        raise ConflictError(
+            f"The '{plan.name}' plan is not sold by the {duration.value} term.",
+            details={"plan_id": str(plan.id), "duration": duration.value},
+        )
+
     discount = money(base_price * Decimal(discount_pct) / Decimal(100))
 
     subscription = MemberSubscription(
@@ -330,6 +341,7 @@ async def create_subscription(
         plan_name=plan.name,
         plan_color=plan.color,
         start_date=start_date,
+        joined_on=start_date,
         expiry_date=add_months(start_date, DURATION_MONTHS[duration]),
         duration=duration,
         status=SubscriptionStatus.ACTIVE,
@@ -388,6 +400,14 @@ async def renew_subscription(
     if plan is None:
         raise NotFoundError("The plan behind this membership no longer exists.")
 
+    if plan.price_for(duration) <= 0:
+        raise ConflictError(
+            f"The '{plan.name}' plan is not sold by the {duration.value} term.",
+            details={"plan_id": str(plan.id), "duration": duration.value},
+        )
+
+    # `start_date` is this term's start and is meant to move. `joined_on` is not
+    # touched here — that is the whole reason it exists.
     subscription.start_date = start
     subscription.expiry_date = add_months(start, DURATION_MONTHS[duration])
     subscription.duration = duration
@@ -413,6 +433,53 @@ async def renew_subscription(
     )
     await session.flush()
     return subscription, invoice
+
+
+def resume_subscription(
+    subscription: MemberSubscription, *, today: date, zone: ZoneInfo
+) -> int:
+    """Take a membership off pause, giving back the days it was parked for.
+
+    The paid term is a quantity of *membership*, not a window on the calendar. A
+    member who pauses for six weeks while injured and comes back to six fewer weeks
+    has been charged for time they were explicitly told they were not using — which
+    makes pause strictly worse for them than doing nothing, and the feature becomes
+    a trap. So the expiry moves out by exactly the days spent paused.
+
+    `zone` is load-bearing, not decoration. `paused_at` is a UTC instant while every
+    date on this row is a civil date in the venue's own timezone. Taking `.date()`
+    off the UTC value and subtracting it from a local `today` gifts an IST member a
+    free day whenever they pause and resume during the evening — 20:30 UTC is
+    already tomorrow in Kolkata. Both sides have to be read in the venue's frame.
+
+    Returns the number of days banked, which the caller reports back.
+    """
+    if subscription.status is not SubscriptionStatus.PAUSED:
+        raise ConflictError(
+            f"This membership is {subscription.status.value}, not paused.",
+            details={"status": subscription.status.value},
+        )
+
+    # `paused_at` should always be set alongside the PAUSED status, but a row that
+    # lost it must still be resumable — stranding a member because of our bad data
+    # is not an option. Zero days banked is the honest fallback.
+    if subscription.paused_at is None:
+        banked = 0
+    else:
+        paused_at = subscription.paused_at
+        # Rows written before the column was timezone-aware, and SQLite in tests,
+        # can hand back a naive datetime. It is UTC either way — that is what was
+        # stored — so say so rather than letting astimezone() assume local.
+        if paused_at.tzinfo is None:
+            paused_at = paused_at.replace(tzinfo=UTC)
+        banked = (today - paused_at.astimezone(zone).date()).days
+    banked = max(banked, 0)
+
+    subscription.expiry_date = subscription.expiry_date + timedelta(days=banked)
+    subscription.paused_days_total += banked
+    subscription.paused_at = None
+    subscription.status = SubscriptionStatus.ACTIVE
+    return banked
 
 
 def expire_lapsed(subscriptions: Sequence[MemberSubscription], *, today: date) -> int:

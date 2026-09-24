@@ -1,277 +1,216 @@
+/**
+ * Sell a membership, against the API.
+ *
+ * Plans and prices are not chosen here in any meaningful sense — they are read
+ * from what Settings → Membership Plans defines. Only terms the plan actually
+ * prices are offered, because the server refuses a duration priced at zero, and
+ * a picker that can produce a rejected request is a picker that will.
+ *
+ * The subscription and its invoice are created in one transaction on the
+ * server, so there is no half-state to clean up if this closes mid-flight.
+ */
 import { useEffect, useState } from 'react'
-import { Banknote, Check, CreditCard, Smartphone, Wallet, X } from 'lucide-react'
-import { PAYMENT_METHODS, SPORTS, money, toISO } from '../data/booking'
-import { TIER_ORDER, addMonths, planById, type MembershipRecord, type Tier } from '../data/membership'
-import * as db from '../lib/db'
-
-const METHOD_ICON: Record<string, typeof Smartphone> = { upi: Smartphone, card: CreditCard, cash: Banknote, wallet: Wallet }
-const TIER_LABEL: Record<Tier, string> = { bronze: 'Starter', silver: 'Pro', gold: 'Elite' }
+import { Check, Loader2, X } from 'lucide-react'
+import {
+  DURATION_LABEL,
+  planPrice,
+  sellableDurations,
+  useCreateCustomer,
+  useCreateMembership,
+  useCustomers,
+  useMembershipPlans,
+  type PlanDuration,
+} from '../api/hooks'
 
 const inputClass =
   'w-full rounded-lg border border-border-input bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none'
 
-export default function NewMembershipWizard({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [step, setStep] = useState(1)
+const rupees = (n: number) =>
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+
+export default function NewMembershipWizard({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const { data: plans, isLoading } = useMembershipPlans()
   const [phone, setPhone] = useState('')
+  const { data: customerPage } = useCustomers(phone.length >= 4 ? phone : undefined)
+
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [sportId, setSportId] = useState(SPORTS[0].id)
-  const [tier, setTier] = useState<Tier>('silver')
-  const [startDate, setStartDate] = useState(toISO(new Date()))
-  const [method, setMethod] = useState('upi')
-  const [success, setSuccess] = useState<MembershipRecord | null>(null)
+  const [planId, setPlanId] = useState('')
+  const [duration, setDuration] = useState<PlanDuration | ''>('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<{ memberNo: string; invoiceNo: string; total: string } | null>(null)
 
   const phoneOk = /^\d{10}$/.test(phone)
-  const modes = db.getPaymentModes()
-  const availableMethods = PAYMENT_METHODS.filter((m) => modes[m.id] !== false)
+  const match = (customerPage?.items ?? []).find((c) => c.phone === phone)
 
   useEffect(() => {
-    if (!phoneOk) return
-    const match = db.findCustomer(phone)
-    if (match) {
-      setName(match.name)
-      setEmail(match.email)
+    if (match) setName((prev) => prev || match.name)
+  }, [match])
+
+  // Only plans that are actually sellable — an active plan with every term at
+  // zero would otherwise sit in the list and fail on submit.
+  const offered = (plans ?? []).filter((p) => sellableDurations(p).length > 0)
+  const plan = offered.find((p) => p.id === planId) ?? null
+  const terms = plan ? sellableDurations(plan) : []
+
+  useEffect(() => {
+    // Keep the chosen term valid when the plan changes under it.
+    if (plan && (!duration || !terms.includes(duration))) setDuration(terms[0] ?? '')
+  }, [plan, duration, terms])
+
+  const createCustomer = useCreateCustomer()
+  const createMembership = useCreateMembership()
+
+  const confirm = async () => {
+    if (!plan || !duration) return
+    setError(null)
+    setBusy(true)
+    try {
+      const customer = match ?? (await createCustomer.mutateAsync({ name: name.trim(), phone }))
+      const result = await createMembership.mutateAsync({
+        customer_id: customer.id,
+        plan_id: plan.id,
+        duration,
+      })
+      setDone({
+        memberNo: result.subscription.member_no,
+        invoiceNo: result.invoice.invoice_no,
+        total: String(result.invoice.total),
+      })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create this membership.')
+    } finally {
+      setBusy(false)
     }
-  }, [phone, phoneOk])
-
-  const plan = planById(`${sportId}-${tier}`)!
-  const endDate = addMonths(startDate, plan.months)
-
-  const canNext = step === 1 ? phoneOk && name.trim().length > 1 : true
-
-  const confirm = () => {
-    const id = `MS${Math.floor(10000 + Math.random() * 89999)}`
-    const record: MembershipRecord = {
-      id,
-      customer: { name: name.trim(), phone, email },
-      planId: plan.id,
-      startDate,
-      endDate,
-      fee: plan.fee,
-      gst: plan.gst,
-      total: plan.total,
-      paidTotal: plan.total,
-      sessionsUsed: 0,
-      frozen: false,
-      payment: { method, status: 'paid' },
-      createdAt: new Date().toISOString(),
-    }
-    db.saveMembership(record)
-    db.upsertCustomer({ name: record.customer.name, phone, email })
-    setSuccess(record)
   }
 
+  const ready = phoneOk && name.trim().length > 1 && !!plan && !!duration
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
+      <aside
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-[520px] flex-col gap-5 overflow-y-auto rounded-2xl bg-white p-6"
       >
-        {success ? (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-lime">
-              <Check size={24} className="text-lime-ink" />
+        <header className="flex items-start justify-between gap-4 border-b border-border-card px-5 py-4">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-ink">New membership</h2>
+            <p className="mt-0.5 text-sm text-slate">Creates the membership and its invoice together.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-muted">
+            <X size={18} />
+          </button>
+        </header>
+
+        {done ? (
+          <div className="flex flex-col gap-4 px-5 py-6">
+            <div className="flex items-center gap-2 text-positive">
+              <Check size={18} />
+              <p className="font-medium">Membership created</p>
             </div>
-            <div>
-              <p className="text-lg font-semibold text-ink">Membership created</p>
-              <p className="mt-1 text-sm text-slate">
-                {planById(success.planId)?.name} · runs to {success.endDate}
-              </p>
-            </div>
+            <p className="text-sm text-slate">
+              <span className="font-medium text-ink">{done.memberNo}</span> · invoice{' '}
+              <span className="font-medium text-ink">{done.invoiceNo}</span> for{' '}
+              {rupees(Number(done.total))}.
+            </p>
             <button
               type="button"
-              onClick={() => {
-                onCreated()
-                onClose()
-              }}
-              className="flex h-11 items-center justify-center rounded-full px-8 text-sm text-[#fefefe]"
-              style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+              onClick={onClose}
+              className="mt-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white"
             >
               Done
             </button>
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <p className="text-lg font-semibold text-ink">New membership</p>
-              <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
-                <X size={20} />
-              </button>
-            </div>
+          <div className="flex flex-col gap-5 px-5 py-5">
+            <section className="flex flex-col gap-3">
+              <p className="text-[13px] font-medium text-ink">Member</p>
+              <input
+                className={inputClass}
+                placeholder="Phone (10 digits)"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              />
+              {match && <p className="text-xs text-positive">Existing customer — {match.name}.</p>}
+              <input
+                className={inputClass}
+                placeholder="Full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </section>
 
-            <div className="flex items-center gap-2">
-              {['Customer', 'Plan', 'Duration', 'Payment'].map((label, i) => (
-                <div key={label} className="flex flex-1 items-center gap-2">
-                  <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                      i + 1 <= step ? 'bg-lime text-lime-ink' : 'bg-surface-muted text-muted'
-                    }`}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className={`hidden text-xs sm:inline ${i + 1 === step ? 'text-ink' : 'text-muted'}`}>{label}</span>
-                  {i < 3 && <span className="h-px flex-1 bg-border-card" />}
-                </div>
-              ))}
-            </div>
+            <section className="flex flex-col gap-3">
+              <p className="text-[13px] font-medium text-ink">Plan</p>
+              {isLoading && <p className="text-sm text-muted">Loading plans…</p>}
+              {!isLoading && offered.length === 0 && (
+                <p className="text-sm text-muted">
+                  No sellable plans. Define one in Settings → Membership Plans and price
+                  at least one term.
+                </p>
+              )}
+              {offered.length > 0 && (
+                <select className={inputClass} value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                  <option value="">Choose a plan…</option>
+                  {offered.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.category ? ` · ${p.category}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-            {step === 1 && (
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Phone number</span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">+91</span>
-                    <input
-                      className={`${inputClass} pl-11`}
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="90000 00000"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    />
-                  </div>
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Name</span>
-                  <input className={inputClass} placeholder="Member's name" value={name} onChange={(e) => setName(e.target.value)} />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Email (optional)</span>
-                  <input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="flex flex-col gap-4">
+              {plan && (
                 <div className="flex flex-wrap gap-2">
-                  {SPORTS.map((s) => (
+                  {terms.map((d) => (
                     <button
-                      key={s.id}
+                      key={d}
                       type="button"
-                      onClick={() => setSportId(s.id)}
-                      className={`rounded-full px-4 py-2 text-sm transition-colors ${
-                        sportId === s.id ? 'bg-ink text-bone' : 'bg-surface-muted text-slate'
+                      onClick={() => setDuration(d)}
+                      className={`rounded-full px-3 py-1.5 text-sm ${
+                        duration === d ? 'bg-ink text-white' : 'border border-border-card text-slate'
                       }`}
                     >
-                      {s.name}
+                      {DURATION_LABEL[d]} {rupees(planPrice(plan, d))}
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {TIER_ORDER.map((t) => {
-                    const p = planById(`${sportId}-${t}`)!
-                    const active = tier === t
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTier(t)}
-                        className={`flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-colors ${
-                          active ? 'border-ink bg-ink text-bone' : 'border-border-card bg-white text-ink'
-                        }`}
-                      >
-                        <span className="text-sm font-semibold">{TIER_LABEL[t]}</span>
-                        <span className="text-lg font-semibold">{money(p.total)}</span>
-                        <span className={`text-xs ${active ? 'text-bone/70' : 'text-muted'}`}>
-                          {p.months} mo · {Math.round(p.discount * 100)}% off court hire
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate">Start date</span>
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </label>
-                <div className="rounded-xl border border-border-card bg-surface p-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate">Plan</span>
-                    <span className="text-ink">{plan.name}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-slate">Runs</span>
-                    <span className="text-ink">
-                      {startDate} → {endDate}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-slate">Sessions / month</span>
-                    <span className="text-ink">{plan.sessionsPerMonth}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {availableMethods.map((m) => {
-                    const Icon = METHOD_ICON[m.id]
-                    const active = method === m.id
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMethod(m.id)}
-                        className={`flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                          active ? 'border-ink bg-ink text-bone' : 'border-border-card bg-white text-ink'
-                        }`}
-                      >
-                        <Icon size={16} /> {m.name}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center justify-between border-t border-border-card pt-3">
-                  <span className="text-sm text-slate">Total due today</span>
-                  <span className="text-lg font-semibold text-ink">{money(plan.total)}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2">
-              {step > 1 ? (
-                <button type="button" onClick={() => setStep((s) => s - 1)} className="text-sm text-slate hover:text-ink">
-                  Back
-                </button>
-              ) : (
-                <span />
               )}
-              {step < 4 ? (
-                <button
-                  type="button"
-                  disabled={!canNext}
-                  onClick={() => setStep((s) => s + 1)}
-                  className="flex h-10 items-center justify-center rounded-full px-6 text-sm text-[#fefefe] disabled:opacity-40"
-                  style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={confirm}
-                  className="flex h-10 items-center justify-center rounded-full px-6 text-sm text-[#fefefe]"
-                  style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
-                >
-                  Confirm &amp; charge {money(plan.total)}
-                </button>
+
+              {plan && Number(plan.joining_fee ?? 0) > 0 && (
+                <p className="text-xs text-muted">
+                  Plus a one-off joining fee of {rupees(Number(plan.joining_fee))}.
+                </p>
               )}
-            </div>
-          </>
+            </section>
+
+            {error && (
+              <div className="rounded-lg border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={confirm}
+              disabled={!ready || busy}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+            >
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              Create and invoice
+            </button>
+          </div>
         )}
-      </div>
+      </aside>
     </div>
   )
 }

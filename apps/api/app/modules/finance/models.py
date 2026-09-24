@@ -318,7 +318,13 @@ class MemberSubscription(TenantScoped):
     plan_name: Mapped[str] = mapped_column(String(150), nullable=False)
     plan_color: Mapped[str | None] = mapped_column(String(9))
 
+    #: The first day of the *current* term. Rewritten by every renewal, which is
+    #: why it cannot answer "how long have they been a member" — `joined_on` does.
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    #: The day they first joined, set once and never touched again. Without it a
+    #: five-year member looks like they signed up last month the moment they renew,
+    #: and every loyalty or tenure report reads from the wrong column.
+    joined_on: Mapped[date] = mapped_column(Date, nullable=False)
     expiry_date: Mapped[date] = mapped_column(Date, nullable=False)
     duration: Mapped[PlanDuration] = mapped_column(
         enum_type(PlanDuration, name="subscription_duration"), nullable=False
@@ -333,6 +339,11 @@ class MemberSubscription(TenantScoped):
     total_paid: Mapped[Decimal] = mapped_column(money(), default=0, nullable=False)
     referral_code: Mapped[str | None] = mapped_column(String(64))
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Days banked across every pause, cumulative. The expiry date already carries
+    #: the extension, so this exists to be *shown*: "paused 47 days" is the answer
+    #: to a member asking why their year runs into February, and the number a
+    #: manager needs before someone parks a membership indefinitely.
+    paused_days_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     def days_left(self, today: date) -> int:

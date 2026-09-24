@@ -135,25 +135,53 @@ COACHES = [
      ["English", "Portuguese", "Spanish"], 0, 5000, False, True, "5.0"),
 ]
 
+# Football and tennis, each split kids/adults and laddered beginner → advanced.
+# Deliberately the two sports only: an academy grows one sport at a time, and a
+# seed that pretends to run five is a seed nobody trusts the shape of.
+#
+# `age_band` is what enrolment enforces; `age_min`/`age_max` override the band's
+# defaults where the academy runs to its own boundaries (the U-14 squad). The
+# free-text `age_group` beside them is display only and kept in step by hand.
 PROGRAMS = [
-    # name, sport slug, level, age group, duration, max, freq, session len, coach index, location, fees, color, bg
-    ("Tennis Beginners", "tennis", "Beginner", "6–14 yrs", "3 Months", 12, "3 sessions/week", "60 min", 0,
+    # name, sport, skill_level, age_band, (age_min, age_max), age group label,
+    # duration, max, freq, session len, coach index, location, fees, color, bg
+    ("Football Kids – Beginners", "football", "beginner", "kids", (5, 12), "5–12 yrs",
+     "3 Months", 16, "2 sessions/week", "60 min", 0,
+     "Football Ground", (2500, 6800, 12500, 22000), "#333333", "#F0F0F0"),
+    ("Football Kids – Development", "football", "intermediate", "kids", (10, 16), "10–16 yrs",
+     "6 Months", 14, "3 sessions/week", "75 min", 0,
+     "Football Ground", (3200, 8800, 16000, 29000), "#333333", "#F0F0F0"),
+    ("Football U-14 Squad", "football", "advanced", "kids", (11, 14), "11–14 yrs",
+     "12 Months", 12, "4 sessions/week", "90 min", 0,
+     "Football Ground", (4500, 12500, 23000, 42000), "#1A6B3C", "#E6F4EC"),
+    ("Football Adults – Social", "football", "beginner", "adults", None, "17+ yrs",
+     "3 Months", 20, "2 sessions/week", "90 min", 0,
+     "Football Ground", (2200, 6000, 11000, 19500), "#333333", "#F0F0F0"),
+    ("Tennis Kids – Beginners", "tennis", "beginner", "kids", (6, 14), "6–14 yrs",
+     "3 Months", 12, "3 sessions/week", "60 min", 0,
      "Court 1 & 2", (3500, 9500, 17000, 30000), "#C8A900", "#FFFBDC"),
-    ("Tennis Advanced", "tennis", "Advanced", "14+ yrs", "12 Months", 6, "5 sessions/week", "120 min", 4,
+    ("Tennis Kids – Advanced", "tennis", "advanced", "kids", (10, 16), "10–16 yrs",
+     "12 Months", 8, "4 sessions/week", "90 min", 4,
+     "Court 1", (6000, 16500, 30000, 55000), "#FF6600", "#FFF0E0"),
+    ("Tennis Adults – Beginners", "tennis", "beginner", "adults", None, "17+ yrs",
+     "3 Months", 12, "2 sessions/week", "60 min", 4,
+     "Court 2", (4000, 11000, 20000, 36000), "#C8A900", "#FFFBDC"),
+    ("Tennis Adults – Advanced", "tennis", "advanced", "adults", None, "17+ yrs",
+     "12 Months", 6, "5 sessions/week", "120 min", 4,
      "Court 1", (8000, 22000, 42000, 78000), "#FF6600", "#FFF0E0"),
-    ("Swim Beginners", "swimming", "Beginner", "5–12 yrs", "3 Months", 15, "5 sessions/week", "45 min", 1,
-     "Pool Lane 1–3", (2800, 7800, 14000, 25000), "#0077CC", "#E0F4FF"),
-    ("Badminton Club", "badminton", "Intermediate", "All ages", "6 Months", 16, "3 sessions/week", "90 min", 2,
-     "Badminton Courts", (2500, 7000, 12500, 22000), "#7B2FBE", "#F5EDFF"),
 ]
 
 BATCHES = [
     # name, program index, capacity, schedule, time label, location, color
-    ("Tennis A – Morning", 0, 12, "Mon · Wed · Fri", "6:30 AM – 7:30 AM", "Court 1", "#C8A900"),
-    ("Tennis B – Evening", 0, 12, "Tue · Thu · Sat", "5:00 PM – 6:00 PM", "Court 2", "#C8A900"),
-    ("Elite Tennis – Pro", 1, 6, "Mon–Fri", "4:30 PM – 6:30 PM", "Court 1", "#FF6600"),
-    ("Swim Kids – Morning", 2, 15, "Mon–Fri", "6:00 AM – 6:45 AM", "Pool Lane 1–3", "#0077CC"),
-    ("Badminton Club – Eve", 3, 16, "Mon · Wed · Fri", "6:00 PM – 7:30 PM", "Badminton Courts", "#7B2FBE"),
+    ("Football Cubs – Morning", 0, 16, "Sat · Sun", "8:00 AM – 9:00 AM", "Football Ground", "#333333"),
+    ("Football Juniors – Evening", 1, 14, "Mon · Wed · Fri", "5:00 PM – 6:15 PM", "Football Ground", "#333333"),
+    ("U-14 Squad – Training", 2, 12, "Tue · Thu · Sat", "4:00 PM – 5:30 PM", "Football Ground", "#1A6B3C"),
+    ("Football Social – Evening", 3, 20, "Tue · Thu", "7:00 PM – 8:30 PM", "Football Ground", "#333333"),
+    ("Tennis A – Morning", 4, 12, "Mon · Wed · Fri", "6:30 AM – 7:30 AM", "Court 1", "#C8A900"),
+    ("Tennis B – Evening", 4, 12, "Tue · Thu · Sat", "5:00 PM – 6:00 PM", "Court 2", "#C8A900"),
+    ("Tennis Juniors – Elite", 5, 8, "Mon–Fri", "4:30 PM – 6:00 PM", "Court 1", "#FF6600"),
+    ("Tennis Adults – Morning", 6, 12, "Tue · Thu", "7:00 AM – 8:00 AM", "Court 2", "#C8A900"),
+    ("Elite Tennis – Pro", 7, 6, "Mon–Fri", "4:30 PM – 6:30 PM", "Court 1", "#FF6600"),
 ]
 
 STUDENTS = [
@@ -327,12 +355,17 @@ async def seed_domain_data(session: AsyncSession, prefix: str) -> dict[str, int]
     # ── Programmes and batches ──────────────────────────────────────────────
     known_programs = await _existing(session, Program, Program.name)
     program_ids: list[uuid.UUID] = []
-    for (name, slug, level, age_group, duration, max_students, freq, session_len,
-         coach_index, location, fees, color, bg) in PROGRAMS:
+    for (name, slug, skill_level, age_band, bounds, age_group, duration, max_students,
+         freq, session_len, coach_index, location, fees, color, bg) in PROGRAMS:
         if name in known_programs:
             continue
         program = Program(
-            name=name, sport_id=sport_ids.get(slug), level=level, age_group=age_group,
+            name=name, sport_id=sport_ids.get(slug),
+            skill_level=skill_level, age_band=age_band,
+            age_min=bounds[0] if bounds else None,
+            age_max=bounds[1] if bounds else None,
+            # Kept in step with the structured fields above, and display only.
+            level=skill_level.title(), age_group=age_group,
             duration_label=duration, max_students=max_students,
             session_freq=freq, session_duration=session_len,
             coach_id=coach_ids[coach_index] if coach_index < len(coach_ids) else None,
@@ -346,14 +379,23 @@ async def seed_domain_data(session: AsyncSession, prefix: str) -> dict[str, int]
         program_ids.append(program.id)
     created["programs"] = len(program_ids)
 
-    if not program_ids:
-        program_ids = list((await session.execute(select(Program.id).order_by(Program.name))).scalars())
+    # Resolved by name, not by position. `program_ids` only collects the
+    # programmes this run created, so on a re-seed — or any run where one
+    # programme already existed — positional indices slide and batches attach to
+    # the wrong course. Silently: a kids' batch under an adults' programme still
+    # saves, and then refuses every child who tries to join it.
+    programs_by_name = {
+        name: pid
+        for name, pid in (await session.execute(select(Program.name, Program.id))).all()
+    }
 
     known_batches = await _existing(session, Batch, Batch.name)
     for name, program_index, capacity, schedule, time_label, location, color in BATCHES:
-        if name in known_batches or program_index >= len(program_ids):
+        program_name = PROGRAMS[program_index][0]
+        program_id = programs_by_name.get(program_name)
+        if name in known_batches or program_id is None:
             continue
-        program = await session.get(Program, program_ids[program_index])
+        program = await session.get(Program, program_id)
         session.add(
             Batch(
                 name=name, program_id=program.id, sport_id=program.sport_id,

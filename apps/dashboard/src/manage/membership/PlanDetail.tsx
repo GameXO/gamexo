@@ -1,31 +1,58 @@
+/**
+ * One plan, and who is on it.
+ *
+ * The members list is fetched filtered by status rather than pulled whole and
+ * counted here, so the numbers match what the Members screen shows — two
+ * independent derivations of "how many active members" is how they end up
+ * disagreeing in a meeting.
+ */
 import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { money, sportById } from '../../data/booking'
-import { membershipStatus } from '../../data/membership'
-import * as db from '../../lib/db'
 import Tabs from '../../ui/Tabs'
-import type { EffectivePlan } from './planOverrides'
+import {
+  DURATION_LABEL,
+  PLAN_DURATIONS,
+  planPrice,
+  sellableDurations,
+  useMemberships,
+  type MembershipPlanOut,
+  type PlanDuration,
+} from '../../api/hooks'
 
-const TABS = ['Overview', 'Members', 'Revenue', 'Invoices', 'Renewals'] as const
+const TABS = ['Overview', 'Members'] as const
 type Tab = (typeof TABS)[number]
+
+const rupees = (n: number) =>
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
 
 const STATUS_COLOR: Record<string, string> = {
   active: 'bg-positive/15 text-positive',
-  expiring: 'bg-flame/15 text-flame',
+  paused: 'bg-surface-muted text-muted',
   expired: 'bg-negative/15 text-negative',
-  frozen: 'bg-surface-muted text-muted',
+  cancelled: 'bg-surface-muted text-muted',
 }
 
-export default function PlanDetail({ plan, onBack }: { plan: EffectivePlan; onBack: () => void }) {
+export default function PlanDetail({
+  plan,
+  onBack,
+}: {
+  plan: MembershipPlanOut
+  onBack: () => void
+}) {
   const [tab, setTab] = useState<Tab>('Overview')
-  db.useDbVersion()
+  const { data, isLoading } = useMemberships('all')
 
-  const enrollments = db.getMemberships().filter((m) => m.planId === plan.id)
-  const revenue = enrollments.reduce((sum, m) => sum + m.paidTotal, 0)
+  const onThisPlan = (data?.items ?? []).filter((m) => m.plan_id === plan.id)
+  const revenue = onThisPlan.reduce((sum, m) => sum + Number(m.total_paid ?? 0), 0)
+  const terms = sellableDurations(plan)
 
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <button type="button" onClick={onBack} className="flex w-fit items-center gap-1.5 text-sm font-medium text-slate">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex w-fit items-center gap-1.5 text-sm font-medium text-slate"
+      >
         <ArrowLeft size={15} /> Back to plans
       </button>
 
@@ -33,16 +60,19 @@ export default function PlanDetail({ plan, onBack }: { plan: EffectivePlan; onBa
         <div>
           <p className="text-lg font-semibold text-ink">{plan.name}</p>
           <p className="text-sm text-slate">
-            {money(plan.price)}
-            {plan.durationMonths === 1 ? '/month' : ` / ${plan.durationMonths} mo`} · {enrollments.length} members
+            {terms.length > 0
+              ? terms.map((d) => `${DURATION_LABEL[d]} ${rupees(planPrice(plan, d))}`).join(' · ')
+              : 'No term priced'}
+            {' · '}
+            {onThisPlan.length} member{onThisPlan.length === 1 ? '' : 's'}
           </p>
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-            plan.status === 'active' ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'
+            plan.is_active ? 'bg-positive/10 text-positive' : 'bg-surface-muted text-muted'
           }`}
         >
-          {plan.status === 'active' ? 'Active' : 'Paused'}
+          {plan.is_active ? 'Offered' : 'Retired'}
         </span>
       </div>
 
@@ -50,141 +80,93 @@ export default function PlanDetail({ plan, onBack }: { plan: EffectivePlan; onBa
 
       {tab === 'Overview' && (
         <div className="grid w-full grid-cols-1 gap-4 rounded-2xl border border-border-card bg-white p-5 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)] sm:grid-cols-2">
-          <Field label="Duration" value={plan.durationMonths === 1 ? '1 month' : `${plan.durationMonths} months`} />
-          <Field label="Discount %" value={`${plan.discountPercent}% off court hire`} />
+          {PLAN_DURATIONS.map((d) => (
+            <Field
+              key={d}
+              label={DURATION_LABEL[d]}
+              value={
+                planPrice(plan, d) > 0 ? rupees(planPrice(plan, d)) : 'Not offered'
+              }
+            />
+          ))}
           <Field
-            label="Sports included"
-            value={plan.sportsIncluded.length ? plan.sportsIncluded.map((id) => sportById(id)?.name || id).join(', ') : 'All sports'}
+            label="Joining fee"
+            value={
+              Number(plan.joining_fee ?? 0) > 0 ? rupees(Number(plan.joining_fee)) : 'None'
+            }
           />
-          <Field label="Price" value={`${money(plan.price)} + GST = ${money(plan.total)}`} />
-          <div className="sm:col-span-2">
-            <p className="text-xs uppercase tracking-wide text-muted">Benefits</p>
-            <p className="text-sm text-ink">{plan.benefits}</p>
-          </div>
+          <Field label="Discount on court hire" value={`${plan.discount_pct ?? 0}%`} />
+          <Field
+            label="Visits included"
+            value={plan.max_visits == null ? 'Unlimited' : String(plan.max_visits)}
+          />
+          <Field label="Collected to date" value={rupees(revenue)} />
+          {(plan.benefits ?? []).length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="text-xs uppercase tracking-wide text-muted">Benefits</p>
+              <ul className="mt-1.5 flex flex-col gap-1">
+                {(plan.benefits ?? []).map((b) => (
+                  <li key={b} className="text-sm text-ink">
+                    · {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'Members' && (
-        <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
-          {enrollments.length === 0 ? (
-            <EmptyState plan={plan} />
-          ) : (
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-border-card bg-surface-muted text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Sessions used</th>
+        <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
+                <th className="px-4 py-3 font-medium">Member</th>
+                <th className="px-4 py-3 font-medium">Term</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Expires</th>
+                <th className="px-4 py-3 font-medium">Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              {onThisPlan.map((m) => (
+                <tr key={m.id} className="border-b border-border-card last:border-0">
+                  <td className="px-4 py-3 font-medium text-ink">{m.member_no}</td>
+                  <td className="px-4 py-3 text-slate">
+                    {DURATION_LABEL[m.duration as PlanDuration]}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
+                        STATUS_COLOR[m.status ?? 'active']
+                      }`}
+                    >
+                      {m.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate">{m.expiry_date}</td>
+                  <td className="px-4 py-3 text-slate">{rupees(Number(m.total_paid ?? 0))}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {enrollments.map((m) => (
-                  <tr key={m.id} className="border-b border-border-card last:border-0">
-                    <td className="px-4 py-3 font-medium text-ink">{m.customer.name}</td>
-                    <td className="px-4 py-3 text-slate">{m.customer.phone}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_COLOR[membershipStatus(m)]}`}>
-                        {membershipStatus(m)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate">{m.sessionsUsed}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {tab === 'Revenue' && (
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-          <Stat label="Total collected" value={money(revenue)} />
-          <Stat label="Active members" value={String(enrollments.filter((m) => membershipStatus(m) === 'active').length)} />
-          <Stat label="Avg. per member" value={money(enrollments.length ? revenue / enrollments.length : 0)} />
-        </div>
-      )}
-
-      {tab === 'Invoices' && (
-        <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
-          {enrollments.length === 0 ? (
-            <EmptyState plan={plan} />
-          ) : (
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-border-card bg-surface-muted text-xs uppercase tracking-wide text-muted">
+              ))}
+              {isLoading && (
                 <tr>
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Status</th>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
+                    Loading…
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {enrollments.map((m) => (
-                  <tr key={m.id} className="border-b border-border-card last:border-0">
-                    <td className="px-4 py-3 font-medium text-ink">{m.id}</td>
-                    <td className="px-4 py-3 text-slate">{m.customer.name}</td>
-                    <td className="px-4 py-3 text-ink">{money(m.total)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          m.paidTotal >= m.total ? 'bg-lime/20 text-lime-ink' : 'bg-negative/10 text-negative'
-                        }`}
-                      >
-                        {m.paidTotal >= m.total ? 'Paid' : `${money(m.total - m.paidTotal)} due`}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {tab === 'Renewals' && (
-        <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
-          {enrollments.length === 0 ? (
-            <EmptyState plan={plan} />
-          ) : (
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-border-card bg-surface-muted text-xs uppercase tracking-wide text-muted">
+              )}
+              {!isLoading && onThisPlan.length === 0 && (
                 <tr>
-                  <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Expires</th>
-                  <th className="px-4 py-3">Status</th>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
+                    Nobody is on this plan yet.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {[...enrollments]
-                  .sort((a, b) => a.endDate.localeCompare(b.endDate))
-                  .map((m) => (
-                    <tr key={m.id} className="border-b border-border-card last:border-0">
-                      <td className="px-4 py-3 font-medium text-ink">{m.customer.name}</td>
-                      <td className="px-4 py-3 text-slate">{m.endDate}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_COLOR[membershipStatus(m)]}`}>
-                          {membershipStatus(m)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          )}
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
-  )
-}
-
-function EmptyState({ plan }: { plan: EffectivePlan }) {
-  return (
-    <p className="px-4 py-10 text-center text-sm text-muted">
-      {plan.isCustom
-        ? "No members enrolled yet — custom plans aren't wired into the enrollment flow yet."
-        : 'No members enrolled in this plan yet.'}
-    </p>
   )
 }
 
@@ -192,16 +174,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="text-sm font-medium text-ink">{value}</p>
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border-card bg-white p-4 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-xl font-semibold text-ink">{value}</p>
+      <p className="mt-1 text-sm text-ink">{value}</p>
     </div>
   )
 }

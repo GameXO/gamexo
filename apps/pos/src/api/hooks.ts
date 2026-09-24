@@ -137,6 +137,8 @@ export const queryKeys = {
   equipment: ['equipment'] as const,
   bookingSearch: (query: string) => ['bookingSearch', query] as const,
   publicSettings: ['publicSettings'] as const,
+  academySessions: (dayISO: string) => ['academySessions', dayISO] as const,
+  sessionRoster: (sessionId: string) => ['sessionRoster', sessionId] as const,
 }
 
 /**
@@ -318,3 +320,77 @@ export function useEmailInvoice() {
 }
 
 export type { BookingOut }
+
+
+/* ── Academy register ──────────────────────────────────────────────────────── */
+
+export type SessionOut = components['schemas']['SessionOut']
+export type RosterEntry = components['schemas']['RosterEntry']
+export type AttendanceStatus = 'present' | 'absent' | 'late'
+
+/**
+ * Today's classes.
+ *
+ * Bounded to the day rather than fetching every session ever scheduled: a
+ * register is taken for a class happening now, and the tablet should not hold
+ * the academy's whole history in memory to find it.
+ *
+ * The window is built from local midnight, not UTC — an evening class in IST
+ * would otherwise fall into tomorrow and vanish from the list at 18:30.
+ */
+export function useTodaysSessions() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  const dayISO = start.toISOString().slice(0, 10)
+
+  return useQuery({
+    queryKey: queryKeys.academySessions(dayISO),
+    queryFn: () =>
+      api.academySessions({ date_from: start.toISOString(), date_to: end.toISOString() }),
+    staleTime: 60_000,
+  })
+}
+
+export function useSessionRoster(sessionId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.sessionRoster(sessionId ?? ''),
+    queryFn: () => api.sessionRoster(sessionId!),
+    enabled: Boolean(sessionId),
+  })
+}
+
+export function useMarkAttendance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: {
+      sessionId: string
+      marks: { student_id: string; status: AttendanceStatus; note?: string | null }[]
+    }) => api.markAttendance(vars.sessionId, vars.marks),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.sessionRoster(vars.sessionId) })
+      // Taking the register completes the session, so the list's status moves too.
+      qc.invalidateQueries({ queryKey: ['academySessions'] })
+    },
+  })
+}
+
+
+export type MembershipCheck = components['schemas']['MembershipCheck']
+
+/**
+ * Look a member up at the counter.
+ *
+ * Not `enabled` until somebody actually asks: this fires on a submitted code,
+ * not on every keystroke, because a 404 is a normal answer here and retrying it
+ * per character would make "not a member" flash while somebody is still typing.
+ */
+export function useMembershipCheck(code: string | null) {
+  return useQuery({
+    queryKey: ['membershipCheck', code ?? ''],
+    queryFn: () => api.checkMembership(code!),
+    enabled: Boolean(code),
+    retry: false,
+  })
+}

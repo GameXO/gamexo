@@ -1,7 +1,9 @@
 import {
+  BadgeIndianRupee,
   Bell,
   Clock,
   CreditCard,
+  GraduationCap,
   Landmark,
   Link2,
   Lock,
@@ -22,6 +24,8 @@ export type SettingsSectionId =
   | 'account'
   | 'team'
   | 'counterServices'
+  | 'membershipPlans'
+  | 'academyPrograms'
   | 'bookingRules'
   | 'notifications'
   | 'billing'
@@ -46,6 +50,8 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
     label: 'Operations',
     items: [
       { id: 'counterServices', label: 'Counter Services', icon: Monitor },
+      { id: 'membershipPlans', label: 'Membership Plans', icon: BadgeIndianRupee },
+      { id: 'academyPrograms', label: 'Academy Programmes', icon: GraduationCap },
       { id: 'bookingRules', label: 'Booking Rules', icon: Clock },
       { id: 'notifications', label: 'Notifications', icon: Bell },
     ],

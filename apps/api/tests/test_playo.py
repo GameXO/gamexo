@@ -18,11 +18,30 @@ from sqlalchemy import select, update
 from app.db.session import tenant_session
 from app.modules.booking.models import Booking, BookingStatus
 from tests.conftest import TenantFixture
-from tests.test_booking import at, book, setup_academy
+from tests.test_booking import book, setup_academy
 from tests.test_gateway import make_partner
 
-DAY = "2026-09-04"
 IST = ZoneInfo("Asia/Kolkata")
+
+#: A week out, recomputed every run. The gateway refuses to hold a slot that has
+#: already happened — correctly — so a date literal here is a fuse: these tests
+#: passed until the wall clock went past 4 September 2026, then began failing with
+#: an empty `orderIds` and an IndexError that says nothing about the cause.
+#: Nothing below asserts on the date itself, and Playo supplies its own price, so
+#: which weekday this lands on does not matter.
+DAY = (datetime.now(IST).date() + timedelta(days=7)).isoformat()
+
+
+def counter_slot(hour: int) -> str:
+    """The same slot as `slot(...)` below, in the shape the counter books it.
+
+    Half these tests are about a Playo hold and a walk-in colliding on one court,
+    which only works while both name the same instant. `at()` from the booking
+    suite is pinned to September 2026 and DAY is not, so mixing the two silently
+    puts them on different days and the collision stops happening — the test then
+    passes or fails for a reason unrelated to what it is checking.
+    """
+    return f"{DAY}T{hour:02d}:00:00+05:30"
 
 
 def slot(court: str, hour: int, order_id: str, price: str = "1200", paid: str = "1200") -> dict:
@@ -147,7 +166,7 @@ async def test_a_hold_blocks_the_counter(client: AsyncClient, tenant_a: TenantFi
     )
     assert held.json()["requestStatus"] == 1
 
-    counter = await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    counter = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
     assert counter.status_code == 409
 
 
@@ -157,7 +176,7 @@ async def test_the_counter_blocks_playo(client: AsyncClient, tenant_a: TenantFix
     ctx = await setup_academy(client, tenant_a)
     partner = await playo(client, ctx, tenant_a)
 
-    await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
 
     response = await post(
         client, partner, "/order/create",
@@ -206,7 +225,7 @@ async def test_a_partial_order_is_not_committed(
         ).scalars().all()
     assert leaked == []
 
-    free = await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    free = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
     assert free.status_code == 201
 
 
@@ -375,7 +394,7 @@ async def test_an_expired_hold_stops_blocking_the_court(
     )
     await _expire(tenant_a, created.json()["orderIds"][0]["externalOrderId"])
 
-    counter = await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    counter = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
     assert counter.status_code == 201
 
 
@@ -416,7 +435,7 @@ async def test_a_lapsed_hold_cannot_be_confirmed_once_the_court_is_gone(
     reference = created.json()["orderIds"][0]["externalOrderId"]
     await _expire(tenant_a, reference)
 
-    walkin = await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))
+    walkin = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
     assert walkin.status_code == 201
 
     confirmed = await post(client, partner, "/order/confirm", {"orderIds": [reference]})
@@ -439,7 +458,7 @@ async def test_playo_cannot_cancel_a_walk_in(
     ctx = await setup_academy(client, tenant_a)
     partner = await playo(client, ctx, tenant_a)
 
-    walkin = (await book(client, ctx, court=ctx["court_1"], starts_at=at(4, 9))).json()
+    walkin = (await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))).json()
 
     response = await post(
         client, partner, "/booking/cancel",
