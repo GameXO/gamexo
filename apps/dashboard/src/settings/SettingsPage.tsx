@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { identityFrom } from '../auth/identity'
+import { AcademyPrograms } from './AcademyPrograms'
 import { ChangePassword } from './ChangePassword'
 import { ServicesPicker } from './ServicesPicker'
 import { SETTINGS_NAV, type SettingsSectionId } from './settingsNav'
@@ -103,6 +104,11 @@ const SECTION_COPY: Partial<Record<SettingsSectionId, { title: string; descripti
     title: 'Security & Sessions',
     description: 'Active sign-ins for this account and where they were made from.',
   },
+  membershipPlans: {
+    title: 'Membership Plans',
+    description:
+      'The tiers this academy sells and what each term costs — managed today from Manage → Membership.',
+  },
   integrations: {
     title: 'Integrations',
     description: 'Booking platforms and third-party tools connected to this academy — managed today from Manage → Integrations.',
@@ -142,6 +148,7 @@ export default function SettingsPage() {
 
   const renderSection = () => {
     if (section === 'counterServices') return <ServicesPicker />
+    if (section === 'academyPrograms') return <AcademyPrograms />
     if (section === 'password') return <ChangePassword />
     if (section === 'account') return <AccountCard />
 

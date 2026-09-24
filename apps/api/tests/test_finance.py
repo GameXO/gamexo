@@ -3,13 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 from httpx import AsyncClient
 
 from tests.conftest import PASSWORD, TenantFixture, auth_headers, login
-from tests.test_booking import at, book, setup_academy
+from tests.test_booking import IST, at, book, setup_academy
+
+
+def future_slot(*, days: int = 3, hour: int = 10) -> str:
+    """A slot that is still ahead of us, whenever this suite happens to run.
+
+    `at()` pins its dates to September 2026 because the booking suite asserts on
+    specific weekdays and peak-hour windows. That is fine there, and wrong here:
+    an invoice takes its due date from the booking, so a fixed date turns every
+    unpaid invoice OVERDUE the moment the wall clock passes it — which is exactly
+    how the partial-payment test below started failing on 4 September 2026, having
+    asserted PENDING since the day it was written.
+    """
+    when = datetime.now(IST).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return (when + timedelta(days=days)).isoformat()
 
 
 async def make_customer(client: AsyncClient, ctx: dict, name="Arjun Mehta", phone="9876543210"):
@@ -255,7 +270,7 @@ async def test_partial_then_full_payment_updates_invoice_and_booking(
     client: AsyncClient, tenant_a: TenantFixture
 ) -> None:
     ctx = await setup_academy(client, tenant_a)
-    created = await book(client, ctx, court=ctx["court_1"], starts_at=at(3, 10))
+    created = await book(client, ctx, court=ctx["court_1"], starts_at=future_slot())
     booking_id = created.json()["id"]
     total = Decimal(created.json()["total"])  # 944.00
 
@@ -578,3 +593,283 @@ async def test_renewal_due_filter(client: AsyncClient, tenant_a: TenantFixture) 
     )
     assert due.json()["total"] == 1
     assert due.json()["items"][0]["customer_id"] == expiring
+
+
+# ── Membership lifecycle ────────────────────────────────────────────────────
+
+
+async def make_membership(client: AsyncClient, ctx: dict, plan_id: str, duration="12m") -> dict:
+    customer_id = await make_customer(client, ctx, name="Priya Nair", phone="9812300099")
+    response = await client.post(
+        "/api/v1/memberships",
+        json={"customer_id": customer_id, "plan_id": plan_id, "duration": duration},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["subscription"]
+
+
+async def test_pause_then_resume_gives_the_parked_days_back(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A paid term is a quantity of membership, not a window on the calendar.
+
+    Resuming on the same day banks nothing, which is the honest answer and also the
+    only one this test can assert without waiting. The arithmetic itself is covered
+    below, where the clock can be moved.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    plan_id = await make_plan(client, ctx)
+    membership = await make_membership(client, ctx, plan_id)
+    expiry_before = membership["expiry_date"]
+
+    paused = await client.post(
+        f"/api/v1/memberships/{membership['id']}/pause", headers=ctx["headers"]
+    )
+    assert paused.status_code == 200, paused.text
+    assert paused.json()["status"] == "paused"
+
+    resumed = await client.post(
+        f"/api/v1/memberships/{membership['id']}/resume", headers=ctx["headers"]
+    )
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["status"] == "active"
+    assert resumed.json()["expiry_date"] == expiry_before
+    assert resumed.json()["paused_days_total"] == 0
+
+
+def test_resume_extends_expiry_by_the_days_parked() -> None:
+    """The unit the endpoint delegates to, with the clock under our control.
+
+    Charging a member for six weeks they were told they were not using makes pause
+    strictly worse for them than doing nothing — at which point it is a trap, not a
+    feature. So the expiry moves out by exactly the days spent parked.
+    """
+    from datetime import UTC, datetime
+
+    from app.modules.finance.models import MemberSubscription, SubscriptionStatus
+    from app.modules.finance.service import resume_subscription
+
+    start = date(2026, 1, 1)
+    subscription = MemberSubscription(
+        start_date=start,
+        joined_on=start,
+        expiry_date=date(2026, 12, 31),
+        status=SubscriptionStatus.PAUSED,
+        paused_at=datetime(2026, 3, 1, tzinfo=UTC),
+        paused_days_total=0,
+    )
+
+    banked = resume_subscription(
+        subscription, today=date(2026, 4, 15), zone=ZoneInfo("Asia/Kolkata")
+    )
+
+    assert banked == 45
+    assert subscription.expiry_date == date(2027, 2, 14)
+    assert subscription.paused_days_total == 45
+    assert subscription.status is SubscriptionStatus.ACTIVE
+    assert subscription.paused_at is None
+
+
+def test_pauses_accumulate_across_several_spells() -> None:
+    """Two injuries in a year bank both spells, not just the last one."""
+    from datetime import UTC, datetime
+
+    from app.modules.finance.models import MemberSubscription, SubscriptionStatus
+    from app.modules.finance.service import resume_subscription
+
+    subscription = MemberSubscription(
+        start_date=date(2026, 1, 1),
+        joined_on=date(2026, 1, 1),
+        expiry_date=date(2026, 12, 31),
+        status=SubscriptionStatus.PAUSED,
+        paused_at=datetime(2026, 3, 1, tzinfo=UTC),
+        paused_days_total=10,
+    )
+
+    resume_subscription(subscription, today=date(2026, 3, 11), zone=ZoneInfo("Asia/Kolkata"))
+    assert subscription.paused_days_total == 20
+    assert subscription.expiry_date == date(2027, 1, 10)
+
+
+async def test_resume_refuses_a_membership_that_is_not_paused(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    ctx = await setup_academy(client, tenant_a)
+    plan_id = await make_plan(client, ctx)
+    membership = await make_membership(client, ctx, plan_id)
+
+    response = await client.post(
+        f"/api/v1/memberships/{membership['id']}/resume", headers=ctx["headers"]
+    )
+    assert response.status_code == 409, response.text
+    assert "not paused" in response.json()["error"]["message"]
+
+
+async def test_renewal_keeps_the_original_join_date(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Tenure survives a renewal.
+
+    `start_date` is the current term and is meant to move. Before `joined_on`
+    existed it was the only date on the row, so a five-year member looked like they
+    joined last month the moment they renewed — and every loyalty report read it.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    plan_id = await make_plan(client, ctx)
+    membership = await make_membership(client, ctx, plan_id)
+    joined = membership["joined_on"]
+    assert joined == membership["start_date"]
+
+    renewed = await client.post(
+        f"/api/v1/memberships/{membership['id']}/renew",
+        json={"duration": "12m"},
+        headers=ctx["headers"],
+    )
+    assert renewed.status_code == 200, renewed.text
+    subscription = renewed.json()["subscription"]
+
+    assert subscription["joined_on"] == joined
+    assert subscription["start_date"] != joined  # the new term starts at the old expiry
+
+
+async def test_a_duration_the_plan_does_not_price_cannot_be_sold(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Zero is how a plan says "we don't sell this term length".
+
+    Every price column defaults to 0, so without this rule a plan priced only by
+    the year would hand out a free month to anyone who picked the wrong radio
+    button — and the invoice would say ₹0 with nothing obviously wrong.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    yearly_only = await client.post(
+        "/api/v1/membership-plans",
+        json={"name": "Annual Only", "price_12m": "30000"},
+        headers=ctx["headers"],
+    )
+    assert yearly_only.status_code == 201, yearly_only.text
+    plan_id = yearly_only.json()["id"]
+    customer_id = await make_customer(client, ctx, name="Term Tester", phone="9812300077")
+
+    refused = await client.post(
+        "/api/v1/memberships",
+        json={"customer_id": customer_id, "plan_id": plan_id, "duration": "1m"},
+        headers=ctx["headers"],
+    )
+    assert refused.status_code == 409, refused.text
+    assert "1m" in refused.json()["error"]["message"]
+
+    sold = await client.post(
+        "/api/v1/memberships",
+        json={"customer_id": customer_id, "plan_id": plan_id, "duration": "12m"},
+        headers=ctx["headers"],
+    )
+    assert sold.status_code == 201, sold.text
+
+
+async def test_renewing_into_an_unpriced_duration_is_refused_too(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The same rule on the renewal path, which raises its own invoice."""
+    ctx = await setup_academy(client, tenant_a)
+    plan = await client.post(
+        "/api/v1/membership-plans",
+        json={"name": "Annual Only", "price_12m": "30000"},
+        headers=ctx["headers"],
+    )
+    membership = await make_membership(client, ctx, plan.json()["id"], duration="12m")
+
+    response = await client.post(
+        f"/api/v1/memberships/{membership['id']}/renew",
+        json={"duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 409, response.text
+
+
+def test_an_evening_pause_and_resume_banks_nothing() -> None:
+    """The timezone trap, pinned.
+
+    `paused_at` is a UTC instant; every date on the row is civil time in the
+    venue's zone. At 20:30 UTC it is already tomorrow in Kolkata, so reading the
+    UTC date and subtracting it from a local `today` hands the member a free day
+    for a pause that lasted minutes. Same calendar day in the venue's own frame
+    means nothing banked — that is the whole assertion.
+    """
+    from datetime import UTC, datetime
+
+    from app.modules.finance.models import MemberSubscription, SubscriptionStatus
+    from app.modules.finance.service import resume_subscription
+
+    ist = ZoneInfo("Asia/Kolkata")
+    # 2026-03-01 20:30 UTC is 2026-03-02 02:00 in Kolkata.
+    paused_at = datetime(2026, 3, 1, 20, 30, tzinfo=UTC)
+    assert paused_at.astimezone(ist).date() == date(2026, 3, 2)
+
+    subscription = MemberSubscription(
+        start_date=date(2026, 1, 1),
+        joined_on=date(2026, 1, 1),
+        expiry_date=date(2026, 12, 31),
+        status=SubscriptionStatus.PAUSED,
+        paused_at=paused_at,
+        paused_days_total=0,
+    )
+
+    banked = resume_subscription(subscription, today=date(2026, 3, 2), zone=ist)
+
+    assert banked == 0
+    assert subscription.expiry_date == date(2026, 12, 31)
+
+
+# ── What the counter tablet may learn about a membership ────────────────────
+
+
+async def test_the_tablet_can_check_membership_but_not_read_money(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """"Is this person a member?" is the counter's question, and its whole answer.
+
+    Status and expiry, never what they paid, and never a list. Selling stays with
+    a login that names a person — the shared tablet credential is the most
+    exposed one in the venue.
+    """
+    from app.core.security import Role
+
+    from tests.conftest import make_user
+
+    ctx = await setup_academy(client, tenant_a)
+    plan_id = await make_plan(client, ctx)
+    membership = await make_membership(client, ctx, plan_id)
+
+    kiosk = await make_user(tenant_a, email="counter3@example.com", role=Role.KIOSK)
+    tablet = auth_headers(await login(client, tenant_a, kiosk.username, PASSWORD), tenant_a)
+
+    found = await client.get(
+        "/api/v1/memberships/check", params={"code": membership["member_no"]}, headers=tablet
+    )
+    assert found.status_code == 200, found.text
+    body = found.json()
+    assert body["status"] == "active"
+    assert body["member_no"] == membership["member_no"]
+    assert "total_paid" not in body
+
+    by_phone = await client.get(
+        "/api/v1/memberships/check", params={"code": "9812300099"}, headers=tablet
+    )
+    assert by_phone.status_code == 200, by_phone.text
+
+    missing = await client.get(
+        "/api/v1/memberships/check", params={"code": "XC-M-9999"}, headers=tablet
+    )
+    assert missing.status_code == 404
+
+    # And the things it must not reach.
+    assert (await client.get("/api/v1/memberships", headers=tablet)).status_code == 403
+    assert (
+        await client.post(
+            f"/api/v1/memberships/{membership['id']}/renew",
+            json={"duration": "12m"},
+            headers=tablet,
+        )
+    ).status_code == 403

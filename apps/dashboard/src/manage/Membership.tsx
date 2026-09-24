@@ -1,54 +1,89 @@
+/**
+ * Manage → Membership: the one place plans are defined.
+ *
+ * API-backed. It used to run on `planOverrides.ts`, which layered localStorage
+ * edits over a generated mock catalogue — so a plan "created" here existed only
+ * in that browser, and the memberships actually sold against the API knew
+ * nothing about it.
+ *
+ * Grouped by category rather than by sport, because a plan on the server has a
+ * free-text category and no sport: one membership usually covers the venue, not
+ * a single court type.
+ *
+ * Two behaviours inherited from the API and worth stating plainly in the UI:
+ *
+ *   **A term priced at zero is not sold.** That is how a plan says "yearly
+ *   only", and `POST /memberships` refuses anything else. So the card shows the
+ *   terms that exist rather than a single headline price.
+ *
+ *   **Plans are retired, not deleted.** The foreign key from a subscription is
+ *   RESTRICT, so a plan anyone holds cannot be removed. Retiring hides it from
+ *   new sales and leaves existing members alone — which is what "delete" was
+ *   always meant to do here.
+ */
 import { useState } from 'react'
-import { Eye, Pencil, Copy, Pause, Play, Trash2 } from 'lucide-react'
-import { SPORTS } from '../data/booking'
-import { money } from '../data/booking'
-import * as db from '../lib/db'
+import { Eye, Pause, Pencil, Play } from 'lucide-react'
 import RowActionsMenu from '../ui/RowActionsMenu'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import {
-  listEffectivePlans,
-  pausePlan,
-  resumePlan,
-  deletePlan,
-  duplicatePlan,
-  editPlan,
-  createCustomPlan,
-  type EffectivePlan,
-} from './membership/planOverrides'
+  DURATION_LABEL,
+  planPrice,
+  sellableDurations,
+  useMembershipPlans,
+  useSaveMembershipPlan,
+  type MembershipPlanOut,
+} from '../api/hooks'
 import PlanFormDrawer from './membership/PlanFormDrawer'
 import PlanDetail from './membership/PlanDetail'
 
+const rupees = (n: number) =>
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+
 export default function Membership() {
-  db.useDbVersion()
-  const plans = listEffectivePlans()
+  const { data: plans, isLoading } = useMembershipPlans(true)
+  const save = useSaveMembershipPlan()
 
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [formPlan, setFormPlan] = useState<EffectivePlan | 'new' | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<EffectivePlan | null>(null)
+  const [formPlan, setFormPlan] = useState<MembershipPlanOut | 'new' | null>(null)
+  const [confirmRetire, setConfirmRetire] = useState<MembershipPlanOut | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const detailPlan = detailId ? plans.find((p) => p.id === detailId) || null : null
+  const all = plans ?? []
+  const detailPlan = detailId ? (all.find((p) => p.id === detailId) ?? null) : null
   if (detailPlan) return <PlanDetail plan={detailPlan} onBack={() => setDetailId(null)} />
 
-  const customPlans = plans.filter((p) => p.isCustom)
-  const generatedBySport = SPORTS.map((sport) => ({
-    sport,
-    plans: plans.filter((p) => !p.isCustom && p.sourceSportId === sport.id),
-  }))
+  const setActive = async (plan: MembershipPlanOut, is_active: boolean) => {
+    setError(null)
+    try {
+      await save.mutateAsync({ planId: plan.id, body: { is_active } })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update that plan.')
+    }
+  }
 
-  const actionsFor = (plan: EffectivePlan) => [
+  const actionsFor = (plan: MembershipPlanOut) => [
     { label: 'View', icon: Eye, onClick: () => setDetailId(plan.id) },
     { label: 'Edit', icon: Pencil, onClick: () => setFormPlan(plan) },
-    { label: 'Duplicate', icon: Copy, onClick: () => duplicatePlan(plan) },
-    plan.status === 'active'
-      ? { label: 'Pause', icon: Pause, onClick: () => pausePlan(plan) }
-      : { label: 'Resume', icon: Play, onClick: () => resumePlan(plan) },
-    { label: 'Delete', icon: Trash2, danger: true, onClick: () => setConfirmDelete(plan) },
+    plan.is_active
+      ? { label: 'Retire', icon: Pause, danger: true, onClick: () => setConfirmRetire(plan) }
+      : { label: 'Offer again', icon: Play, onClick: () => setActive(plan, true) },
   ]
+
+  // Uncategorised plans last, so a venue that never sets a category still reads
+  // as one list rather than a section called "Other" above everything.
+  const categories = [...new Set(all.map((p) => p.category ?? ''))].sort((a, b) =>
+    a === '' ? 1 : b === '' ? -1 : a.localeCompare(b),
+  )
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-5 sm:px-6">
       <div className="flex items-center justify-between">
-        <p className="text-lg text-ink">Membership</p>
+        <div>
+          <p className="text-lg text-ink">Membership</p>
+          <p className="text-sm text-slate">
+            Plans this academy sells. Price the terms you offer; leave the rest at zero.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setFormPlan('new')}
@@ -58,39 +93,74 @@ export default function Membership() {
         </button>
       </div>
 
-      {customPlans.length > 0 && (
-        <PlanSection title="Custom Plans" plans={customPlans} actionsFor={actionsFor} onOpen={setDetailId} />
+      {error && (
+        <div className="rounded-lg border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+          {error}
+        </div>
       )}
 
-      {generatedBySport.map(
-        ({ sport, plans: sportPlans }) =>
-          sportPlans.length > 0 && (
-            <PlanSection key={sport.id} title={sport.name} plans={sportPlans} actionsFor={actionsFor} onOpen={setDetailId} />
-          ),
+      {isLoading && <p className="text-sm text-muted">Loading plans…</p>}
+
+      {!isLoading && all.length === 0 && (
+        <div className="rounded-xl border border-border-card bg-white p-6">
+          <p className="text-sm font-medium text-ink">No plans yet</p>
+          <p className="mt-1 text-sm text-slate">
+            Create one and it becomes sellable from the Members screen straight away.
+          </p>
+        </div>
       )}
+
+      {categories.map((category) => {
+        const inCategory = all.filter((p) => (p.category ?? '') === category)
+        if (inCategory.length === 0) return null
+        return (
+          <PlanSection
+            key={category || 'uncategorised'}
+            title={category || 'All members'}
+            plans={inCategory}
+            actionsFor={actionsFor}
+            onOpen={setDetailId}
+          />
+        )
+      })}
 
       {formPlan && (
         <PlanFormDrawer
           plan={formPlan === 'new' ? null : formPlan}
+          saving={save.isPending}
           onClose={() => setFormPlan(null)}
-          onSave={(fields) => {
-            if (formPlan !== 'new') editPlan(formPlan, fields)
-            else createCustomPlan(fields)
-            setFormPlan(null)
+          onSave={async (body) => {
+            setError(null)
+            try {
+              // Branched rather than passing `planId: maybeUndefined`, so the
+              // create path is type-checked as needing a full body.
+              await (formPlan === 'new'
+                ? save.mutateAsync({ body })
+                : save.mutateAsync({ planId: formPlan.id, body }))
+              setFormPlan(null)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Could not save that plan.')
+            }
           }}
         />
       )}
 
-      {confirmDelete && (
+      {confirmRetire && (
         <ConfirmDialog
-          title={`Delete ${confirmDelete.name}?`}
-          message="This plan will no longer be offered. Existing members already enrolled are not affected."
-          confirmLabel="Delete"
+          title={`Retire ${confirmRetire.name}?`}
+          message={
+            (confirmRetire.active_count ?? 0) > 0
+              ? `${confirmRetire.active_count} member${
+                  confirmRetire.active_count === 1 ? '' : 's'
+                } hold this plan. They keep it and can still renew — it just stops being offered to new members.`
+              : 'It stops being offered to new members. You can put it back any time.'
+          }
+          confirmLabel="Retire"
           danger
-          onCancel={() => setConfirmDelete(null)}
+          onCancel={() => setConfirmRetire(null)}
           onConfirm={() => {
-            deletePlan(confirmDelete)
-            setConfirmDelete(null)
+            setActive(confirmRetire, false)
+            setConfirmRetire(null)
           }}
         />
       )}
@@ -105,35 +175,63 @@ function PlanSection({
   onOpen,
 }: {
   title: string
-  plans: EffectivePlan[]
-  actionsFor: (plan: EffectivePlan) => { label: string; icon: typeof Eye; danger?: boolean; onClick: () => void }[]
+  plans: MembershipPlanOut[]
+  actionsFor: (
+    plan: MembershipPlanOut,
+  ) => { label: string; icon: typeof Eye; danger?: boolean; onClick: () => void }[]
   onOpen: (id: string) => void
 }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm font-semibold text-ink">{title}</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {plans.map((plan) => (
-          <div
-            key={plan.id}
-            className={`flex flex-col gap-2 rounded-xl border bg-white p-4 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)] ${
-              plan.status === 'paused' ? 'opacity-60' : 'border-border-card'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <button type="button" onClick={() => onOpen(plan.id)} className="text-left">
-                <p className="text-sm font-semibold text-ink">{plan.name}</p>
-              </button>
-              <RowActionsMenu actions={actionsFor(plan)} />
+        {plans.map((plan) => {
+          const terms = sellableDurations(plan)
+          return (
+            <div
+              key={plan.id}
+              className={`flex flex-col gap-2 rounded-xl border bg-white p-4 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)] ${
+                plan.is_active ? 'border-border-card' : 'border-border-card opacity-60'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <button type="button" onClick={() => onOpen(plan.id)} className="text-left">
+                  <p className="text-sm font-semibold text-ink">{plan.name}</p>
+                </button>
+                <RowActionsMenu actions={actionsFor(plan)} />
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                {terms.map((d) => (
+                  <p key={d} className="text-sm text-slate">
+                    <span className="text-muted">{DURATION_LABEL[d]}</span>{' '}
+                    <span className="font-medium text-ink">{rupees(planPrice(plan, d))}</span>
+                  </p>
+                ))}
+                {terms.length === 0 && (
+                  <p className="text-sm text-amber-700">No term priced — can't be sold</p>
+                )}
+              </div>
+
+              {(plan.benefits ?? []).length > 0 && (
+                <p className="text-xs text-muted">{(plan.benefits ?? []).join(' · ')}</p>
+              )}
+
+              <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                {(plan.active_count ?? 0) > 0 && (
+                  <span className="text-[11px] text-slate">
+                    {plan.active_count} member{plan.active_count === 1 ? '' : 's'}
+                  </span>
+                )}
+                {!plan.is_active && (
+                  <span className="w-fit rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">
+                    Retired
+                  </span>
+                )}
+              </div>
             </div>
-            <p className="text-xl font-semibold text-ink">
-              {money(plan.price)}
-              {plan.durationMonths === 1 ? '/month' : ` / ${plan.durationMonths}mo`}
-            </p>
-            <p className="text-xs text-muted">{plan.benefits}</p>
-            {plan.status === 'paused' && <span className="w-fit rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted">Paused</span>}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

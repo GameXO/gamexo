@@ -13,12 +13,12 @@ from sqlalchemy.orm import selectinload
 
 from app.api_utils import Page, Params, get_or_404, paginate
 from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
-from app.core.errors import ConflictError, MailDeliveryError
+from app.core.errors import ConflictError, MailDeliveryError, NotFoundError
 from app.core.mail import MailNotConfigured, Message, send_email
 from app.core.mail_templates import invoice_raised
 from app.models.tenant import TenantSettings
 from app.modules.booking.models import Booking, BookingEventKind, Customer
-from app.modules.booking.pricing import money
+from app.modules.booking.pricing import money, tenant_zone
 from app.modules.admin.notify import (
     EMAIL_INVOICE,
     EMAIL_PAYMENT_RECEIPT,
@@ -44,6 +44,7 @@ from app.modules.finance.schemas import (
     MembershipPlanCreate,
     MembershipPlanOut,
     MembershipPlanUpdate,
+    MembershipCheck,
     PaymentCreate,
     PaymentOut,
     PaymentsOverview,
@@ -446,15 +447,65 @@ def _to_out(subscription: MemberSubscription, today: date) -> SubscriptionOut:
                 "plan_name",
                 "plan_color",
                 "start_date",
+                "joined_on",
                 "expiry_date",
                 "duration",
                 "status",
                 "visits_used",
                 "total_paid",
+                "paused_days_total",
             )
         },
         days_left=subscription.days_left(today),
         renewal_due=subscription.renewal_due(today),
+    )
+
+
+@router.get(
+    "/memberships/check",
+    response_model=MembershipCheck,
+    summary="Is this person a member?",
+    description=(
+        "The counter's question, and the only membership endpoint the **kiosk** "
+        "can reach. Matches a member number or the customer's phone, and answers "
+        "with status and expiry — never with money, and never with a list.\n\n"
+        "Selling and renewing stay at reception and above: the shared tablet "
+        "login is the most exposed credential in the venue, and taking payment "
+        "for a twelve-month membership is not something it should be able to do. "
+        "A **404** here means no membership, which is a complete answer."
+    ),
+)
+async def check_membership(
+    db: Db,
+    _: RequireKiosk,
+    code: Annotated[str, Query(min_length=3, description="Member number or phone")],
+) -> MembershipCheck:
+    cleaned = code.strip()
+    customer_ids = (
+        (await db.execute(select(Customer.id).where(Customer.phone == cleaned))).scalars().all()
+    )
+
+    stmt = select(MemberSubscription).where(
+        (MemberSubscription.member_no.ilike(cleaned))
+        | (MemberSubscription.customer_id.in_(customer_ids) if customer_ids else False)
+    )
+    # Newest first: somebody who let one lapse and bought another should be read
+    # as the member they are now, not the one they used to be.
+    subscription = (
+        await db.execute(stmt.order_by(MemberSubscription.start_date.desc()).limit(1))
+    ).scalar_one_or_none()
+
+    if subscription is None:
+        raise NotFoundError("No membership found for that number or phone.")
+
+    customer = await db.get(Customer, subscription.customer_id)
+    return MembershipCheck(
+        member_no=subscription.member_no,
+        customer_name=customer.name if customer else subscription.member_no,
+        plan_name=subscription.plan_name,
+        status=subscription.status,
+        expiry_date=subscription.expiry_date,
+        days_left=subscription.days_left(date.today()),
     )
 
 
@@ -552,7 +603,14 @@ async def renew_membership(
 
 
 @router.post(
-    "/memberships/{subscription_id}/pause", response_model=SubscriptionOut, summary="Pause a membership"
+    "/memberships/{subscription_id}/pause",
+    response_model=SubscriptionOut,
+    summary="Pause a membership",
+    description=(
+        "Parks the membership without consuming the paid term: the days spent "
+        "paused are given back on resume, so the expiry moves out by however long "
+        "it was parked. Reversible with `POST /memberships/{id}/resume`."
+    ),
 )
 async def pause_membership(subscription_id: uuid.UUID, db: Db, _: RequireStaff) -> SubscriptionOut:
     subscription = await get_or_404(db, MemberSubscription, subscription_id, label="Membership")
@@ -562,6 +620,32 @@ async def pause_membership(subscription_id: uuid.UUID, db: Db, _: RequireStaff) 
     subscription.paused_at = datetime.now(UTC)
     await db.flush()
     return _to_out(subscription, date.today())
+
+
+@router.post(
+    "/memberships/{subscription_id}/resume",
+    response_model=SubscriptionOut,
+    summary="Resume a paused membership",
+    description=(
+        "Returns a paused membership to active and extends its expiry by the "
+        "number of days it spent paused. The running total is on "
+        "`paused_days_total`, so a member asking why their year now ends in "
+        "February can be shown the answer."
+    ),
+)
+async def resume_membership(subscription_id: uuid.UUID, db: Db, _: RequireStaff) -> SubscriptionOut:
+    subscription = await get_or_404(db, MemberSubscription, subscription_id, label="Membership")
+
+    # The venue's own clock, on both sides of the subtraction. `date.today()` here
+    # would be the server's, which is UTC in production and five and a half hours
+    # behind the academy — enough to bank a day that was never paused.
+    settings = await service._settings(db)
+    zone = tenant_zone(settings.timezone)
+    local_today = datetime.now(zone).date()
+
+    service.resume_subscription(subscription, today=local_today, zone=zone)
+    await db.flush()
+    return _to_out(subscription, local_today)
 
 
 @router.post(

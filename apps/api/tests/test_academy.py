@@ -529,3 +529,493 @@ async def test_academy_data_does_not_cross_tenants(
         headers=ctx_b["headers"],
     )
     assert attempt.status_code == 404
+
+
+# ── Age bands ───────────────────────────────────────────────────────────────
+#
+# The rule staff rely on: a child cannot be filed into an adults' programme by a
+# mis-click, and the refusal says why in words a parent can be shown.
+
+
+def years_ago(years: int) -> str:
+    """A date of birth that means exactly `years` old, whenever the suite runs.
+
+    1 January, so the birthday has already passed on every day the suite could run
+    — including 1 January itself, where the age still comes out exact. Picking a
+    day later in the month would make the answer depend on what today is, which is
+    the bug this helper exists to avoid.
+    """
+    return date(date.today().year - years, 1, 1).isoformat()
+
+
+async def band_program(client: AsyncClient, ctx: dict, *, band: str, name: str, **extra) -> str:
+    response = await client.post(
+        "/api/v1/academy/programs",
+        json={
+            "name": name,
+            "sport_id": ctx["sport_id"],
+            "age_band": band,
+            "max_students": 12,
+            "fee_3m": "9000",
+            **extra,
+        },
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def batch_for(client: AsyncClient, ctx: dict, program_id: str, name: str) -> str:
+    response = await client.post(
+        "/api/v1/academy/batches",
+        json={
+            "name": name,
+            "program_id": program_id,
+            "sport_id": ctx["sport_id"],
+            "capacity": 10,
+        },
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def test_a_child_cannot_be_enrolled_in_an_adults_programme(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The mis-click this whole feature exists to stop.
+
+    The message has to carry the numbers, because the person reading it is at a
+    counter with a parent in front of them and needs to say what to do instead.
+    """
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(client, ctx, band="adults", name="Adults Tennis")
+    batch_id = await batch_for(client, ctx, program_id, "Adults – Evening")
+    student_id = await make_student(client, ctx, "Aryan Mehta", dob=years_ago(9))
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400, response.text
+    body = response.json()["error"]
+    assert body["details"]["student_age"] == 9
+    assert body["details"]["age_band"] == "adults"
+    assert "17" in body["message"]
+
+
+async def test_an_adult_cannot_be_enrolled_in_a_kids_programme(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The band has a ceiling as well as a floor — it is a band, not a minimum."""
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(client, ctx, band="kids", name="Kids Tennis")
+    batch_id = await batch_for(client, ctx, program_id, "Kids – Morning")
+    student_id = await make_student(client, ctx, "Ravi Chandran", dob=years_ago(34))
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["details"]["student_age"] == 34
+
+
+async def test_age_is_judged_at_the_start_of_the_term_not_today(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A sixteen-year-old signing up for a term that begins after their birthday.
+
+    They will be seventeen on the first day of class, so the kids' batch is the
+    wrong answer for them even though they are sixteen at the counter today.
+    """
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(client, ctx, band="kids", name="Kids Tennis")
+    batch_id = await batch_for(client, ctx, program_id, "Kids – Morning")
+
+    # Sixteen today; seventeen in a month.
+    turning_17 = date.today().replace(year=date.today().year - 17) + timedelta(days=30)
+    student_id = await make_student(client, ctx, "Ishaan Roy", dob=turning_17.isoformat())
+
+    today_ok = await client.post(
+        "/api/v1/academy/enrollments",
+        json={
+            "student_id": student_id,
+            "batch_id": batch_id,
+            "duration": "3m",
+            "start_date": date.today().isoformat(),
+        },
+        headers=ctx["headers"],
+    )
+    assert today_ok.status_code == 201, today_ok.text
+
+    later = await client.post(
+        "/api/v1/academy/enrollments",
+        json={
+            "student_id": student_id,
+            "batch_id": batch_id,
+            "duration": "3m",
+            "start_date": (date.today() + timedelta(days=60)).isoformat(),
+        },
+        headers=ctx["headers"],
+    )
+    assert later.status_code == 400, later.text
+    assert later.json()["error"]["details"]["student_age"] == 17
+
+
+async def test_an_age_banded_programme_needs_a_date_of_birth(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Refused rather than waved through.
+
+    `date_of_birth` is nullable, so the alternative is a missing field silently
+    defeating the rule — which is worse than an error, because nobody finds out.
+    """
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(client, ctx, band="kids", name="Kids Tennis")
+    batch_id = await batch_for(client, ctx, program_id, "Kids – Morning")
+
+    created = await client.post(
+        "/api/v1/academy/students",
+        json={"name": "No Birthday", "phone": "9811000009"},
+        headers=ctx["headers"],
+    )
+    assert created.status_code == 201, created.text
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": created.json()["id"], "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["details"]["field"] == "date_of_birth"
+
+
+async def test_a_programme_with_no_band_admits_any_age(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Every programme that existed before age bands keeps working.
+
+    This is what makes the migration safe: NULL means unrestricted, so nothing that
+    enrolled yesterday starts being refused today — including a student with no
+    date of birth on file.
+    """
+    ctx = await build_academy(client, tenant_a)  # its programme has no band
+    created = await client.post(
+        "/api/v1/academy/students",
+        json={"name": "Unbanded", "phone": "9811000010"},
+        headers=ctx["headers"],
+    )
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": created.json()["id"], "batch_id": ctx["batch_id"], "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+
+
+async def test_explicit_bounds_beat_the_bands_defaults(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """An academy that runs its kids' football to 14, not 16, says so once."""
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(
+        client, ctx, band="kids", name="Kids U-14", age_min=6, age_max=14
+    )
+    batch_id = await batch_for(client, ctx, program_id, "U-14 Squad")
+    student_id = await make_student(client, ctx, "Kabir Singh", dob=years_ago(15))
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    # 15 would pass the kids default of 5–16, and fails the academy's own 6–14.
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["details"]["age_max"] == 14
+
+
+async def test_a_refused_enrolment_leaves_no_invoice_behind(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The age check runs before the fee is raised.
+
+    Getting this backwards bills a parent for a place their child was never given.
+    """
+    ctx = await build_academy(client, tenant_a)
+    program_id = await band_program(client, ctx, band="adults", name="Adults Tennis")
+    batch_id = await batch_for(client, ctx, program_id, "Adults – Evening")
+    student_id = await make_student(client, ctx, "Aryan Mehta", dob=years_ago(9))
+
+    before = (await client.get("/api/v1/invoices", headers=ctx["headers"])).json()["total"]
+    await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    after = (await client.get("/api/v1/invoices", headers=ctx["headers"])).json()["total"]
+    assert after == before
+
+
+# ── The progression ladder ──────────────────────────────────────────────────
+
+
+async def test_a_student_holds_a_level_per_sport(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Advanced at tennis and a beginner at football is a normal child.
+
+    One level per student would force one of those to be a lie, which is the whole
+    reason the standing is keyed on the sport.
+    """
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+
+    football = await client.post(
+        "/api/v1/sports",
+        json={
+            "name": "Football",
+            "icon": "⚽",
+            "price_base": "2500",
+            "price_peak": "3500",
+            "price_weekend": "3000",
+        },
+        headers=ctx["headers"],
+    )
+    assert football.status_code == 201, football.text
+
+    for sport_id, level in ((ctx["sport_id"], "advanced"), (football.json()["id"], "beginner")):
+        response = await client.post(
+            f"/api/v1/academy/students/{student_id}/promotions",
+            json={"sport_id": sport_id, "to_level": level},
+            headers=ctx["headers"],
+        )
+        assert response.status_code == 201, response.text
+
+    levels = await client.get(
+        f"/api/v1/academy/students/{student_id}/levels", headers=ctx["headers"]
+    )
+    by_sport = {row["sport_id"]: row["level"] for row in levels.json()}
+    assert by_sport[ctx["sport_id"]] == "advanced"
+    assert by_sport[football.json()["id"]] == "beginner"
+
+
+async def test_a_first_assessment_has_no_from_level(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Arriving at a level is a different event from moving to one."""
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+
+    first = await client.post(
+        f"/api/v1/academy/students/{student_id}/promotions",
+        json={"sport_id": ctx["sport_id"], "to_level": "beginner"},
+        headers=ctx["headers"],
+    )
+    assert first.json()["from_level"] is None
+
+    second = await client.post(
+        f"/api/v1/academy/students/{student_id}/promotions",
+        json={"sport_id": ctx["sport_id"], "to_level": "intermediate"},
+        headers=ctx["headers"],
+    )
+    assert second.json()["from_level"] == "beginner"
+    assert second.json()["to_level"] == "intermediate"
+
+
+async def test_the_ladder_records_demotions_and_standstills_too(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A review that confirms the status quo is still a review worth keeping.
+
+    Dropping it would make a carefully-tended ladder look untended.
+    """
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+
+    for level in ("intermediate", "intermediate", "beginner"):
+        response = await client.post(
+            f"/api/v1/academy/students/{student_id}/promotions",
+            json={"sport_id": ctx["sport_id"], "to_level": level},
+            headers=ctx["headers"],
+        )
+        assert response.status_code == 201, response.text
+
+    history = await client.get(
+        f"/api/v1/academy/students/{student_id}/promotions", headers=ctx["headers"]
+    )
+    assert len(history.json()) == 3
+
+    levels = await client.get(
+        f"/api/v1/academy/students/{student_id}/levels", headers=ctx["headers"]
+    )
+    # One standing, not three — the history accumulates, the standing does not.
+    assert len(levels.json()) == 1
+    assert levels.json()[0]["level"] == "beginner"
+
+
+async def test_a_batch_above_the_students_level_warns_but_enrols(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Level is coaching judgment, not a gate — unlike age.
+
+    Stretching a strong beginner into an intermediate batch is how anyone ever
+    improves, so this reports and gets out of the way.
+    """
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+    await client.post(
+        f"/api/v1/academy/students/{student_id}/promotions",
+        json={"sport_id": ctx["sport_id"], "to_level": "beginner"},
+        headers=ctx["headers"],
+    )
+
+    program_id = await band_program(
+        client, ctx, band="kids", name="Advanced Kids", skill_level="advanced"
+    )
+    batch_id = await batch_for(client, ctx, program_id, "Advanced Squad")
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    assert "beginner" in response.json()["level_warning"]
+    assert "2 levels above" in response.json()["level_warning"]
+
+
+async def test_enrolling_at_or_below_the_students_level_says_nothing(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """No warning where there is nothing to warn about — noise trains people to ignore it."""
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+    await client.post(
+        f"/api/v1/academy/students/{student_id}/promotions",
+        json={"sport_id": ctx["sport_id"], "to_level": "advanced"},
+        headers=ctx["headers"],
+    )
+
+    program_id = await band_program(
+        client, ctx, band="kids", name="Intermediate Kids", skill_level="intermediate"
+    )
+    batch_id = await batch_for(client, ctx, program_id, "Intermediate Squad")
+
+    response = await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": batch_id, "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["level_warning"] is None
+
+
+# ── What the counter tablet may touch ───────────────────────────────────────
+
+
+async def kiosk_headers(client: AsyncClient, tenant: TenantFixture) -> dict[str, str]:
+    from app.core.security import Role
+
+    from tests.conftest import make_user
+
+    kiosk = await make_user(tenant, email="counter@academy.example.com", role=Role.KIOSK)
+    return auth_headers(await login(client, tenant, kiosk.username, PASSWORD), tenant)
+
+
+async def test_the_tablet_can_take_a_register(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Attendance is the one academy action that belongs on a shared device.
+
+    A register is taken at the door, on whatever is at the door. The worst a
+    leaked kiosk credential does here is mark a child present who was not.
+    """
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+    await client.post(
+        "/api/v1/academy/enrollments",
+        json={"student_id": student_id, "batch_id": ctx["batch_id"], "duration": "3m"},
+        headers=ctx["headers"],
+    )
+    created = await client.post(
+        "/api/v1/academy/sessions",
+        json={
+            "batch_id": ctx["batch_id"],
+            "starts_at": session_at(4, 7),
+            "ends_at": session_at(4, 8),
+        },
+        headers=ctx["headers"],
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+
+    tablet = await kiosk_headers(client, tenant_a)
+
+    listed = await client.get("/api/v1/academy/sessions", headers=tablet)
+    assert listed.status_code == 200, listed.text
+
+    # The roster, not the attendance rows: nobody is marked yet, so a register
+    # built from attendance would be empty and there would be nothing to tick.
+    roster = await client.get(f"/api/v1/academy/sessions/{session_id}/roster", headers=tablet)
+    assert roster.status_code == 200, roster.text
+    assert [r["student_name"] for r in roster.json()] == ["Aryan Mehta"]
+    assert roster.json()[0]["status"] is None
+
+    marked = await client.post(
+        f"/api/v1/academy/sessions/{session_id}/attendance",
+        json={"marks": [{"student_id": student_id, "status": "present"}]},
+        headers=tablet,
+    )
+    assert marked.status_code == 200, marked.text
+    assert marked.json()[0]["status"] == "present"
+
+    register = await client.get(
+        f"/api/v1/academy/sessions/{session_id}/attendance", headers=tablet
+    )
+    assert register.status_code == 200, register.text
+
+    # And the roster now carries the mark, so re-opening a half-taken register
+    # resumes where the coach left off rather than starting again.
+    resumed = await client.get(f"/api/v1/academy/sessions/{session_id}/roster", headers=tablet)
+    assert resumed.json()[0]["status"] == "present"
+
+
+async def test_the_tablet_cannot_enrol_promote_or_price(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The register, and nothing else.
+
+    This is the whole of the kiosk's academy blast radius, written down. The
+    shared counter login is the most exposed credential in the venue, so
+    anything that takes money, moves a child between groups, or changes what
+    the academy charges stays with a login that names a person.
+    """
+    ctx = await build_academy(client, tenant_a)
+    student_id = await make_student(client, ctx, "Aryan Mehta")
+    tablet = await kiosk_headers(client, tenant_a)
+
+    refused = {
+        "enrol": await client.post(
+            "/api/v1/academy/enrollments",
+            json={"student_id": student_id, "batch_id": ctx["batch_id"], "duration": "3m"},
+            headers=tablet,
+        ),
+        "promote": await client.post(
+            f"/api/v1/academy/students/{student_id}/promotions",
+            json={"sport_id": ctx["sport_id"], "to_level": "advanced"},
+            headers=tablet,
+        ),
+        "reprice": await client.patch(
+            f"/api/v1/academy/programs/{ctx['program_id']}",
+            json={"fee_3m": "1"},
+            headers=tablet,
+        ),
+        "read students": await client.get("/api/v1/academy/students", headers=tablet),
+    }
+
+    for action, response in refused.items():
+        assert response.status_code == 403, f"{action} should be refused: {response.text}"

@@ -75,6 +75,48 @@ class EnrollmentStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class AgeBand(StrEnum):
+    """Who a programme is for. Enforced at enrolment against the student's DOB.
+
+    Two states, not a spectrum: an academy runs a kids' programme and an adults'
+    programme, and the thing staff need at the counter is which of the two a child
+    belongs in. The actual boundary lives in `age_min`/`age_max` beside this,
+    because "kids" is 5–16 at one academy and 4–12 at another — this names the
+    group, those enforce it.
+    """
+
+    KIDS = "kids"
+    ADULTS = "adults"
+
+
+#: Used when a programme is given a band but no explicit bounds. Deliberately wide
+#: at the top: an "adults" programme should not refuse a 70-year-old.
+DEFAULT_AGE_BOUNDS: dict[AgeBand, tuple[int, int]] = {
+    AgeBand.KIDS: (5, 16),
+    AgeBand.ADULTS: (17, 99),
+}
+
+
+class SkillLevel(StrEnum):
+    """The progression ladder a student climbs, per sport.
+
+    Ordered — `LEVEL_ORDER` below turns it into something comparable, so "is this a
+    promotion or a demotion" is a question the code can answer rather than a label
+    someone types.
+    """
+
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+
+
+LEVEL_ORDER: dict[SkillLevel, int] = {
+    SkillLevel.BEGINNER: 0,
+    SkillLevel.INTERMEDIATE: 1,
+    SkillLevel.ADVANCED: 2,
+}
+
+
 class Coach(TenantScoped):
     """A coach. ← `Coach` in src/pages/Coaching.tsx.
 
@@ -168,8 +210,28 @@ class Program(TenantScoped):
     sport_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("sport.id", ondelete="RESTRICT")
     )
-    level: Mapped[str | None] = mapped_column(String(50))  # Beginner | Intermediate | Advanced
-    age_group: Mapped[str | None] = mapped_column(String(50))  # "6–14 yrs"
+
+    #: Where this programme sits on the ladder. NULL means the programme predates
+    #: levelling, or is genuinely mixed-ability — either way, no level check runs.
+    skill_level: Mapped[SkillLevel | None] = mapped_column(
+        enum_type(SkillLevel, name="skill_level")
+    )
+
+    #: Kids or adults. **NULL means unrestricted**, which is what every programme
+    #: created before this existed carries — so the migration cannot start refusing
+    #: enrolments that worked yesterday. The check switches on only once a band is
+    #: set deliberately.
+    age_band: Mapped[AgeBand | None] = mapped_column(enum_type(AgeBand, name="age_band"))
+    #: The enforced bounds, inclusive, in years at the *start of the term*. Set from
+    #: DEFAULT_AGE_BOUNDS when a band is chosen without explicit numbers.
+    age_min: Mapped[int | None] = mapped_column(Integer)
+    age_max: Mapped[int | None] = mapped_column(Integer)
+
+    #: Free text, kept: "6–14 yrs" as staff wrote it. Superseded by the three fields
+    #: above for anything that decides something, and left alone because it is the
+    #: only record of what a pre-existing programme meant.
+    age_group: Mapped[str | None] = mapped_column(String(50))
+    level: Mapped[str | None] = mapped_column(String(50))  # legacy free text
     duration_label: Mapped[str | None] = mapped_column(String(50))  # "3 Months"
     max_students: Mapped[int] = mapped_column(Integer, default=12, nullable=False)
     session_freq: Mapped[str | None] = mapped_column(String(50))  # "3 sessions/week"
@@ -192,6 +254,25 @@ class Program(TenantScoped):
         return {"1m": self.fee_1m, "3m": self.fee_3m, "6m": self.fee_6m, "12m": self.fee_12m}[
             duration
         ]
+
+    def age_bounds(self) -> tuple[int, int] | None:
+        """The inclusive age range this programme admits, or None if unrestricted.
+
+        Explicit bounds win over the band's defaults, so an academy that runs its
+        kids' football to 14 rather than 16 says so once and is believed. A band
+        with no bounds falls back to DEFAULT_AGE_BOUNDS rather than to "anyone",
+        because a band that admits everybody is not a band.
+        """
+        if self.age_band is None and self.age_min is None and self.age_max is None:
+            return None
+
+        default_min, default_max = (
+            DEFAULT_AGE_BOUNDS[self.age_band] if self.age_band else (0, 200)
+        )
+        return (
+            self.age_min if self.age_min is not None else default_min,
+            self.age_max if self.age_max is not None else default_max,
+        )
 
 
 class Batch(TenantScoped):
@@ -336,6 +417,79 @@ class StudentEnrollment(TenantScoped):
         default=EnrollmentStatus.ACTIVE,
         nullable=False,
     )
+
+
+class StudentSportLevel(TenantScoped):
+    """Where a student currently stands in one sport.
+
+    Per sport, not per student: a child can be advanced at tennis and a beginner at
+    football, and a single column would force one of those to be a lie. The row is
+    the *current* standing only — how they got here is `StudentPromotion`.
+    """
+
+    __tablename__ = "student_sport_level"
+    __table_args__ = (
+        # One standing per student per sport. Without this, two assessments recorded
+        # in the same week leave the student at two levels and every read picks one
+        # arbitrarily.
+        Index(
+            "uq_student_sport_level",
+            "tenant_id",
+            "student_id",
+            "sport_id",
+            unique=True,
+        ),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("student.id", ondelete="CASCADE"), nullable=False
+    )
+    sport_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("sport.id", ondelete="CASCADE"), nullable=False
+    )
+    level: Mapped[SkillLevel] = mapped_column(
+        enum_type(SkillLevel, name="skill_level"), nullable=False
+    )
+    #: When this standing was last reviewed — not when the row was written. A level
+    #: nobody has looked at in two years is a different thing from a fresh one.
+    assessed_on: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class StudentPromotion(TenantScoped):
+    """A movement on the ladder — up or down.
+
+    Kept as events rather than only a current level because the question a parent
+    asks is "has she moved up this year?", and a single mutable column cannot answer
+    it. Demotions are recorded the same way: `LEVEL_ORDER` tells the two apart, so
+    nothing needs a separate table or a direction flag.
+
+    Not an append-only ledger, unlike `audit_log`. A promotion entered against the
+    wrong child is a clerical slip staff should be able to erase, and nothing
+    financial or legal hangs off these rows.
+    """
+
+    __tablename__ = "student_promotion"
+    __table_args__ = (
+        Index("ix_student_promotion_tenant_student", "tenant_id", "student_id", "assessed_on"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("student.id", ondelete="CASCADE"), nullable=False
+    )
+    sport_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("sport.id", ondelete="CASCADE"), nullable=False
+    )
+    #: NULL for the first assessment — a student arriving at a level rather than
+    #: moving from one. Distinct from "moved from beginner", which is a real event.
+    from_level: Mapped[SkillLevel | None] = mapped_column(enum_type(SkillLevel, name="skill_level"))
+    to_level: Mapped[SkillLevel] = mapped_column(
+        enum_type(SkillLevel, name="skill_level"), nullable=False
+    )
+    assessed_on: Mapped[date] = mapped_column(Date, nullable=False)
+    #: The coach who made the call, as a name rather than an FK — it has to keep
+    #: answering "who promoted her?" after that coach leaves and their row goes.
+    assessed_by: Mapped[str | None] = mapped_column(String(200))
+    note: Mapped[str | None] = mapped_column(Text)
 
 
 class CoachingSession(TenantScoped):

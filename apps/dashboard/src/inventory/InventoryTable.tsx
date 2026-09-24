@@ -23,7 +23,7 @@ export default function InventoryTable({
   const update = useUpdateInventoryItem()
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-card bg-white">
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">

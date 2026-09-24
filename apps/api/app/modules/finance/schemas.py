@@ -198,17 +198,39 @@ class SubscriptionOut(BaseModel):
     plan_id: uuid.UUID
     plan_name: str
     plan_color: str | None
+    #: The current term's start. `joined_on` is the one that answers tenure — a
+    #: renewal moves this and leaves that alone.
     start_date: date
+    joined_on: date
     expiry_date: date
     duration: PlanDuration
     status: SubscriptionStatus
     visits_used: int
     total_paid: Decimal
+    #: Days banked across every pause. Already reflected in `expiry_date`; carried
+    #: separately so the UI can explain an expiry that looks too far out.
+    paused_days_total: int
 
     # Wall-clock functions, computed per request. Storing them would mean mr-4's
     # `daysLeft: 1` is wrong tomorrow — and the renewal reminders run off it.
     days_left: int
     renewal_due: bool
+
+
+class MembershipCheck(BaseModel):
+    """What the counter is allowed to learn about a membership.
+
+    Status and dates, never money. The question at the door is "is this person a
+    member today", and answering it needs nothing about what they paid — so the
+    shared tablet credential cannot read that even if it is leaked.
+    """
+
+    member_no: str
+    customer_name: str
+    plan_name: str
+    status: SubscriptionStatus
+    expiry_date: date
+    days_left: int
 
 
 class SubscriptionWithInvoice(BaseModel):

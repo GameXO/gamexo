@@ -47,6 +47,60 @@ type ErrorEnvelope = {
   error: { code: string; message: string; details?: Record<string, unknown> }
 }
 
+/** The four term lengths every priced thing here shares — memberships and
+ *  academy programmes both. `6m` exists in the schema and most academies leave
+ *  it at 0; see the membership-plan comments below for what 0 means. */
+export type PlanDuration = '1m' | '3m' | '6m' | '12m'
+
+/** The progression ladder. Ordered, and compared as such on the server. */
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced'
+
+/** Kids or adults. `null` on a programme means it admits any age. */
+export type AgeBand = 'kids' | 'adults'
+
+export type MembershipPlanBody = {
+  name: string
+  category?: string | null
+  description?: string | null
+  color?: string | null
+  bg_color?: string | null
+  /** Price per term. **0 means this term is not sold.** */
+  price_1m?: string
+  price_3m?: string
+  price_6m?: string
+  price_12m?: string
+  joining_fee?: string
+  discount_pct?: number
+  /** `null` is unlimited. */
+  max_visits?: number | null
+  benefits?: string[]
+  is_active?: boolean
+}
+
+export type ProgramBody = {
+  name: string
+  sport_id?: string | null
+  /** `null` is mixed-ability — no level warning is raised either way. */
+  skill_level?: SkillLevel | null
+  /** `null` admits any age. Setting it switches enforcement on at enrolment. */
+  age_band?: AgeBand | null
+  /** Override the band's defaults (kids 5–16, adults 17–99) when the academy
+   *  runs to its own boundaries — a U-14 squad, say. */
+  age_min?: number | null
+  age_max?: number | null
+  max_students?: number
+  coach_id?: string | null
+  location?: string | null
+  session_freq?: string | null
+  session_duration?: string | null
+  fee_1m?: string
+  fee_3m?: string
+  fee_6m?: string
+  fee_12m?: string
+  color?: string | null
+  is_active?: boolean
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
@@ -654,6 +708,209 @@ export const api = {
   /** 409 while any booking still references the partner — revoke instead. */
   deletePartner: (partnerId: string) =>
     request<void>(`/api/v1/partners/${partnerId}`, { method: 'DELETE' }),
+
+  /* ── Customers ───────────────────────────────────────────────────────────
+   *
+   * The payer behind a membership or a student's fees. Both flows need to find
+   * one or create one, which is why this sits here rather than in either. */
+
+  customers: (query?: { page?: number; size?: number; search?: string }) =>
+    request<Ok<'/api/v1/customers', 'get'>>('/api/v1/customers', { query }),
+
+  createCustomer: (body: { name: string; phone: string; email?: string | null }) =>
+    request<Ok<'/api/v1/customers', 'post', 201>>('/api/v1/customers', {
+      method: 'POST',
+      body,
+    }),
+
+  /* ── Membership plans ────────────────────────────────────────────────────
+   *
+   * A plan prices the same tier over four term lengths. **A zero price means the
+   * term is not sold** — the API refuses to issue a membership against it — so
+   * the editor writes 0 for anything the academy does not offer rather than
+   * needing a separate "enabled" flag per duration. */
+
+  membershipPlans: (query?: { include_inactive?: boolean }) =>
+    request<Ok<'/api/v1/membership-plans', 'get'>>('/api/v1/membership-plans', { query }),
+
+  createMembershipPlan: (body: MembershipPlanBody) =>
+    request<Ok<'/api/v1/membership-plans', 'post', 201>>('/api/v1/membership-plans', {
+      method: 'POST',
+      body,
+    }),
+
+  /** `is_active: false` retires a plan from new sales. Existing members keep
+   *  theirs — the FK is RESTRICT, so a plan with subscribers cannot be deleted. */
+  updateMembershipPlan: (planId: string, body: Partial<MembershipPlanBody>) =>
+    request<Ok<'/api/v1/membership-plans/{plan_id}', 'patch'>>(
+      `/api/v1/membership-plans/${planId}`,
+      { method: 'PATCH', body },
+    ),
+
+  /* ── Memberships ─────────────────────────────────────────────────────────── */
+
+  memberships: (query?: {
+    page?: number
+    size?: number
+    status?: 'active' | 'expired' | 'paused' | 'cancelled'
+    customer_id?: string
+    search?: string
+  }) => request<Ok<'/api/v1/memberships', 'get'>>('/api/v1/memberships', { query }),
+
+  membership: (subscriptionId: string) =>
+    request<Ok<'/api/v1/memberships/{subscription_id}', 'get'>>(
+      `/api/v1/memberships/${subscriptionId}`,
+    ),
+
+  /** Raises the joining fee and the term's invoice in the same transaction. */
+  createMembership: (body: {
+    customer_id: string
+    plan_id: string
+    duration: PlanDuration
+    start_date?: string
+    discount_pct?: number
+    referral_code?: string | null
+  }) =>
+    request<Ok<'/api/v1/memberships', 'post', 201>>('/api/v1/memberships', {
+      method: 'POST',
+      body,
+    }),
+
+  /** Continues from the current expiry when the membership is still running, so
+   *  renewing early does not forfeit days already paid for. */
+  renewMembership: (subscriptionId: string, duration: PlanDuration) =>
+    request<Ok<'/api/v1/memberships/{subscription_id}/renew', 'post'>>(
+      `/api/v1/memberships/${subscriptionId}/renew`,
+      { method: 'POST', body: { duration } },
+    ),
+
+  /** Parks the term without consuming it — see `resumeMembership`. */
+  pauseMembership: (subscriptionId: string) =>
+    request<Ok<'/api/v1/memberships/{subscription_id}/pause', 'post'>>(
+      `/api/v1/memberships/${subscriptionId}/pause`,
+      { method: 'POST' },
+    ),
+
+  /** Gives back every day spent paused, so the expiry moves out to match. The
+   *  running total comes back on `paused_days_total`. */
+  resumeMembership: (subscriptionId: string) =>
+    request<Ok<'/api/v1/memberships/{subscription_id}/resume', 'post'>>(
+      `/api/v1/memberships/${subscriptionId}/resume`,
+      { method: 'POST' },
+    ),
+
+  cancelMembership: (subscriptionId: string) =>
+    request<Ok<'/api/v1/memberships/{subscription_id}/cancel', 'post'>>(
+      `/api/v1/memberships/${subscriptionId}/cancel`,
+      { method: 'POST' },
+    ),
+
+  /* ── Academy: programmes and batches ─────────────────────────────────────── */
+
+  programs: (query?: { include_inactive?: boolean }) =>
+    request<Ok<'/api/v1/academy/programs', 'get'>>('/api/v1/academy/programs', { query }),
+
+  createProgram: (body: ProgramBody) =>
+    request<Ok<'/api/v1/academy/programs', 'post', 201>>('/api/v1/academy/programs', {
+      method: 'POST',
+      body,
+    }),
+
+  updateProgram: (programId: string, body: Partial<ProgramBody>) =>
+    request<Ok<'/api/v1/academy/programs/{program_id}', 'patch'>>(
+      `/api/v1/academy/programs/${programId}`,
+      { method: 'PATCH', body },
+    ),
+
+  batches: (query?: { program_id?: string; sport_id?: string }) =>
+    request<Ok<'/api/v1/academy/batches', 'get'>>('/api/v1/academy/batches', { query }),
+
+  createBatch: (body: {
+    name: string
+    program_id: string
+    sport_id?: string | null
+    coach_id?: string | null
+    capacity?: number
+    schedule?: string | null
+    time_label?: string | null
+    location?: string | null
+    start_date?: string | null
+    end_date?: string | null
+  }) =>
+    request<Ok<'/api/v1/academy/batches', 'post', 201>>('/api/v1/academy/batches', {
+      method: 'POST',
+      body,
+    }),
+
+  /* ── Academy: students ───────────────────────────────────────────────────── */
+
+  students: (query?: { page?: number; size?: number; status?: string; search?: string }) =>
+    request<Ok<'/api/v1/academy/students', 'get'>>('/api/v1/academy/students', { query }),
+
+  student: (studentId: string) =>
+    request<Ok<'/api/v1/academy/students/{student_id}', 'get'>>(
+      `/api/v1/academy/students/${studentId}`,
+    ),
+
+  createStudent: (body: {
+    name: string
+    parent_name?: string | null
+    phone?: string | null
+    email?: string | null
+    gender?: string | null
+    /** Required in practice for any age-banded programme — enrolment refuses
+     *  without it rather than letting a missing field defeat the age rule. */
+    date_of_birth?: string | null
+    customer_id?: string | null
+  }) =>
+    request<Ok<'/api/v1/academy/students', 'post', 201>>('/api/v1/academy/students', {
+      method: 'POST',
+      body,
+    }),
+
+  coaches: (query?: { page?: number; size?: number; sport_id?: string }) =>
+    request<Ok<'/api/v1/academy/coaches', 'get'>>('/api/v1/academy/coaches', { query }),
+
+  /* ── Academy: enrolment and the ladder ───────────────────────────────────── */
+
+  /** Refused with **400** when the student's age at the start of the term falls
+   *  outside the programme's band, or when a banded programme meets a student
+   *  with no date of birth. A batch *above* the student's level is allowed and
+   *  comes back with `level_warning` set — that is a coach's call, not ours. */
+  enrolStudent: (body: {
+    student_id: string
+    batch_id: string
+    duration: PlanDuration
+    start_date?: string
+    discount?: string
+  }) =>
+    request<Ok<'/api/v1/academy/enrollments', 'post', 201>>('/api/v1/academy/enrollments', {
+      method: 'POST',
+      body,
+    }),
+
+  /** One row per sport the student has been assessed in. A sport that is absent
+   *  has never been assessed, which is not the same as beginner. */
+  studentLevels: (studentId: string) =>
+    request<Ok<'/api/v1/academy/students/{student_id}/levels', 'get'>>(
+      `/api/v1/academy/students/${studentId}/levels`,
+    ),
+
+  studentPromotions: (studentId: string) =>
+    request<Ok<'/api/v1/academy/students/{student_id}/promotions', 'get'>>(
+      `/api/v1/academy/students/${studentId}/promotions`,
+    ),
+
+  /** Records the new standing and the move that produced it. Handles a first
+   *  assessment, a promotion, a demotion and a same-level review alike. */
+  promoteStudent: (
+    studentId: string,
+    body: { sport_id: string; to_level: SkillLevel; assessed_on?: string; assessed_by?: string | null; note?: string | null },
+  ) =>
+    request<Ok<'/api/v1/academy/students/{student_id}/promotions', 'post', 201>>(
+      `/api/v1/academy/students/${studentId}/promotions`,
+      { method: 'POST', body },
+    ),
 }
 
 export { request, BASE_URL, TENANT }

@@ -56,6 +56,16 @@ os.environ["ACCESS_TOKEN_TTL_MINUTES"] = "30"
 # Fernet key is 32 bytes, url-safe base64; this one decodes to obvious filler.
 os.environ["SECRETS_ENCRYPTION_KEY"] = "Z2FtZXhvLXRlc3Qta2V5LW5vdC1mb3ItcmVhbC11c2U="
 
+# Force mock billing, whatever the developer's .env says. `billing_provider` flips
+# to Razorpay on the mere presence of a key id, so a real key pasted into .env —
+# even a `rzp_test_` one — silently rewires the entire signup suite to expect a
+# live checkout and fails all 38 of its tests for a reason that has nothing to do
+# with the code under test. Emptied rather than deleted: pydantic-settings reads
+# the .env behind os.environ, so unsetting here would not stop it being picked up.
+os.environ["PLATFORM_RAZORPAY_KEY_ID"] = ""
+os.environ["PLATFORM_RAZORPAY_KEY_SECRET"] = ""
+os.environ["PLATFORM_RAZORPAY_WEBHOOK_SECRET"] = ""
+
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402

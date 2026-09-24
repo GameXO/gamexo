@@ -1345,6 +1345,15 @@
         "title": "AdvertisingOverview",
         "type": "object"
       },
+      "AgeBand": {
+        "description": "Who a programme is for. Enforced at enrolment against the student's DOB.\n\nTwo states, not a spectrum: an academy runs a kids' programme and an adults'\nprogramme, and the thing staff need at the counter is which of the two a child\nbelongs in. The actual boundary lives in `age_min`/`age_max` beside this,\nbecause \"kids\" is 5\u201316 at one academy and 4\u201312 at another \u2014 this names the\ngroup, those enforce it.",
+        "enum": [
+          "kids",
+          "adults"
+        ],
+        "title": "AgeBand",
+        "type": "string"
+      },
       "AttendanceBulkMark": {
         "description": "Reception marks a whole batch at once, not one student at a time.",
         "properties": {
@@ -5294,6 +5303,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Invoice Total",
             "type": "string"
+          },
+          "level_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Warning"
           }
         },
         "required": [
@@ -6772,6 +6792,45 @@
         ],
         "title": "MemberType",
         "type": "string"
+      },
+      "MembershipCheck": {
+        "description": "What the counter is allowed to learn about a membership.\n\nStatus and dates, never money. The question at the door is \"is this person a\nmember today\", and answering it needs nothing about what they paid \u2014 so the\nshared tablet credential cannot read that even if it is leaked.",
+        "properties": {
+          "customer_name": {
+            "title": "Customer Name",
+            "type": "string"
+          },
+          "days_left": {
+            "title": "Days Left",
+            "type": "integer"
+          },
+          "expiry_date": {
+            "format": "date",
+            "title": "Expiry Date",
+            "type": "string"
+          },
+          "member_no": {
+            "title": "Member No",
+            "type": "string"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          }
+        },
+        "required": [
+          "member_no",
+          "customer_name",
+          "plan_name",
+          "status",
+          "expiry_date",
+          "days_left"
+        ],
+        "title": "MembershipCheck",
+        "type": "object"
       },
       "MembershipPlanCreate": {
         "properties": {
@@ -9460,6 +9519,16 @@
       },
       "ProgramCreate": {
         "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeBand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "age_group": {
             "anyOf": [
               {
@@ -9470,6 +9539,32 @@
               }
             ],
             "title": "Age Group"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
           },
           "bg_color": {
             "anyOf": [
@@ -9636,6 +9731,16 @@
             ],
             "title": "Session Freq"
           },
+          "skill_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sport_id": {
             "anyOf": [
               {
@@ -9657,6 +9762,16 @@
       },
       "ProgramOut": {
         "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeBand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "age_group": {
             "anyOf": [
               {
@@ -9667,6 +9782,32 @@
               }
             ],
             "title": "Age Group"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
           },
           "bg_color": {
             "anyOf": [
@@ -9806,6 +9947,16 @@
             ],
             "title": "Session Freq"
           },
+          "skill_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sport_id": {
             "anyOf": [
               {
@@ -9828,6 +9979,16 @@
       },
       "ProgramUpdate": {
         "properties": {
+          "age_band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeBand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "age_group": {
             "anyOf": [
               {
@@ -9838,6 +9999,32 @@
               }
             ],
             "title": "Age Group"
+          },
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
           },
           "bg_color": {
             "anyOf": [
@@ -10029,6 +10216,16 @@
             ],
             "title": "Session Freq"
           },
+          "skill_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sport_id": {
             "anyOf": [
               {
@@ -10043,6 +10240,130 @@
           }
         },
         "title": "ProgramUpdate",
+        "type": "object"
+      },
+      "PromotionCreate": {
+        "properties": {
+          "assessed_by": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed By"
+          },
+          "assessed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed On"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "sport_id": {
+            "format": "uuid",
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "to_level": {
+            "$ref": "#/components/schemas/SkillLevel"
+          }
+        },
+        "required": [
+          "sport_id",
+          "to_level"
+        ],
+        "title": "PromotionCreate",
+        "type": "object"
+      },
+      "PromotionOut": {
+        "properties": {
+          "assessed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed By"
+          },
+          "assessed_on": {
+            "format": "date",
+            "title": "Assessed On",
+            "type": "string"
+          },
+          "from_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "sport_id": {
+            "format": "uuid",
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "to_level": {
+            "$ref": "#/components/schemas/SkillLevel"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "sport_id",
+          "from_level",
+          "to_level",
+          "assessed_on",
+          "assessed_by",
+          "note"
+        ],
+        "title": "PromotionOut",
         "type": "object"
       },
       "ProviderConfigOut": {
@@ -10543,6 +10864,47 @@
         ],
         "title": "Role",
         "type": "string"
+      },
+      "RosterEntry": {
+        "description": "One student on a session's register, with their mark if one exists.\n\nBuilt for the counter tablet, which needs the *roster* \u2014 everyone enrolled in\nthe batch \u2014 not the attendance rows, which only exist for students already\nmarked. A fresh session has no attendance rows at all, so a register built\nfrom those would show an empty class.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_name"
+        ],
+        "title": "RosterEntry",
+        "type": "object"
       },
       "RoutingUpdate": {
         "description": "Which surfaces this gateway collects for.\n\nOmitted means unchanged, so the dashboard toggle cannot silently reset the POS.\nSetting either to true takes it away from whichever gateway currently holds it \u2014\nonly one gateway can collect for a surface.",
@@ -11505,6 +11867,16 @@
           "failed"
         ],
         "title": "SignupStatus",
+        "type": "string"
+      },
+      "SkillLevel": {
+        "description": "The progression ladder a student climbs, per sport.\n\nOrdered \u2014 `LEVEL_ORDER` below turns it into something comparable, so \"is this a\npromotion or a demotion\" is a question the code can answer rather than a label\nsomeone types.",
+        "enum": [
+          "beginner",
+          "intermediate",
+          "advanced"
+        ],
+        "title": "SkillLevel",
         "type": "string"
       },
       "SkillScore": {
@@ -12640,6 +13012,31 @@
         "title": "StudentDetail",
         "type": "object"
       },
+      "StudentLevelOut": {
+        "description": "A student's standing in one sport.",
+        "properties": {
+          "assessed_on": {
+            "format": "date",
+            "title": "Assessed On",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/SkillLevel"
+          },
+          "sport_id": {
+            "format": "uuid",
+            "title": "Sport Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sport_id",
+          "level",
+          "assessed_on"
+        ],
+        "title": "StudentLevelOut",
+        "type": "object"
+      },
       "StudentOut": {
         "properties": {
           "achievements": {
@@ -13036,9 +13433,18 @@
             "title": "Id",
             "type": "string"
           },
+          "joined_on": {
+            "format": "date",
+            "title": "Joined On",
+            "type": "string"
+          },
           "member_no": {
             "title": "Member No",
             "type": "string"
+          },
+          "paused_days_total": {
+            "title": "Paused Days Total",
+            "type": "integer"
           },
           "plan_color": {
             "anyOf": [
@@ -13090,11 +13496,13 @@
           "plan_name",
           "plan_color",
           "start_date",
+          "joined_on",
           "expiry_date",
           "duration",
           "status",
           "visits_used",
           "total_paid",
+          "paused_days_total",
           "days_left",
           "renewal_due"
         ],
@@ -14189,7 +14597,7 @@
     },
     "/api/v1/academy/enrollments": {
       "post": {
-        "description": "Creates the enrolment and its fee invoice in one transaction, and refuses with **409** if the batch is already at capacity. Occupancy is counted from live enrolments, not a stored column that could disagree.",
+        "description": "Creates the enrolment and its fee invoice in one transaction, and refuses with **409** if the batch is already at capacity. Occupancy is counted from live enrolments, not a stored column that could disagree.\n\nRefuses with **400** if the student's age at the start of the term falls outside the programme's band, or if the programme is age-banded and the student has no date of birth on file. Programmes with no band set admit any age.\n\nA batch above the student's assessed level is **allowed** and comes back with `level_warning` set \u2014 that call belongs to the coach, not to us.",
         "operationId": "academy_createEnrollment",
         "requestBody": {
           "content": {
@@ -14417,6 +14825,7 @@
     },
     "/api/v1/academy/sessions": {
       "get": {
+        "description": "Readable by the **counter tablet**, which needs today's classes in order to take a register. Deliberately the weakest guard in this module \u2014 see `POST /sessions/{session_id}/attendance` for why the register, and only the register, is reachable from the kiosk.",
         "operationId": "academy_listSessions",
         "parameters": [
           {
@@ -14695,7 +15104,7 @@
         ]
       },
       "post": {
-        "description": "Marks a whole batch in one call, the way a register is actually taken. Re-marking a student updates their existing row rather than adding a second one \u2014 a duplicate would double-count them in every percentage.",
+        "description": "Marks a whole batch in one call, the way a register is actually taken. Re-marking a student updates their existing row rather than adding a second one \u2014 a duplicate would double-count them in every percentage.\n\n**Reachable by the counter tablet.** Taking a register is the one academy action that genuinely belongs on a shared device at the door, and the worst a leaked kiosk credential does here is mis-mark a child present. Enrolling students, moving them up a level and anything touching fees stay at reception and above, where the login names a person.",
         "operationId": "academy_markAttendance",
         "parameters": [
           {
@@ -14751,6 +15160,59 @@
           }
         ],
         "summary": "Mark attendance for a session",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/sessions/{session_id}/roster": {
+      "get": {
+        "description": "What the counter tablet needs to take a register: every student actively enrolled in the session's batch, each with their mark if one has been recorded and `null` if not.\n\nDistinct from `GET /sessions/{session_id}/attendance`, which returns only the rows that exist \u2014 empty for a class nobody has marked yet, and therefore useless as the thing you tick down.\n\nReadable by the **kiosk**, and scoped to one class: it gives the tablet the names of the children in front of it and nothing else. Listing the academy's students stays at reception and above.",
+        "operationId": "academy_sessionRoster",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RosterEntry"
+                  },
+                  "title": "Response Academy Sessionroster",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Everyone in this class, and how they are marked",
         "tags": [
           "academy"
         ]
@@ -15067,6 +15529,169 @@
           }
         ],
         "summary": "A student's enrolment history",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/students/{student_id}/levels": {
+      "get": {
+        "description": "One row per sport the student has been assessed in. A sport that is missing has simply never been assessed \u2014 it is not the same as beginner.",
+        "operationId": "academy_listStudentLevels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StudentLevelOut"
+                  },
+                  "title": "Response Academy Liststudentlevels",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Where a student stands, per sport",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/students/{student_id}/promotions": {
+      "get": {
+        "description": "Newest first. Includes demotions and re-assessments at the same level.",
+        "operationId": "academy_listStudentPromotions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromotionOut"
+                  },
+                  "title": "Response Academy Liststudentpromotions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "A student's movements on the ladder",
+        "tags": [
+          "academy"
+        ]
+      },
+      "post": {
+        "description": "Records the new standing and the move that produced it, in one write. Works for a first assessment (`from_level` comes back null), a promotion, a demotion, and a re-assessment at the level they are already at \u2014 a review that confirms the status quo is still a review worth keeping.\n\nManager and above: moving a child up a level changes who they train with.",
+        "operationId": "academy_promoteStudent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromotionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Assess a student at a level",
         "tags": [
           "academy"
         ]
@@ -19724,6 +20349,57 @@
         ]
       }
     },
+    "/api/v1/memberships/check": {
+      "get": {
+        "description": "The counter's question, and the only membership endpoint the **kiosk** can reach. Matches a member number or the customer's phone, and answers with status and expiry \u2014 never with money, and never with a list.\n\nSelling and renewing stay at reception and above: the shared tablet login is the most exposed credential in the venue, and taking payment for a twelve-month membership is not something it should be able to do. A **404** here means no membership, which is a complete answer.",
+        "operationId": "finance_checkMembership",
+        "parameters": [
+          {
+            "description": "Member number or phone",
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "Member number or phone",
+              "minLength": 3,
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipCheck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Is this person a member?",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/memberships/{subscription_id}": {
       "get": {
         "operationId": "finance_getMembership",
@@ -19822,6 +20498,7 @@
     },
     "/api/v1/memberships/{subscription_id}/pause": {
       "post": {
+        "description": "Parks the membership without consuming the paid term: the days spent paused are given back on resume, so the expiry moves out by however long it was parked. Reversible with `POST /memberships/{id}/resume`.",
         "operationId": "finance_pauseMembership",
         "parameters": [
           {
@@ -19922,6 +20599,55 @@
           }
         ],
         "summary": "Renew a membership",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/memberships/{subscription_id}/resume": {
+      "post": {
+        "description": "Returns a paused membership to active and extends its expiry by the number of days it spent paused. The running total is on `paused_days_total`, so a member asking why their year now ends in February can be shown the answer.",
+        "operationId": "finance_resumeMembership",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscription_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subscription Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Resume a paused membership",
         "tags": [
           "finance"
         ]

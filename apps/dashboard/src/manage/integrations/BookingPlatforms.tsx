@@ -9,7 +9,7 @@
  */
 import { useState } from 'react'
 import { Check, Copy, KeyRound, Plug, RotateCcw, Trash2 } from 'lucide-react'
-import { ApiError, apiOrigin } from '../../api/client'
+import { ApiError } from '../../api/client'
 import ConfirmDialog from '../../ui/ConfirmDialog'
 import {
   type DialectOut,
@@ -71,7 +71,9 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
   // than being frozen at whatever the first render guessed.
   const [dialect, setDialect] = useState('')
   const selected = dialect || firstReady
-  const [freshKey, setFreshKey] = useState<PartnerWithKey | null>(null)
+  // Reader dropped, not the state: the panel that read it is commented out
+  // below. Put `freshKey` back in the destructure when restoring it.
+  const [, setFreshKey] = useState<PartnerWithKey | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<PartnerOut | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -438,7 +440,7 @@ function useCopy(value: string) {
  * Not a toast: it must survive until it has been copied somewhere safe, so it is
  * dismissed by hand and says plainly that it will not be shown again.
  */
-function FreshKeyPanel({
+export function FreshKeyPanel({
   partner,
   url,
   onDone,
