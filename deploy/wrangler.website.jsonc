@@ -1,0 +1,26 @@
+{
+  // The public marketing site and self-serve signup, as its own static-asset
+  // Worker — previously built but never shipped anywhere (see the comment on
+  // wrangler.jsonc). Separate from that Worker for the same reason the docs are
+  // separate: different audience, different release cadence. A copy-change on the
+  // marketing page must not risk redeploying the admin dashboard, and vice versa.
+  //
+  // Signup ends by redirecting into the dashboard, so the two need to agree on
+  // which environment they point at — the dashboard's live API base URL, not
+  // whatever VITE_API_BASE_URL a local `pnpm build` happened to pick up. Build
+  // with `pnpm website:deploy` (root package.json), which sets it explicitly the
+  // same way `deploy/build.sh` does for the dashboard and POS.
+  "name": "gamexo-web",
+  "compatibility_date": "2026-08-11",
+
+  // A plain Vite build — output/vite.config.ts point here by default. No "main":
+  // this is assets-only, so every request is served straight from the asset
+  // store and the free-tier request cap never applies.
+  "assets": {
+    "directory": "../apps/website/dist",
+
+    // The site has no URL router (navigates with useState, like the dashboard),
+    // so an unmatched path should still render the app rather than a bare 404.
+    "not_found_handling": "single-page-application"
+  }
+}

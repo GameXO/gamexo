@@ -5631,6 +5631,8 @@ export interface components {
         };
         /** PartnerCreate */
         PartnerCreate: {
+            /** Allowed Origins */
+            allowed_origins?: string[];
             /**
              * Dialect
              * @default native
@@ -5638,6 +5640,12 @@ export interface components {
             dialect?: string;
             /** External Venue Id */
             external_venue_id?: string | null;
+            /**
+             * Key Kind
+             * @default secret
+             * @enum {string}
+             */
+            key_kind?: "secret" | "publishable";
             /** Name */
             name: string;
             /** Slug */
@@ -5645,6 +5653,8 @@ export interface components {
         };
         /** PartnerOut */
         PartnerOut: {
+            /** Allowed Origins */
+            allowed_origins: string[];
             /**
              * Created At
              * Format: date-time
@@ -5661,6 +5671,8 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Key Kind */
+            key_kind: string;
             /** Key Prefix */
             key_prefix: string;
             /** Last Used At */
@@ -5698,6 +5710,8 @@ export interface components {
         };
         /** PartnerUpdate */
         PartnerUpdate: {
+            /** Allowed Origins */
+            allowed_origins?: string[] | null;
             /** Dialect */
             dialect?: string | null;
             /** External Venue Id */
@@ -5716,6 +5730,8 @@ export interface components {
          *     "we didn't write it down" costs an afternoon.
          */
         PartnerWithKey: {
+            /** Allowed Origins */
+            allowed_origins: string[];
             /**
              * Api Key
              * @description Shown once. Store it now — it cannot be recovered.
@@ -5737,6 +5753,8 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Key Kind */
+            key_kind: string;
             /** Key Prefix */
             key_prefix: string;
             /** Last Used At */

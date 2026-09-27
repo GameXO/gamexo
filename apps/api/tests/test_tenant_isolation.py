@@ -34,12 +34,18 @@ from tests.conftest import TenantFixture
 #: is the sharpest case: a policy filtering on tenant_id could only ever match a
 #: tenant that by definition no longer exists, so every row would be invisible to
 #: everyone forever. See models/tenant.py::DeletedTenant.
+#: `partner_key_directory` is account_directory's twin for machines: a gateway call
+#: arrives with an API key and no subdomain, and `integration_partner` is invisible
+#: to an unbound session, so something outside the policy has to say which academy
+#: owns the key. It carries only the *public* half of the key and an opaque tenant
+#: id — the hashed secret stays on the scoped table and is still checked there.
 UNSCOPED_TABLES = {
     "tenant",
     "platform_admin",
     "account_directory",
     "signup_intent",
     "deleted_tenant",
+    "partner_key_directory",
 }
 
 

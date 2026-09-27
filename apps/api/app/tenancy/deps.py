@@ -12,6 +12,11 @@ from app.core.errors import AuthenticationError, TenantResolutionError
 from app.core.security import Audience, TokenError, decode_token
 from app.db.session import tenant_session, untenanted_session
 from app.tenancy.context import TenantContext
+
+#: Spelled out rather than imported from `gateway/deps.py`, which imports this
+#: module. Starlette matches header names case-insensitively, so the casing here is
+#: cosmetic.
+API_KEY_HEADER = "X-API-Key"
 from app.tenancy.resolver import (
     IMPERSONATE_HEADER,
     TENANT_HEADER,
@@ -97,16 +102,35 @@ async def get_tenant_context(
     On a miss it falls back to an untenanted session, because the `tenant` table is
     what is being read — it carries no tenant_id and no RLS policy, by necessity.
     """
+    # Imported here rather than at module scope: gateway.dispatch imports the
+    # resolver, and hoisting this would close the cycle.
+    from app.modules.gateway.dispatch import (
+        load_tenant_reference_for_key,
+        tenant_reference_for_key,
+    )
+
+    raw_key = request.headers.get(API_KEY_HEADER)
     args = {
         "host": request.headers.get("host"),
         "tenant_header": request.headers.get(TENANT_HEADER),
         "impersonate_header": request.headers.get(IMPERSONATE_HEADER),
         "is_platform_admin": _looks_like_platform_token(credentials),
         "token_tenant": _tenant_from_token(credentials),
+        # Cache-only, so the fast path stays free of a database round trip.
+        "api_key_tenant": tenant_reference_for_key(raw_key),
     }
 
     try:
         context = resolve_tenant_cached(**args)
+        if context is None:
+            # Only now pay for the key lookup, and only if nothing higher in the
+            # priority order already answered. `routing_for` caches, so this costs
+            # one query per key per TTL rather than one per request.
+            if args["api_key_tenant"] is None and raw_key:
+                args["api_key_tenant"] = await load_tenant_reference_for_key(raw_key)
+                if args["api_key_tenant"] is not None:
+                    context = resolve_tenant_cached(**args)
+
         if context is None:
             async with untenanted_session() as session:
                 context = await resolve_tenant(session, **args)
@@ -128,6 +152,16 @@ async def get_tenant_context(
             raise AuthenticationError(
                 "Your session has expired. Please sign in again."
             ) from None
+
+        # A key was presented and named no academy, which means we do not know it.
+        # Answering "could not determine the academy" would make an unknown prefix
+        # distinguishable from a known one with a wrong secret — and watching 400
+        # against 401 is then a free oracle for enumerating which prefixes exist.
+        # `gateway/deps.py` is careful to give one message for "no such prefix",
+        # "wrong secret" and "revoked"; this is the fourth door into the same room,
+        # so it says the same thing, word for word.
+        if raw_key:
+            raise AuthenticationError("Invalid or revoked API key.") from None
         raise
 
     # Stash for the audit log and for logging middleware.

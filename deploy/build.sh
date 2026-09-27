@@ -45,11 +45,11 @@ VITE_TENANT_SLUG="$TENANT_SLUG" \
 VITE_UPI_ID="$UPI_ID" \
   pnpm --filter @gamexo/pos build
 
-  echo "==> building @gamexo/website"
-VITE_API_BASE_URL="$API_BASE_URL" \
-VITE_TENANT_SLUG="$TENANT_SLUG" \
-VITE_UPI_ID="$UPI_ID" \
-  pnpm --filter @gamexo/website build
+# apps/website is NOT built here. It ships as its own Worker now — see
+# wrangler.website.jsonc and `pnpm website:deploy` — with its own env vars
+# (VITE_DASHBOARD_URL matters to it and TENANT_SLUG/UPI_ID do not). Building it
+# here used to discard the output and never set VITE_DASHBOARD_URL at all, which
+# would have shipped a "Sign in" link pointed at localhost.
 
 # The dashboard owns the root; the POS nests under /pos/, matching the `base`
 # already set in apps/pos/vite.config.ts. Copying with `/.` copies directory

@@ -194,6 +194,7 @@ def _plan_resolution(
     impersonate_header: str | None,
     is_platform_admin: bool,
     token_tenant: str | None = None,
+    api_key_tenant: str | None = None,
 ) -> _Plan:
     """Apply the resolution priority. Pure — no I/O, so cache and database paths
     cannot drift apart on which header wins.
@@ -206,6 +207,7 @@ def _plan_resolution(
        this header is a complete isolation bypass for anyone who can reach the API.
     3. Host subdomain — the per-academy-hostname path.
     4. The JWT's `tid` claim — the shared-origin path, gated on ALLOW_TOKEN_TENANT.
+    5. The academy behind an `X-API-Key` — the partner path.
 
     Why (4) is safe where (2) is not, since the two look superficially alike. The
     header is a bare string the caller types, so trusting it means trusting the
@@ -220,6 +222,16 @@ def _plan_resolution(
     there is no such hostname — every academy answers on the same one. Where a
     subdomain does exist it still wins here, at priority 3, and that check still
     bites exactly as before.
+
+    (5) is the same bargain as (4), reached the same way. A partner has no login and
+    no subdomain, so before this existed every gateway call to a shared origin died
+    at "could not determine the academy" — including the ones the published Playo
+    docs instruct partners to make. The key is not a name the caller picked either:
+    `key_prefix` is globally unique and we minted it, and the *secret* half is still
+    verified afterwards by `gateway/deps.py::get_current_partner` against a row read
+    inside the resolved tenant. So a forged prefix resolves to an academy and is then
+    refused by it. Last in priority, so a per-academy hostname still overrides it and
+    the cross-tenant check keeps biting wherever one exists.
     """
     if impersonate_header:
         if not is_platform_admin:
@@ -239,6 +251,14 @@ def _plan_resolution(
 
     if token_tenant and settings.allow_token_tenant:
         return _Plan(token_tenant, "token", True, "This token's academy no longer exists.")
+
+    if api_key_tenant:
+        return _Plan(
+            api_key_tenant,
+            "api_key",
+            True,
+            "The academy behind this API key no longer exists.",
+        )
 
     hint = (
         f" Send {TENANT_HEADER} with a tenant slug, or use a subdomain "
@@ -264,6 +284,7 @@ def resolve_tenant_cached(
     impersonate_header: str | None = None,
     is_platform_admin: bool = False,
     token_tenant: str | None = None,
+    api_key_tenant: str | None = None,
 ) -> TenantContext | None:
     """Resolve without touching the database, or return None if it cannot.
 
@@ -277,6 +298,7 @@ def resolve_tenant_cached(
         impersonate_header=impersonate_header,
         is_platform_admin=is_platform_admin,
         token_tenant=token_tenant,
+        api_key_tenant=api_key_tenant,
     )
     snapshot = _cache_get(plan.reference)
     return None if snapshot is None else _context_from(plan, snapshot)
@@ -290,6 +312,7 @@ async def resolve_tenant(
     impersonate_header: str | None = None,
     is_platform_admin: bool = False,
     token_tenant: str | None = None,
+    api_key_tenant: str | None = None,
 ) -> TenantContext:
     """Resolve the tenant for a request, reading the database on a cache miss."""
     plan = _plan_resolution(
@@ -298,6 +321,7 @@ async def resolve_tenant(
         impersonate_header=impersonate_header,
         is_platform_admin=is_platform_admin,
         token_tenant=token_tenant,
+        api_key_tenant=api_key_tenant,
     )
 
     snapshot = _cache_get(plan.reference)

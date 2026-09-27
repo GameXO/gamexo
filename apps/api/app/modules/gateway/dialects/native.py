@@ -23,7 +23,7 @@ from sqlalchemy import select
 from app.core.errors import ConflictError, NotFoundError
 from app.modules.booking.models import Booking, Sport
 from app.modules.gateway import service
-from app.modules.gateway.deps import speaking
+from app.modules.gateway.deps import speaks
 from app.modules.gateway.dialects.base import Dialect
 from app.modules.gateway.models import IntegrationPartner
 from app.modules.gateway.schemas import (
@@ -39,7 +39,21 @@ router = APIRouter(tags=["gateway"])
 
 #: This dialect's principal. Same authentication as everywhere else, plus a check
 #: that the key was actually issued for 'native' — see `deps.speaking`.
-Partner = Annotated[IntegrationPartner, Depends(speaking("native"))]
+#: One alias per operation, because what a *publishable* key may do differs per
+#: endpoint — see `deps.PUBLISHABLE_OPERATIONS` for which, and why. A secret key
+#: sees no difference between any of these.
+def _partner(operation: str):
+    return Annotated[IntegrationPartner, Depends(speaks("native", operation))]
+
+
+ReadAvailability = _partner("availability")
+MakeBooking = _partner("create")
+HoldSlots = _partner("hold")
+ConfirmHeld = _partner("confirm")
+MapRefs = _partner("map")
+ListBookings = _partner("list")
+ReadBooking = _partner("get")
+CancelBooking = _partner("cancel")
 
 
 class NativeSlot(BaseModel):
@@ -141,7 +155,7 @@ def _conflict(exc: GatewayError) -> ConflictError:
 )
 async def availability(
     db: Db,
-    partner: Partner,
+    partner: ReadAvailability,
     date: Annotated[datetime, Query(description="Any instant on the target day")],
     duration_min: Annotated[int, Query(ge=15, le=1440)] = 60,
     sport_id: uuid.UUID | None = None,
@@ -205,7 +219,7 @@ async def availability(
     ),
 )
 async def create_bookings(
-    payload: SlotBatch, db: Db, partner: Partner
+    payload: SlotBatch, db: Db, partner: MakeBooking
 ) -> list[PartnerBookingOut]:
     try:
         async with service.atomic(db):
@@ -237,7 +251,7 @@ async def create_bookings(
     ),
 )
 async def hold_slots(
-    payload: SlotBatch, db: Db, partner: Partner
+    payload: SlotBatch, db: Db, partner: HoldSlots
 ) -> list[PartnerBookingOut]:
     try:
         async with service.atomic(db):
@@ -267,7 +281,7 @@ async def hold_slots(
     ),
 )
 async def confirm_bookings(
-    payload: ConfirmRequest, db: Db, partner: Partner
+    payload: ConfirmRequest, db: Db, partner: ConfirmHeld
 ) -> list[PartnerBookingOut]:
     try:
         async with service.atomic(db):
@@ -287,7 +301,7 @@ async def confirm_bookings(
         "records the second, so reconciliation can match on whichever one you quote."
     ),
 )
-async def map_bookings(payload: MapRequest, db: Db, partner: Partner) -> None:
+async def map_bookings(payload: MapRequest, db: Db, partner: MapRefs) -> None:
     try:
         async with service.atomic(db):
             await service.map_external(db, partner, list(payload.pairs.items()))
@@ -304,7 +318,7 @@ async def map_bookings(payload: MapRequest, db: Db, partner: Partner) -> None:
 )
 async def list_bookings(
     db: Db,
-    partner: Partner,
+    partner: ListBookings,
     from_date: datetime | None = Query(default=None, description="starts_at >= this"),
     to_date: datetime | None = Query(default=None, description="starts_at < this"),
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -334,7 +348,7 @@ async def list_bookings(
     ),
 )
 async def get_booking(
-    reference: str, db: Db, partner: Partner
+    reference: str, db: Db, partner: ReadBooking
 ) -> PartnerBookingOut:
     booking = await service.owned(db, partner, reference)
     if booking is None:
@@ -353,7 +367,7 @@ async def get_booking(
     ),
 )
 async def cancel_booking(
-    reference: str, payload: PartnerBookingCancel, db: Db, partner: Partner
+    reference: str, payload: PartnerBookingCancel, db: Db, partner: CancelBooking
 ) -> PartnerBookingOut:
     try:
         async with service.atomic(db):

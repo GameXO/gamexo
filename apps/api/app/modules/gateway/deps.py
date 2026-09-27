@@ -15,7 +15,8 @@ from typing import Annotated
 from fastapi import Depends, Header
 from sqlalchemy import func, select
 
-from app.core.errors import AuthenticationError
+from app.core.errors import AuthenticationError, PermissionDeniedError
+from app.modules.gateway import throttle
 from app.modules.gateway.models import IntegrationPartner, hash_api_key, split_api_key
 from app.tenancy.deps import Db
 
@@ -70,6 +71,80 @@ async def get_current_partner(
 CurrentPartner = Annotated[IntegrationPartner, Depends(get_current_partner)]
 
 
+# ── What a public key may do ────────────────────────────────────────────────
+
+KIND_SECRET = "secret"
+KIND_PUBLISHABLE = "publishable"
+
+#: Endpoints a **publishable** key may reach, by operation name rather than by URL —
+#: every dialect spells the same operation differently, and a path allowlist would
+#: have to be rewritten for each one.
+#:
+#: An *allowlist*, so an endpoint added later is closed to public keys until someone
+#: opens it deliberately. Same reasoning `auth/deps.py` gives for defaulting to
+#: RequireStaff: the safe default has to be the one you get by forgetting.
+#:
+#: What is on it, and why only this:
+#:
+#:   availability  Already public. A venue's free slots are on its own website.
+#:   hold / create Writes, and the point of the integration. Bounded by the 15-minute
+#:                 hold TTL and by rate limiting; the worst case is junk bookings,
+#:                 which are visible and reversible.
+#:   confirm       Completes a hold the same key just made.
+#:
+#: What is deliberately absent, and why:
+#:
+#:   list / get    Return customer names and phone numbers for the whole venue. A key
+#:                 anyone can read out of a browser must not be able to export the
+#:                 customer list.
+#:   cancel        Would let anyone cancel anyone's booking. There is no way to prove
+#:                 ownership from a public key, so the capability cannot be offered.
+#:   map           Reconciliation plumbing for a partner's own back office; a browser
+#:                 has no business doing it.
+PUBLISHABLE_OPERATIONS = frozenset({"availability", "hold", "create", "confirm"})
+
+
+def _assert_scope(partner: IntegrationPartner, operation: str) -> None:
+    """Refuse an operation a publishable key is not allowed to perform.
+
+    Secret keys pass through untouched — that is the existing behaviour, and every
+    partner onboarded before publishable keys existed has one.
+    """
+    if partner.key_kind != KIND_PUBLISHABLE:
+        return
+    if operation in PUBLISHABLE_OPERATIONS:
+        return
+    raise PermissionDeniedError(
+        f"This is a publishable key, which cannot {operation}. Publishable keys are "
+        "assumed to be readable by anyone, so they are limited to "
+        f"{', '.join(sorted(PUBLISHABLE_OPERATIONS))}. Use a secret key, from a "
+        "server, for anything else.",
+        details={"operation": operation, "key_kind": partner.key_kind},
+    )
+
+
+def speaks(dialect: str, operation: str):
+    """The calling partner, refused unless the key fits this endpoint.
+
+    Two checks, one dependency, because every gateway route needs both and a route
+    that declares only one is a route with a hole in it. Declaring the operation at
+    the endpoint — rather than inferring it from the path — is what lets the
+    publishable allowlist be written once and read by every dialect.
+    """
+
+    async def dependency(partner: CurrentPartner) -> IntegrationPartner:
+        _assert_dialect(partner, dialect)
+        _assert_scope(partner, operation)
+        throttle.check(
+            key_prefix=partner.key_prefix,
+            key_kind=partner.key_kind,
+            operation=operation,
+        )
+        return partner
+
+    return dependency
+
+
 def speaking(dialect: str):
     """Refuse a key issued for a different dialect.
 
@@ -83,15 +158,19 @@ def speaking(dialect: str):
     """
 
     async def dependency(partner: CurrentPartner) -> IntegrationPartner:
-        if partner.dialect != dialect:
-            raise AuthenticationError(
-                f"This API key is registered for the {partner.dialect!r} integration, "
-                f"not {dialect!r}. Use the matching base URL, or change the "
-                "integration's dialect in the dashboard."
-            )
+        _assert_dialect(partner, dialect)
         return partner
 
     return dependency
+
+
+def _assert_dialect(partner: IntegrationPartner, dialect: str) -> None:
+    if partner.dialect != dialect:
+        raise AuthenticationError(
+            f"This API key is registered for the {partner.dialect!r} integration, "
+            f"not {dialect!r}. Use the matching base URL, or change the "
+            "integration's dialect in the dashboard."
+        )
 
 
 async def partner_by_slug(db: Db, slug: str) -> IntegrationPartner | None:

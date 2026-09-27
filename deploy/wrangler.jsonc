@@ -1,13 +1,14 @@
 {
-  // Demo deployment of both frontends as ONE static-asset Worker:
+  // Deployment of both frontends as ONE static-asset Worker:
   //
   //   /       -> apps/dashboard  (admin dashboard)
   //   /pos/   -> apps/pos        (walk-in counter)
   //
   // apps/website — the public marketing site and self-serve signup — is NOT part
-  // of this Worker. It has no deployment target yet, so signup is unreachable in
-  // production. Giving it one is a routing decision, not an omission to paper
-  // over here: it wants the root, which this dashboard currently occupies.
+  // of this Worker. It ships separately, as its own Worker: see
+  // wrangler.website.jsonc and `pnpm website:deploy`. It wants the root, which
+  // this dashboard already occupies, so the two cannot share one Worker without
+  // a routing decision this repo has not made.
   //
   // One origin, so the API needs exactly one CORS_ORIGINS entry rather than one
   // per app. apps/pos already builds with base '/pos/', so its bundle references
@@ -15,7 +16,7 @@
   //
   // Build the ./dist this points at with `pnpm deploy:build` — it is assembled
   // from two separate Vite builds and is not any single app's output directory.
-  "name": "gamexo-demo",
+  "name": "gamexo-dash",
   "compatibility_date": "2026-08-11",
 
   // No "main". This is an assets-only Worker: there is no script to invoke, so

@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -153,12 +154,27 @@ class PartnerCreate(BaseModel):
     #: The id the partner knows this venue by, if they have assigned one.
     external_venue_id: str | None = Field(default=None, max_length=120)
 
+    #: `secret` for a key that lives on a partner's server, `publishable` for one
+    #: that lives in a browser. Publishable keys reach a deliberately narrow set of
+    #: endpoints — see the gateway's `PUBLISHABLE_OPERATIONS`.
+    key_kind: Literal["secret", "publishable"] = "secret"
+
+    #: Only meaningful for a publishable key, and only to make the browser work:
+    #: without a matching Access-Control-Allow-Origin the response is discarded.
+    #: Not a security control — `Origin` is set by whoever is calling.
+    allowed_origins: list[str] = Field(default_factory=list)
+
 
 class PartnerUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     is_active: bool | None = None
     dialect: str | None = Field(default=None, max_length=50)
     external_venue_id: str | None = Field(default=None, max_length=120)
+    allowed_origins: list[str] | None = None
+    #: Deliberately absent: `key_kind`. Flipping a live secret key to publishable
+    #: would silently narrow what a working integration can do, and flipping the
+    #: other way would widen a credential that is already sitting in someone's
+    #: JavaScript bundle. Issue a new integration instead.
 
 
 class PartnerOut(BaseModel):
@@ -170,6 +186,8 @@ class PartnerOut(BaseModel):
     dialect: str
     external_venue_id: str | None
     key_prefix: str
+    key_kind: str
+    allowed_origins: list[str]
     is_active: bool
     last_used_at: datetime | None
     created_at: datetime

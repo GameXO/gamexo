@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
 
@@ -54,6 +55,8 @@ async def make_partner(
     name: str,
     slug: str,
     dialect: str = "native",
+    key_kind: str = "secret",
+    allowed_origins: list[str] | None = None,
 ) -> dict:
     """Mint an integration and return `{headers, id, api_key, slug}`.
 
@@ -66,7 +69,13 @@ async def make_partner(
     """
     response = await client.post(
         "/api/v1/partners",
-        json={"name": name, "slug": slug, "dialect": dialect},
+        json={
+            "name": name,
+            "slug": slug,
+            "dialect": dialect,
+            "key_kind": key_kind,
+            "allowed_origins": allowed_origins or [],
+        },
         headers=ctx["headers"],
     )
     assert response.status_code == 201, response.text
@@ -1095,3 +1104,512 @@ async def test_the_purge_cannot_reach_another_partners_booking(
         }
     assert walkin["reference"] in surviving
     assert theirs["reference"] in surviving
+
+
+# ── Reaching the gateway without a subdomain ────────────────────────────────
+#
+# The partner path. A platform has no login and no per-academy hostname, so before
+# the key could name its own academy every gateway call to a shared origin died at
+# "could not determine the academy" — including the ones the published Playo docs
+# tell partners to make.
+
+
+async def test_a_key_names_its_own_academy_with_no_host_or_header(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The blocker this whole path exists to remove.
+
+    No `X-Tenant-ID` (forbidden in production) and no subdomain — exactly what a
+    partner sends. The request must reach the dialect and be answered, not refused
+    with a 400 about hostnames.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+
+    bare = {"X-API-Key": partner["headers"]["X-API-Key"]}
+    assert "X-Tenant-ID" not in bare
+
+    response = await client.get("/api/v1/gateway/availability", params={"date": DAY}, headers=bare)
+    assert response.status_code == 200, response.text
+
+
+async def test_an_unknown_key_is_401_not_a_tenant_error(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A forged prefix must fail on the credential, not on tenant resolution.
+
+    Answering "could not determine the academy" would tell a caller their key was
+    at least *shaped* like one we know. It also reads as our outage rather than
+    their bad credential, which sends the wrong team looking.
+    """
+    await setup_academy(client, tenant_a)
+
+    response = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={"X-API-Key": "gx_ghost_deadbeef.notarealsecret"},
+    )
+    assert response.status_code == 401, response.text
+    assert response.json()["error"]["code"] == "unauthenticated"
+
+
+async def test_a_hostname_still_outranks_the_key(
+    client: AsyncClient, tenant_a: TenantFixture, tenant_b: TenantFixture
+) -> None:
+    """Academy A's key presented to academy B is still refused.
+
+    The key resolving its own academy must not become a way to ignore the academy
+    the caller actually addressed. Host wins, the authentication lookup runs inside
+    B, finds nothing, and 401s — the cross-tenant replay defence that would
+    otherwise have been quietly removed.
+    """
+    ctx_a = await setup_academy(client, tenant_a)
+    await setup_academy(client, tenant_b)
+    partner = await make_partner(client, ctx_a, tenant_a, "Anyplace", "anyplace")
+
+    response = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={"X-API-Key": partner["headers"]["X-API-Key"], **tenant_b.headers},
+    )
+    assert response.status_code == 401, response.text
+
+
+async def test_an_unknown_prefix_is_indistinguishable_from_a_wrong_secret(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The oracle this must not become.
+
+    Once a key can name its own academy, an unknown prefix has no academy to name
+    and resolution fails — while a known prefix with a forged secret gets all the
+    way to authentication. Left alone, that is 400 against 401 and a free way to
+    enumerate which integrations exist. Both must answer identically.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    real = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    real_prefix = real["headers"]["X-API-Key"].split(".")[0]
+
+    unknown = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={"X-API-Key": "gx_ghost_deadbeef.notarealsecret"},
+    )
+    forged = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={"X-API-Key": f"{real_prefix}.wrong-secret-entirely"},
+    )
+
+    assert unknown.status_code == forged.status_code == 401
+    assert unknown.json()["error"] == forged.json()["error"]
+
+
+async def test_the_key_directory_stays_in_step_with_its_partner(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The mirror is a trigger, so it cannot drift.
+
+    A stale directory does not fail loudly — it resolves a live integration to no
+    academy, which reads as an outage rather than a bug. Rotation is the case that
+    matters most: the prefix itself changes, so the old row has to go or a
+    superseded key keeps resolving.
+    """
+    from sqlalchemy import text
+
+    from app.db.session import untenanted_session
+
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    first_prefix = partner["headers"]["X-API-Key"].split(".")[0]
+
+    async def directory() -> dict[str, str]:
+        async with untenanted_session() as session:
+            rows = (
+                await session.execute(text("select key_prefix, dialect from partner_key_directory"))
+            ).all()
+        return {r[0]: r[1] for r in rows}
+
+    assert await directory() == {first_prefix: "native"}
+
+    # Re-pointing carries the new dialect across.
+    await client.patch(
+        f"/api/v1/partners/{partner['id']}", json={"dialect": "playo"}, headers=ctx["headers"]
+    )
+    assert await directory() == {first_prefix: "playo"}
+
+    # Rotation replaces the row rather than adding a second one.
+    rotated = await client.post(
+        f"/api/v1/partners/{partner['id']}/rotate-key", headers=ctx["headers"]
+    )
+    new_prefix = rotated.json()["api_key"].split(".")[0]
+    assert new_prefix != first_prefix
+    assert await directory() == {new_prefix: "playo"}
+
+    # And the retired prefix no longer resolves an academy at all.
+    stale = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={"X-API-Key": f"{first_prefix}.whatever"},
+    )
+    assert stale.status_code == 401
+
+
+# ── Publishable keys ───────────────────────────────────────────────────────
+#
+# A partner with no backend has nowhere to put a key except their JavaScript, where
+# anyone can read it. A publishable key is the admission that this has happened, and
+# the narrowing that has to follow from it.
+
+
+async def publishable(client: AsyncClient, ctx: dict, tenant: TenantFixture) -> dict:
+    return await make_partner(
+        client, ctx, tenant, "Base44", "base44",
+        key_kind="publishable", allowed_origins=["https://xcs.base44.app"],
+    )
+
+
+async def test_a_publishable_key_is_marked_as_such_in_the_key_itself(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """`gxp_` rather than `gx_`, so the two are told apart on sight.
+
+    A secret key pasted into frontend code is the mistake this distinction exists
+    to prevent, and it should be obvious in a diff or a screenshot — not only after
+    somebody thinks to check the database.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+    secret = await make_partner(client, ctx, tenant_a, "Server Side", "serverside")
+
+    assert pub["api_key"].startswith("gxp_")
+    assert secret["api_key"].startswith("gx_")
+    assert not secret["api_key"].startswith("gxp_")
+
+
+async def test_a_publishable_key_can_sell_a_court(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The whole point: a browser can read availability and take a booking."""
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+
+    seen = await client.get(
+        "/api/v1/gateway/availability", params={"date": DAY}, headers=pub["headers"]
+    )
+    assert seen.status_code == 200, seen.text
+
+    held = await partner_book(client, pub, court=ctx["court_1"], starts_at=at(9, 7), hold=True)
+    assert held.status_code == 201, held.text
+
+    booked = await partner_book(client, pub, court=ctx["court_1"], starts_at=at(9, 9))
+    assert booked.status_code == 201, booked.text
+
+
+async def test_a_publishable_key_cannot_read_the_customer_list(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The exposure that actually matters.
+
+    Listing bookings returns a name and phone number for every customer at the
+    venue. A credential anyone can lift out of a browser must not be able to
+    export that, whatever else it can do.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+    made = await partner_book(client, pub, court=ctx["court_1"], starts_at=at(10, 7))
+    reference = one(made)["reference"]
+
+    listed = await client.get("/api/v1/gateway/bookings", headers=pub["headers"])
+    assert listed.status_code == 403, listed.text
+    assert listed.json()["error"]["details"]["key_kind"] == "publishable"
+
+    single = await client.get(
+        f"/api/v1/gateway/bookings/{reference}", headers=pub["headers"]
+    )
+    assert single.status_code == 403, single.text
+
+
+async def test_a_publishable_key_cannot_cancel(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """There is no way to prove ownership from a public key.
+
+    So "cancel my booking" and "cancel anyone's booking" are the same request, and
+    the capability cannot be offered at all.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+    made = await partner_book(client, pub, court=ctx["court_1"], starts_at=at(11, 7))
+    reference = one(made)["reference"]
+
+    response = await client.post(
+        f"/api/v1/gateway/bookings/{reference}/cancel", json={}, headers=pub["headers"]
+    )
+    assert response.status_code == 403, response.text
+
+
+async def test_a_secret_key_keeps_the_whole_contract(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Every partner onboarded before publishable keys existed has a secret one.
+
+    Nothing about them may narrow, or this becomes a silent breaking change to a
+    live integration.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    made = await partner_book(client, partner, court=ctx["court_1"], starts_at=at(12, 7))
+    reference = one(made)["reference"]
+
+    assert (await client.get("/api/v1/gateway/bookings", headers=partner["headers"])).status_code == 200
+    assert (
+        await client.get(f"/api/v1/gateway/bookings/{reference}", headers=partner["headers"])
+    ).status_code == 200
+    assert (
+        await client.post(
+            f"/api/v1/gateway/bookings/{reference}/cancel", json={}, headers=partner["headers"]
+        )
+    ).status_code == 200
+
+
+async def test_rotating_a_publishable_key_keeps_it_publishable(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Rotation must not quietly promote a browser key to a secret one.
+
+    The new key lands in the same JavaScript bundle the old one came from, so it
+    is public whatever we label it. Minting a `gx_` here would widen a credential
+    that is already exposed, and remove the narrowing that made it safe to issue.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+
+    rotated = await client.post(
+        f"/api/v1/partners/{pub['id']}/rotate-key", headers=ctx["headers"]
+    )
+    assert rotated.status_code == 200, rotated.text
+    assert rotated.json()["api_key"].startswith("gxp_")
+    assert rotated.json()["key_kind"] == "publishable"
+
+    fresh = {"X-API-Key": rotated.json()["api_key"], **tenant_a.headers}
+    assert (await client.get("/api/v1/gateway/bookings", headers=fresh)).status_code == 403
+
+
+# ── Cross-origin, for a partner calling from a browser ─────────────────────
+
+
+async def test_an_allowed_origin_gets_a_cors_header(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Without this the browser discards a perfectly good response.
+
+    That is the whole job: CORS is what makes a browser integration work, not what
+    makes it safe. `PUBLISHABLE_OPERATIONS` is the part that makes it safe.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+
+    response = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={**pub["headers"], "Origin": "https://xcs.base44.app"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["access-control-allow-origin"] == "https://xcs.base44.app"
+    assert "Origin" in response.headers.get("vary", "")
+
+
+async def test_another_origin_gets_no_cors_header(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A stolen key used from someone else's website reads nothing back.
+
+    Answered normally rather than refused, so the browser reports "blocked by
+    CORS" — which is true — instead of us inventing a 4xx that suggests the key
+    or the request was wrong.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+
+    response = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={**pub["headers"], "Origin": "https://not-their-site.example"},
+    )
+    assert "access-control-allow-origin" not in response.headers
+
+
+async def test_origins_are_per_partner_not_global(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """One customer's website must not be allowed by another customer's key."""
+    ctx = await setup_academy(client, tenant_a)
+    theirs = await publishable(client, ctx, tenant_a)
+    other = await make_partner(
+        client, ctx, tenant_a, "Someone Else", "someoneelse",
+        key_kind="publishable", allowed_origins=["https://other.example"],
+    )
+
+    crossed = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={**other["headers"], "Origin": "https://xcs.base44.app"},
+    )
+    assert "access-control-allow-origin" not in crossed.headers
+
+    own = await client.get(
+        "/api/v1/gateway/availability",
+        params={"date": DAY},
+        headers={**theirs["headers"], "Origin": "https://xcs.base44.app"},
+    )
+    assert own.headers["access-control-allow-origin"] == "https://xcs.base44.app"
+
+
+async def test_a_preflight_is_answered_without_a_key(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Browsers do not send custom headers on a preflight, so there is no key here.
+
+    Refusing it would break every browser integration before the real request is
+    ever made. It is answered permissively on purpose, and the origin decision
+    happens on the request that actually carries the credential — see cors.py.
+    """
+    await setup_academy(client, tenant_a)
+
+    response = await client.request(
+        "OPTIONS",
+        "/api/v1/gateway/bookings/hold",
+        headers={
+            "Origin": "https://xcs.base44.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-api-key, content-type",
+        },
+    )
+    assert response.status_code == 204, response.text
+    assert response.headers["access-control-allow-origin"] == "https://xcs.base44.app"
+    assert "X-API-Key" in response.headers["access-control-allow-headers"]
+
+
+async def test_a_call_with_no_origin_is_untouched(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Server-to-server partners send no Origin and must not be affected at all."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+
+    response = await client.get(
+        "/api/v1/gateway/availability", params={"date": DAY}, headers=partner["headers"]
+    )
+    assert response.status_code == 200, response.text
+    assert "access-control-allow-origin" not in response.headers
+
+
+# ── Rate limiting ──────────────────────────────────────────────────────────
+
+
+def test_a_publishable_key_gets_a_tighter_budget_than_a_secret_one() -> None:
+    """The unit, so the numbers are asserted without making 70 HTTP calls.
+
+    A publishable key is one we know to be public, so its ceiling is what a real
+    venue's traffic needs rather than what a trusted server might.
+    """
+    from app.modules.gateway import throttle
+
+    assert throttle.limit_for("publishable", "hold").allowance < (
+        throttle.limit_for("secret", "hold").allowance
+    )
+    # Holds are the tightest of all: they are the only call that takes a court out
+    # of sale before anyone has paid.
+    assert throttle.limit_for("publishable", "hold").allowance < (
+        throttle.limit_for("publishable", "availability").allowance
+    )
+
+
+def test_the_budget_refuses_past_its_allowance_and_recovers() -> None:
+    from app.modules.gateway import throttle
+
+    throttle.reset()
+    allowance = throttle.limit_for("publishable", "hold").allowance
+
+    for _ in range(allowance):
+        throttle.check(key_prefix="gxp_t_1", key_kind="publishable", operation="hold")
+
+    with pytest.raises(throttle.RateLimitedError) as excinfo:
+        throttle.check(key_prefix="gxp_t_1", key_kind="publishable", operation="hold")
+    assert excinfo.value.details["allowance"] == allowance
+    assert excinfo.value.details["retry_after_seconds"] >= 1
+
+    # A different operation has its own budget — exhausting holds must not stop a
+    # customer from seeing what is free.
+    throttle.check(key_prefix="gxp_t_1", key_kind="publishable", operation="availability")
+
+
+def test_budgets_do_not_leak_between_keys() -> None:
+    """One noisy partner must not throttle another."""
+    from app.modules.gateway import throttle
+
+    throttle.reset()
+    allowance = throttle.limit_for("publishable", "hold").allowance
+    for _ in range(allowance + 5):
+        try:
+            throttle.check(key_prefix="gxp_noisy", key_kind="publishable", operation="hold")
+        except throttle.RateLimitedError:
+            pass
+
+    throttle.check(key_prefix="gxp_quiet", key_kind="publishable", operation="hold")
+
+
+async def test_a_throttled_partner_gets_429_and_creates_nothing(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """End to end, and the half that matters: the refusal writes no booking.
+
+    A 429 that still consumed a court would be worse than no limit at all.
+    """
+    from sqlalchemy import func, select
+
+    from app.db.session import tenant_session
+    from app.modules.booking.models import Booking
+    from app.modules.gateway import throttle
+
+    ctx = await setup_academy(client, tenant_a)
+    pub = await publishable(client, ctx, tenant_a)
+    allowance = throttle.limit_for("publishable", "hold").allowance
+
+    made = 0
+    for hour in range(7, 7 + allowance):
+        response = await partner_book(
+            client, pub, court=ctx["court_1"], starts_at=at(13, hour), hold=True
+        )
+        assert response.status_code == 201, response.text
+        made += 1
+
+    async def booking_count() -> int:
+        async with tenant_session(tenant_a.id) as session:
+            return (await session.execute(select(func.count()).select_from(Booking))).scalar_one()
+
+    before = await booking_count()
+
+    refused = await partner_book(
+        client, pub, court=ctx["court_2"], starts_at=at(13, 7), hold=True
+    )
+    assert refused.status_code == 429, refused.text
+    assert refused.json()["error"]["code"] == "rate_limited"
+    assert await booking_count() == before == made
+
+
+async def test_a_secret_key_is_not_throttled_at_a_publishable_rate(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Existing server-to-server partners must not be narrowed by this."""
+    from app.modules.gateway import throttle
+
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Anyplace", "anyplace")
+    over_publishable = throttle.limit_for("publishable", "hold").allowance + 3
+
+    for hour in range(7, 7 + over_publishable):
+        response = await partner_book(
+            client, partner, court=ctx["court_1"], starts_at=at(14, hour), hold=True
+        )
+        assert response.status_code == 201, response.text

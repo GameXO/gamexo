@@ -66,6 +66,12 @@ os.environ["PLATFORM_RAZORPAY_KEY_ID"] = ""
 os.environ["PLATFORM_RAZORPAY_KEY_SECRET"] = ""
 os.environ["PLATFORM_RAZORPAY_WEBHOOK_SECRET"] = ""
 
+# Pin the global CORS list too, for the same reason: the developer's .env carries
+# their own dev origins, and whether `CORSMiddleware` is mounted at all changes the
+# middleware stack the gateway's own CORS handling has to sit outside of. A suite
+# that assembles a different stack than production is testing a different app.
+os.environ["CORS_ORIGINS"] = '["http://localhost:5173"]' 
+
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
@@ -75,6 +81,7 @@ from app.auth.deps import clear_identity_cache  # noqa: E402
 from app.auth.service import provision_tenant  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.security import Role, hash_password  # noqa: E402
+from app.modules.gateway import throttle as gateway_throttle  # noqa: E402
 from app.tenancy.resolver import invalidate_tenant_cache  # noqa: E402
 from app.db.session import dispose_engine, tenant_session, untenanted_session  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
@@ -132,6 +139,10 @@ async def _clean_tables() -> AsyncIterator[None]:
     """
     invalidate_tenant_cache()
     clear_identity_cache()
+    # Rate-limit counters are per process and keyed on a key prefix, and every test
+    # mints fresh partners — but a test that deliberately exhausts a budget would
+    # otherwise leave it exhausted for whatever reuses that prefix.
+    gateway_throttle.reset()
     engine = create_async_engine(TEST_MIGRATION_URL, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.execute(text("TRUNCATE TABLE tenant RESTART IDENTITY CASCADE"))
