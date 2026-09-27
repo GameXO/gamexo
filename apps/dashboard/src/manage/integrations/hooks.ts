@@ -125,8 +125,13 @@ export function usePartners() {
 export function useCreatePartner() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { name: string; slug: string; dialect: string }) =>
-      api.createPartner(vars),
+    mutationFn: (vars: {
+      name: string
+      slug: string
+      dialect: string
+      key_kind?: 'secret' | 'publishable'
+      allowed_origins?: string[]
+    }) => api.createPartner(vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: integrationKeys.partners }),
   })
 }

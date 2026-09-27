@@ -28,6 +28,7 @@ from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
 from app.modules.gateway import sandbox as gateway_sandbox
 from app.modules.gateway.dialects import DIALECTS
+from app.modules.gateway.cors import GatewayCors
 from app.modules.gateway.dispatch import GatewayDispatch
 from app.modules.onboarding import router as onboarding_router
 from app.modules.payments import router as payments_router
@@ -184,6 +185,14 @@ def create_app() -> FastAPI:
             # from the browser, which is the only place they are useful.
             expose_headers=["Server-Timing", "X-DB-Queries", "X-DB-Connects"],
         )
+
+    # Added LAST, so it ends up OUTERMOST — deliberately outside the global CORS
+    # middleware above. That one holds a single origin list for the whole
+    # deployment and answers a preflight for an origin it does not know with a 400,
+    # which would reject every partner's browser before their key was ever read.
+    # A partner's origins are per partner, so their preflights have to be answered
+    # before the global list gets a say. Non-gateway paths pass straight through.
+    app.add_middleware(GatewayCors)
 
     register_exception_handlers(app)
 

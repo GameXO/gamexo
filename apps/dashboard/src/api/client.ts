@@ -684,6 +684,14 @@ export const api = {
      *  without a spec of their own. */
     dialect?: string
     external_venue_id?: string | null
+    /** `secret` lives on a partner's server and can do everything the contract
+     *  allows. `publishable` lives in a browser, where anyone can read it, and is
+     *  confined to availability, hold, create and confirm. */
+    key_kind?: 'secret' | 'publishable'
+    /** Origins the browser may call from. Required in practice for a publishable
+     *  key — without a match the browser discards the response — and meaningless
+     *  for a secret one, which is not called from a page. */
+    allowed_origins?: string[]
   }) =>
     request<Ok<'/api/v1/partners', 'post', 201>>('/api/v1/partners', { method: 'POST', body }),
 

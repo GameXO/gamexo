@@ -116,7 +116,7 @@ async def create_partner(payload: PartnerCreate, db: Db, _: RequireAdmin) -> Par
 
     _assert_usable_dialect(payload.dialect)
 
-    full_key, prefix, key_hash = generate_api_key(payload.slug)
+    full_key, prefix, key_hash = generate_api_key(payload.slug, kind=payload.key_kind)
     partner = IntegrationPartner(
         name=payload.name,
         slug=payload.slug.lower(),
@@ -124,6 +124,8 @@ async def create_partner(payload: PartnerCreate, db: Db, _: RequireAdmin) -> Par
         external_venue_id=payload.external_venue_id,
         key_prefix=prefix,
         key_hash=key_hash,
+        key_kind=payload.key_kind,
+        allowed_origins=list(payload.allowed_origins),
         is_active=True,
     )
     db.add(partner)
@@ -183,7 +185,7 @@ async def update_partner(
 async def rotate_key(partner_id: uuid.UUID, db: Db, _: RequireAdmin) -> PartnerWithKey:
     partner = await get_or_404(db, IntegrationPartner, partner_id, label="Integration")
     retired = partner.key_prefix
-    full_key, prefix, key_hash = generate_api_key(partner.slug)
+    full_key, prefix, key_hash = generate_api_key(partner.slug, kind=partner.key_kind)
     partner.key_prefix = prefix
     partner.key_hash = key_hash
     await db.flush()

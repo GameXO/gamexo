@@ -26,6 +26,8 @@ land.
 from __future__ import annotations
 
 import time
+import uuid
+from dataclasses import dataclass
 
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
@@ -33,16 +35,10 @@ from starlette.routing import Match
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import settings
-from app.core.errors import AppError, _envelope
-from app.db.session import tenant_session, untenanted_session
+from app.core.errors import _envelope
+from app.db.session import untenanted_session
 from app.modules.gateway.dialects import DEFAULT_DIALECT, DIALECTS
-from app.modules.gateway.models import IntegrationPartner, split_api_key
-from app.tenancy.resolver import (
-    IMPERSONATE_HEADER,
-    TENANT_HEADER,
-    resolve_tenant,
-    resolve_tenant_cached,
-)
+from app.modules.gateway.models import PartnerKeyDirectory, split_api_key
 
 API_KEY_HEADER = "x-api-key"
 
@@ -63,17 +59,27 @@ RESERVED = frozenset(DIALECTS) | {"sandbox"}
 #     a stale "no such prefix" — the failure that would be maddening to debug — at
 #     the cost of an unknown prefix reaching the database every time.
 #
-# Keyed on the prefix alone rather than on (tenant, prefix): the prefix is globally
-# unique, so it cannot resolve to two partners. One case looks like it should matter
-# and does not — academy A's key presented on academy B's hostname hits this cache
-# and is routed to A's dialect. The lookup that follows is RLS-scoped to B, finds
-# nothing, and returns 401. Routing to the "wrong" adapter reveals nothing, because
-# nothing there answers without a valid, in-tenant key.
+# Keyed on the prefix alone, and the prefix is globally unique, so it cannot resolve
+# to two partners. Academy A's key presented on academy B's *hostname* still routes
+# to A's dialect and is then refused: the host wins tenant resolution, so the
+# authentication lookup that follows is RLS-scoped to B, finds nothing, and returns
+# 401. Routing to the "wrong" adapter reveals nothing, because nothing there answers
+# without a valid, in-tenant key.
 
 _CACHE_TTL_SECONDS = 300.0
 
-# key_prefix -> (expires_at, dialect slug)
-_dialects: dict[str, tuple[float, str]] = {}
+
+@dataclass(frozen=True, slots=True)
+class PartnerRouting:
+    """What an inbound key prefix tells us before anything is authenticated."""
+
+    dialect: str
+    tenant_id: uuid.UUID
+    allowed_origins: tuple[str, ...]
+
+
+# key_prefix -> (expires_at, routing)
+_routes: dict[str, tuple[float, PartnerRouting]] = {}
 
 
 def invalidate_partner_cache(*prefixes: str) -> None:
@@ -86,35 +92,83 @@ def invalidate_partner_cache(*prefixes: str) -> None:
     next call to behave differently.
     """
     if not prefixes:
-        _dialects.clear()
+        _routes.clear()
         return
     for prefix in prefixes:
-        _dialects.pop(prefix, None)
+        _routes.pop(prefix, None)
 
 
-async def dialect_for(tenant_id, key_prefix: str) -> str | None:
-    """Which wire format this key speaks, or None if no such key exists here."""
-    entry = _dialects.get(key_prefix)
+async def routing_for(key_prefix: str) -> PartnerRouting | None:
+    """The dialect and academy behind a key prefix, or None if no such key exists.
+
+    Reads `partner_key_directory`, not `integration_partner`. That is not a
+    shortcut — `integration_partner` is tenant-scoped, and an unbound session sees
+    zero rows through RLS, which is the whole reason a directory table exists. Same
+    exception, same reasoning as `AccountDirectory` for logins.
+
+    This resolves; it does not authenticate. Only the public half of the key is
+    read, and `deps.get_current_partner` still verifies the secret afterwards
+    against a tenant-scoped row. A forged prefix therefore resolves to an academy
+    and is then refused by it.
+    """
+    entry = _routes.get(key_prefix)
     if entry is not None:
-        expires_at, slug = entry
+        expires_at, routing = entry
         if expires_at > time.monotonic():
-            return slug
-        _dialects.pop(key_prefix, None)
+            return routing
+        _routes.pop(key_prefix, None)
 
-    async with tenant_session(tenant_id) as session:
-        slug = (
+    async with untenanted_session() as session:
+        row = (
             await session.execute(
-                select(IntegrationPartner.dialect).where(
-                    IntegrationPartner.key_prefix == key_prefix
-                )
+                select(
+                    PartnerKeyDirectory.dialect,
+                    PartnerKeyDirectory.tenant_id,
+                    PartnerKeyDirectory.allowed_origins,
+                ).where(PartnerKeyDirectory.key_prefix == key_prefix)
             )
-        ).scalar_one_or_none()
+        ).one_or_none()
 
-    if slug is None:
+    if row is None:
         return None
 
-    _dialects[key_prefix] = (time.monotonic() + _CACHE_TTL_SECONDS, slug)
-    return slug
+    routing = PartnerRouting(
+        dialect=row[0], tenant_id=row[1], allowed_origins=tuple(row[2] or ())
+    )
+    _routes[key_prefix] = (time.monotonic() + _CACHE_TTL_SECONDS, routing)
+    return routing
+
+
+def tenant_reference_for_key(raw_key: str | None) -> str | None:
+    """The cached academy id for this key, as a resolver reference. None on a miss.
+
+    Synchronous and cache-only, so `resolve_tenant_cached` — which exists to answer
+    without opening a connection — keeps that property. A miss returns None and the
+    caller falls through to the async path, exactly as it does for an uncached slug.
+    """
+    prefix = _prefix_of(raw_key)
+    if prefix is None:
+        return None
+    entry = _routes.get(prefix)
+    if entry is None or entry[0] <= time.monotonic():
+        return None
+    return str(entry[1].tenant_id)
+
+
+async def load_tenant_reference_for_key(raw_key: str | None) -> str | None:
+    """Same answer as `tenant_reference_for_key`, paying for a query on a miss."""
+    prefix = _prefix_of(raw_key)
+    if prefix is None:
+        return None
+    routing = await routing_for(prefix)
+    return None if routing is None else str(routing.tenant_id)
+
+
+def _prefix_of(raw_key: str | None) -> str | None:
+    if not raw_key:
+        return None
+    parts = split_api_key(raw_key)
+    return None if parts is None else parts[0]
 
 
 # ── which dialect claims a path ─────────────────────────────────────────────
@@ -199,41 +253,24 @@ class GatewayDispatch:
     async def _dialect(self, scope: Scope) -> str | None:
         """The calling platform, or None if that cannot be established.
 
-        Every failure here — no key, malformed key, unknown key, unresolvable tenant
-        — returns None, and the caller falls back to the default dialect. That is
-        deliberate: a gateway path must never 404 for want of routing when the real
-        answer is 401, and the dependencies downstream produce those errors properly,
-        in the one place they are defined.
+        Every failure here — no key, malformed key, unknown key — returns None, and
+        the caller falls back to the default dialect. That is deliberate: a gateway
+        path must never 404 for want of routing when the real answer is 401, and the
+        dependencies downstream produce those errors properly, in the one place they
+        are defined.
+
+        This used to resolve the tenant first and then look the key up inside it,
+        which meant routing depended on a hostname a partner does not have. The
+        prefix is globally unique, so it is enough on its own.
         """
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
 
-        raw_key = headers.get(API_KEY_HEADER)
-        if not raw_key:
-            return None
-        parts = split_api_key(raw_key)
-        if parts is None:
-            return None
-        key_prefix, _ = parts
-
-        try:
-            args = {
-                "host": headers.get("host"),
-                "tenant_header": headers.get(TENANT_HEADER.lower()),
-                "impersonate_header": headers.get(IMPERSONATE_HEADER.lower()),
-                # A gateway request authenticates with X-API-Key, never a bearer
-                # token, so it can never be a platform operator impersonating.
-                "is_platform_admin": False,
-            }
-            tenant = resolve_tenant_cached(**args)
-            if tenant is None:
-                async with untenanted_session() as session:
-                    tenant = await resolve_tenant(session, **args)
-        except AppError:
-            # An unresolvable or suspended academy. Swallowed here so the same error
-            # is raised once, by get_tenant_context, with its own message.
+        prefix = _prefix_of(headers.get(API_KEY_HEADER))
+        if prefix is None:
             return None
 
-        return await dialect_for(tenant.id, key_prefix)
+        routing = await routing_for(prefix)
+        return None if routing is None else routing.dialect
 
     @staticmethod
     def _rewrite(scope: Scope, path: str) -> Scope:

@@ -8653,6 +8653,13 @@
       },
       "PartnerCreate": {
         "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Origins",
+            "type": "array"
+          },
           "dialect": {
             "default": "native",
             "maxLength": 50,
@@ -8670,6 +8677,15 @@
               }
             ],
             "title": "External Venue Id"
+          },
+          "key_kind": {
+            "default": "secret",
+            "enum": [
+              "secret",
+              "publishable"
+            ],
+            "title": "Key Kind",
+            "type": "string"
           },
           "name": {
             "maxLength": 120,
@@ -8694,6 +8710,13 @@
       },
       "PartnerOut": {
         "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Origins",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -8722,6 +8745,10 @@
           "is_active": {
             "title": "Is Active",
             "type": "boolean"
+          },
+          "key_kind": {
+            "title": "Key Kind",
+            "type": "string"
           },
           "key_prefix": {
             "title": "Key Prefix",
@@ -8755,6 +8782,8 @@
           "dialect",
           "external_venue_id",
           "key_prefix",
+          "key_kind",
+          "allowed_origins",
           "is_active",
           "last_used_at",
           "created_at"
@@ -8801,6 +8830,20 @@
       },
       "PartnerUpdate": {
         "properties": {
+          "allowed_origins": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Origins"
+          },
           "dialect": {
             "anyOf": [
               {
@@ -8856,6 +8899,13 @@
       "PartnerWithKey": {
         "description": "Returned once, at creation and rotation, and never again.\n\nOnly the hash is stored, so this is the single moment the key exists in a form\nanyone can copy. The field name says so, because a partner integration lost to\n\"we didn't write it down\" costs an afternoon.",
         "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Origins",
+            "type": "array"
+          },
           "api_key": {
             "description": "Shown once. Store it now \u2014 it cannot be recovered.",
             "title": "Api Key",
@@ -8890,6 +8940,10 @@
             "title": "Is Active",
             "type": "boolean"
           },
+          "key_kind": {
+            "title": "Key Kind",
+            "type": "string"
+          },
           "key_prefix": {
             "title": "Key Prefix",
             "type": "string"
@@ -8922,6 +8976,8 @@
           "dialect",
           "external_venue_id",
           "key_prefix",
+          "key_kind",
+          "allowed_origins",
           "is_active",
           "last_used_at",
           "created_at",
