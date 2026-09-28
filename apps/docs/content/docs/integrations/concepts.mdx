@@ -48,7 +48,7 @@ times out on your side leaves you with no way to tell "it never arrived" from "i
 arrived and the response was lost" — and retrying blind sells the court twice.
 
 ```json
-{ "externalBookingId": "PLY-88213", "…": "…" }
+{ "external_ref": "PLY-88213", "…": "…" }
 ```
 
 Retries are safe for confirm and cancel too: confirming an already-confirmed order
@@ -114,7 +114,7 @@ with a JSON body:
 | `422` | The body did not match the schema. |
 
 <Callout title="Playo is the exception, on purpose">
-  Playo's contract answers business refusals with `200 OK` and `requestStatus: 0`
+  Playo's contract answers business refusals with `200 OK` and `requestStatus: "0"`
   rather than a 4xx, because their client treats a non-2xx as a transport fault and
   retries it — and a sold court never becomes available by retrying. Genuine faults
   stay real HTTP errors even there. See the

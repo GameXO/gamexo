@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, CalendarDays, CircleDollarSign, Pencil, UserRound } from 'lucide-react'
-import { balanceOf, courtById, money, sportById, toISO, type Booking } from '../data/booking'
-import { useBookings, useRecordPayment } from '../api/hooks'
+import { BadgeCheck, CalendarDays, CircleDollarSign, Clock, Pencil, UserRound } from 'lucide-react'
+import { balanceOf, courtById, money, platformName, sportById, toISO, type Booking } from '../data/booking'
+import { useBookings, useBookingsAwaitingPartnerCancel, useRecordPayment } from '../api/hooks'
 import * as db from '../lib/db'
 import EditBookingDrawer from '../booking/EditBookingDrawer'
+import PlatformBookingCard from '../booking/PlatformBookingCard'
 
 const statusTone = (payment: Booking['payment']) => {
   const status = payment?.status || 'due'
@@ -41,12 +42,17 @@ const hasStarted = (booking: Booking) => {
 
 export default function BookingsPage() {
   const bookingsQuery = useBookings()
+  const awaitingQuery = useBookingsAwaitingPartnerCancel()
   const recordPayment = useRecordPayment()
   const today = toISO(new Date())
   const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  // The follow-up list replaces the date range rather than narrowing it: a request
+  // Playo has sat on for a week is exactly the one outside today's range.
+  const [waitingOnly, setWaitingOnly] = useState(false)
+  const awaiting = useMemo(() => awaitingQuery.data ?? [], [awaitingQuery.data])
 
   const bookings = useMemo(() => {
     const items = bookingsQuery.data?.items ?? []
@@ -54,12 +60,13 @@ export default function BookingsPage() {
   }, [bookingsQuery.data])
 
   const visibleBookings = useMemo(() => {
+    if (waitingOnly) return awaiting
     const start = startDate || today
     const end = endDate || today
     const lower = start <= end ? start : end
     const upper = start <= end ? end : start
     return bookings.filter((booking) => booking.date >= lower && booking.date <= upper)
-  }, [bookings, endDate, startDate, today])
+  }, [awaiting, bookings, endDate, startDate, today, waitingOnly])
 
   // Selection only ever comes from the table now, so it always sits inside the
   // range: narrowing the dates past the selected row re-points at the new first.
@@ -105,6 +112,21 @@ export default function BookingsPage() {
             <p className="text-sm text-slate">Review every booking in a date range, then open the full customer profile.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {(awaiting.length > 0 || waitingOnly) && (
+              <button
+                type="button"
+                onClick={() => setWaitingOnly((on) => !on)}
+                aria-pressed={waitingOnly}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  waitingOnly
+                    ? 'border-amber-300 bg-amber-50 text-amber-800'
+                    : 'border-border-card bg-surface text-slate'
+                }`}
+              >
+                <Clock size={16} />
+                Waiting on platform · {awaiting.length}
+              </button>
+            )}
             <label className="flex items-center gap-2 rounded-lg border border-border-card bg-surface px-3 py-2 text-sm text-slate">
               <CalendarDays size={16} />
               <span>From</span>
@@ -123,8 +145,14 @@ export default function BookingsPage() {
         <div className="flex flex-col gap-3 rounded-2xl border border-border-card bg-white p-4 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between rounded-xl bg-surface-muted px-3 py-2">
             <div>
-              <p className="text-sm font-semibold text-ink">Bookings in range</p>
-              <p className="text-xs text-muted">Live list of all confirmed and due bookings</p>
+              <p className="text-sm font-semibold text-ink">
+                {waitingOnly ? 'Waiting on the platform to cancel' : 'Bookings in range'}
+              </p>
+              <p className="text-xs text-muted">
+                {waitingOnly
+                  ? 'Cancellation requested here, not yet cancelled on the platform — chase these'
+                  : 'Live list of all confirmed and due bookings'}
+              </p>
             </div>
             <p className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate">{visibleBookings.length} results</p>
           </div>
@@ -143,7 +171,7 @@ export default function BookingsPage() {
             </div>
           ) : visibleBookings.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border-card px-4 py-8 text-center text-sm text-muted">
-              No bookings match the selected dates.
+              {waitingOnly ? 'Nothing is waiting on a platform.' : 'No bookings match the selected dates.'}
             </div>
           ) : (
             // Capped so a long range scrolls the list rather than stretching the
@@ -178,7 +206,23 @@ export default function BookingsPage() {
                         aria-current={selectedId === booking.id ? 'true' : undefined}
                         className={`cursor-pointer border-b border-border-card/80 last:border-none transition-colors ${rowAccent(selectedId === booking.id)}`}
                       >
-                        <td className="px-3 py-3 font-semibold text-ink">{booking.reference}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="font-semibold text-ink">{booking.reference}</span>
+                            {booking.platform && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  booking.platform.cancelRequestedAt
+                                    ? 'bg-amber-50 text-amber-800'
+                                    : 'bg-surface-muted text-slate'
+                                }`}
+                              >
+                                {platformName(booking.platform.slug)}
+                                {booking.platform.cancelRequestedAt ? ' · cancel requested' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col">
                             <span className="font-semibold text-ink">{booking.customer.name}</span>
@@ -259,6 +303,8 @@ export default function BookingsPage() {
                   Settle due balance
                 </button>
               )}
+
+              <PlatformBookingCard booking={selectedBooking} locked={isPast} />
 
               <div className="flex flex-col gap-3 rounded-xl border border-border-card bg-surface-muted/50 p-4">
                 <div className="flex items-center gap-2">

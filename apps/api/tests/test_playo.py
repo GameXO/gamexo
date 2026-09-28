@@ -9,17 +9,20 @@ hold is invisible to everything except the calendar.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, update
 
+from app.core.security import Role
 from app.db.session import tenant_session
-from app.modules.booking.models import Booking, BookingStatus
-from tests.conftest import TenantFixture
+from app.models.tenant import TenantSettings
+from app.modules.booking.models import Booking, BookingEvent, BookingStatus
+from tests.conftest import PASSWORD, TenantFixture, auth_headers, login, make_user
 from tests.test_booking import book, setup_academy
-from tests.test_gateway import make_partner
+from tests.test_gateway import make_partner, one, partner_book
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -81,7 +84,7 @@ async def test_availability_speaks_playos_shape(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["requestStatus"] == 1
+    assert body["requestStatus"] == "1"
     court = body["courts"][0]
     assert set(court) == {"courtId", "courtName", "slots"}
     assert set(court["slots"][0]) == {"startTime", "endTime", "available", "ticketsAvailable"}
@@ -106,7 +109,7 @@ async def test_business_failures_are_200_not_4xx(
     )
 
     assert response.status_code == 200
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
     assert response.json()["message"]
 
 
@@ -164,7 +167,7 @@ async def test_a_hold_blocks_the_counter(client: AsyncClient, tenant_a: TenantFi
         client, partner, "/order/create",
         {"userName": "Paying Customer", "orders": [slot(ctx["court_1"], 9, "P-HOLD")]},
     )
-    assert held.json()["requestStatus"] == 1
+    assert held.json()["requestStatus"] == "1"
 
     counter = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
     assert counter.status_code == 409
@@ -182,7 +185,7 @@ async def test_the_counter_blocks_playo(client: AsyncClient, tenant_a: TenantFix
         client, partner, "/order/create",
         {"userName": "Too Late", "orders": [slot(ctx["court_1"], 9, "P-LATE")]},
     )
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
     assert "already booked" in response.json()["message"]
 
 
@@ -215,7 +218,7 @@ async def test_a_partial_order_is_not_committed(
             "orders": [slot(ctx["court_1"], 9, "P-A1"), slot(ctx["court_1"], 10, "P-A2")],
         },
     )
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
     assert response.json()["orderIds"] == []
 
     # The 9am slot was free and must have stayed that way.
@@ -249,7 +252,7 @@ async def test_cancel_is_all_or_nothing(client: AsyncClient, tenant_a: TenantFix
             ]
         },
     )
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
 
     async with tenant_session(tenant_a.id) as session:
         booking = (
@@ -272,7 +275,7 @@ async def test_a_retried_order_returns_the_same_booking(
     first = await post(client, partner, "/order/create", payload)
     again = await post(client, partner, "/order/create", payload)
 
-    assert first.json()["requestStatus"] == again.json()["requestStatus"] == 1
+    assert first.json()["requestStatus"] == again.json()["requestStatus"] == "1"
     assert (
         first.json()["orderIds"][0]["externalOrderId"]
         == again.json()["orderIds"][0]["externalOrderId"]
@@ -335,7 +338,7 @@ async def test_a_hold_cannot_be_checked_in(client: AsyncClient, tenant_a: Tenant
             ],
         },
     )
-    assert created.json()["requestStatus"] == 1, created.text
+    assert created.json()["requestStatus"] == "1", created.text
     reference = created.json()["orderIds"][0]["externalOrderId"]
 
     response = await client.get(
@@ -357,7 +360,7 @@ async def test_confirming_turns_it_into_a_real_booking(
     reference = created.json()["orderIds"][0]["externalOrderId"]
 
     confirmed = await post(client, partner, "/order/confirm", {"orderIds": [reference]})
-    assert confirmed.json()["requestStatus"] == 1
+    assert confirmed.json()["requestStatus"] == "1"
     assert confirmed.json()["bookingIds"][0]["externalBookingId"] == reference
 
     listed = await client.get("/api/v1/bookings", headers=ctx["headers"])
@@ -413,7 +416,7 @@ async def test_a_lapsed_hold_still_confirms_if_the_court_is_free(
     await _expire(tenant_a, reference)
 
     confirmed = await post(client, partner, "/order/confirm", {"orderIds": [reference]})
-    assert confirmed.json()["requestStatus"] == 1, confirmed.text
+    assert confirmed.json()["requestStatus"] == "1", confirmed.text
 
 
 async def test_a_lapsed_hold_cannot_be_confirmed_once_the_court_is_gone(
@@ -439,7 +442,7 @@ async def test_a_lapsed_hold_cannot_be_confirmed_once_the_court_is_gone(
     assert walkin.status_code == 201
 
     confirmed = await post(client, partner, "/order/confirm", {"orderIds": [reference]})
-    assert confirmed.json()["requestStatus"] == 0
+    assert confirmed.json()["requestStatus"] == "0"
     assert "someone else" in confirmed.json()["message"]
 
 
@@ -465,7 +468,7 @@ async def test_playo_cannot_cancel_a_walk_in(
         {"bookingIds": [{"externalBookingId": walkin["reference"], "price": "0",
                          "refundAtPlayo": "0"}]},
     )
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
 
     async with tenant_session(tenant_a.id) as session:
         booking = await session.get(Booking, walkin["id"])
@@ -489,7 +492,7 @@ async def test_one_platform_cannot_touch_anothers_booking(
         client, hudle, "/booking/cancel",
         {"bookingIds": [{"externalBookingId": reference, "price": "0", "refundAtPlayo": "0"}]},
     )
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"
 
 
 async def test_source_platform_comes_from_the_key_not_the_body(
@@ -589,7 +592,7 @@ async def test_booking_map_records_their_second_id(
         client, partner, "/booking/map",
         {"bookingIds": [{"externalBookingId": reference, "playoBookingId": "PB-777"}]},
     )
-    assert mapped.json()["requestStatus"] == 1
+    assert mapped.json()["requestStatus"] == "1"
 
     async with tenant_session(tenant_a.id) as session:
         booking = (
@@ -597,6 +600,394 @@ async def test_booking_map_records_their_second_id(
         ).scalar_one()
     assert booking.partner_booking_ref == "PB-777"
     assert booking.external_ref == "P-ORDER"
+
+
+# ── v2.0 wire details ───────────────────────────────────────────────────────
+
+
+async def test_request_status_is_a_string(client: AsyncClient, tenant_a: TenantFixture) -> None:
+    """v2.0: *Use string requestStatus values*. Their client compares against "1",
+    so an integer 1 reads as a failure on their side."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    ok = await client.get(
+        "/api/v1/gateway/playo/availability", params={"date": DAY}, headers=partner["headers"]
+    )
+    refused = await post(client, partner, "/order/confirm", {"orderIds": ["XCB999999"]})
+
+    assert ok.json()["requestStatus"] == "1"
+    assert refused.json()["requestStatus"] == "0"
+
+
+async def test_booking_create_accepts_an_integer_order_id(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Their generic `/booking/create` client sends `playoOrderId: 100003`, bare.
+    Pydantic v2 refuses an int for a `str` field by default, which made the whole
+    direct-booking flow a 422."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    body = slot(ctx["court_1"], 9, "unused")
+    body["playoOrderId"] = 100003
+    body["clubDiscount"] = 0.0
+
+    created = await post(client, partner, "/booking/create",
+                         {"userName": "Demo Customer", "bookings": [body]})
+
+    assert created.status_code == 200, created.text
+    assert created.json()["requestStatus"] == "1", created.text
+    # Echoed back as a string, per their response schema.
+    assert created.json()["bookingIds"][0]["playoOrderId"] == "100003"
+
+    async with tenant_session(tenant_a.id) as session:
+        booking = (
+            await session.execute(select(Booking).where(Booking.external_ref == "100003"))
+        ).scalar_one()
+    assert booking.status is BookingStatus.UPCOMING
+
+
+async def test_placeholder_contact_is_not_stored(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """9999999999 is Playo's stand-in when user-info sharing is off — not a number
+    the desk should ever try to ring."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    created = await post(
+        client, partner, "/booking/create",
+        {"userName": "Hidden User", "userMobile": "9999999999", "userEmail": "playo@playo.co",
+         "bookings": [slot(ctx["court_1"], 9, "P-ANON")]},
+    )
+    shared = await post(
+        client, partner, "/booking/create",
+        {"userName": "Shared User", "userMobile": "+919000011111",
+         "bookings": [slot(ctx["court_1"], 10, "P-SHARED")]},
+    )
+    assert created.json()["requestStatus"] == shared.json()["requestStatus"] == "1"
+
+    async with tenant_session(tenant_a.id) as session:
+        anon = (
+            await session.execute(select(Booking).where(Booking.external_ref == "P-ANON"))
+        ).scalar_one()
+        real = (
+            await session.execute(select(Booking).where(Booking.external_ref == "P-SHARED"))
+        ).scalar_one()
+    assert anon.customer_phone is None
+    assert real.customer_phone == "+919000011111"
+
+
+async def test_club_discount_lands_on_the_timeline(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Recorded, not applied — its meaning is still to be confirmed with Playo."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    body = slot(ctx["court_1"], 9, "P-CLUB", price="1000", paid="1000")
+    body["clubDiscount"] = 150
+    created = await post(client, partner, "/booking/create",
+                         {"userName": "Member", "bookings": [body]})
+    reference = created.json()["bookingIds"][0]["externalBookingId"]
+
+    async with tenant_session(tenant_a.id) as session:
+        booking = (
+            await session.execute(select(Booking).where(Booking.reference == reference))
+        ).scalar_one()
+        details = (
+            await session.execute(
+                select(BookingEvent.detail).where(BookingEvent.booking_id == booking.id)
+            )
+        ).scalars().all()
+
+    assert booking.total == 1000
+    assert any("clubDiscount 150" in (d or "") for d in details)
+
+
+async def test_availability_uses_the_venues_slot_length(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A venue selling half-hour slots must show Playo half-hour slots."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    async with tenant_session(tenant_a.id) as session:
+        settings = (await session.execute(select(TenantSettings))).scalar_one()
+        settings.booking_rules = {**settings.booking_rules, "min_duration_minutes": 30}
+
+    response = await client.get(
+        "/api/v1/gateway/playo/availability", params={"date": DAY}, headers=partner["headers"]
+    )
+    first = response.json()["courts"][0]["slots"][0]
+    start_h, start_m, _ = map(int, first["startTime"].split(":"))
+    end_h, end_m, _ = map(int, first["endTime"].split(":"))
+    assert (end_h * 60 + end_m) - (start_h * 60 + start_m) == 30
+
+
+async def test_availability_for_a_sport_with_no_courts_is_a_failure(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Their success schema requires at least one court."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    empty_sport = await client.post(
+        "/api/v1/sports",
+        json={"name": "Squash", "icon": "🟢", "price_base": "500",
+              "price_peak": "700", "price_weekend": "600"},
+        headers=ctx["headers"],
+    )
+    assert empty_sport.status_code == 201, empty_sport.text
+
+    response = await client.get(
+        "/api/v1/gateway/playo/availability",
+        params={"date": DAY, "sport_id": empty_sport.json()["id"]},
+        headers=partner["headers"],
+    )
+    assert response.status_code == 200
+    assert response.json()["requestStatus"] == "0"
+    assert "No courts" in response.json()["message"]
+
+
+# ── Venue-side changes to a Playo booking ───────────────────────────────────
+#
+# Playo's contract has no call for the venue to tell them anything. Moving a booking
+# is still safe — they read availability from us — but cancelling one here would
+# resell a court the customer holds a paid Playo ticket for.
+
+
+async def _playo_booking(
+    client: AsyncClient, ctx: dict, partner: dict, tenant: TenantFixture,
+    hour: int, order_id: str, price: str = "1200",
+) -> tuple[str, str]:
+    created = await post(
+        client, partner, "/booking/create",
+        {"userName": "Playo Customer",
+         "bookings": [slot(ctx["court_1"], hour, order_id, price=price, paid=price)]},
+    )
+    assert created.json()["requestStatus"] == "1", created.text
+    reference = created.json()["bookingIds"][0]["externalBookingId"]
+    async with tenant_session(tenant.id) as session:
+        booking = (
+            await session.execute(select(Booking).where(Booking.reference == reference))
+        ).scalar_one()
+    return reference, str(booking.id)
+
+
+def _slot_state(availability: dict, court: str, clock: str) -> bool:
+    row = next(c for c in availability["courts"] if c["courtId"] == court)
+    return next(s for s in row["slots"] if s["startTime"] == clock)["available"]
+
+
+async def test_a_moved_playo_booking_keeps_its_price_and_stays_in_sync(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The reschedule workaround, end to end.
+
+    Moved in GameXO: Playo sees the old slot free and the new one taken, the
+    customer is not suddenly charged our rate card, and Playo's later cancel still
+    finds the booking by the id it was given.
+    """
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+    reference, booking_id = await _playo_booking(
+        client, ctx, partner, tenant_a, 9, "P-MOVE", price="999"
+    )
+
+    moved = await client.patch(
+        f"/api/v1/bookings/{booking_id}",
+        json={"starts_at": counter_slot(11)},
+        headers=ctx["headers"],
+    )
+    assert moved.status_code == 200, moved.text
+    assert Decimal(moved.json()["total"]) == 999
+    assert Decimal(moved.json()["balance_due"]) == 0
+
+    availability = (
+        await client.get(
+            "/api/v1/gateway/playo/availability",
+            params={"date": DAY},
+            headers=partner["headers"],
+        )
+    ).json()
+    assert _slot_state(availability, ctx["court_1"], "09:00:00") is True
+    assert _slot_state(availability, ctx["court_1"], "11:00:00") is False
+
+    timeline = await client.get(
+        f"/api/v1/bookings/{booking_id}/timeline", headers=ctx["headers"]
+    )
+    assert any(e["label"] == "Moved by venue" for e in timeline.json())
+
+    cancelled = await post(
+        client, partner, "/booking/cancel",
+        {"bookingIds": [{"externalBookingId": reference, "playoOrderId": "P-MOVE",
+                         "price": "999", "refundAtPlayo": "999"}]},
+    )
+    assert cancelled.json()["requestStatus"] == "1"
+    free = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(11))
+    assert free.status_code == 201
+
+
+async def test_staff_cannot_silently_cancel_a_playo_booking(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Cancelling here would put the court back on sale while the customer still
+    holds a paid Playo ticket — and Playo would still pay the venue for it."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+    _, booking_id = await _playo_booking(client, ctx, partner, tenant_a, 9, "P-GUARD")
+
+    response = await client.post(
+        f"/api/v1/bookings/{booking_id}/cancel", json={"reason": "Rain"},
+        headers=ctx["headers"],
+    )
+
+    assert response.status_code == 409
+    assert "Playo" in response.json()["error"]["message"]
+    blocked = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
+    assert blocked.status_code == 409
+
+
+async def test_a_cancel_request_holds_the_court_until_playo_cancels(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The cancellation workaround: ask, keep the court blocked, and let Playo's own
+    cancel call close the loop."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+    reference, booking_id = await _playo_booking(client, ctx, partner, tenant_a, 9, "P-ASK")
+
+    asked = await client.post(
+        f"/api/v1/bookings/{booking_id}/request-partner-cancel",
+        json={"reason": "Court flooded"},
+        headers=ctx["headers"],
+    )
+    assert asked.status_code == 200, asked.text
+    assert asked.json()["status"] == "upcoming"
+    requested_at = asked.json()["partner_cancel_requested_at"]
+    assert requested_at
+
+    again = await client.post(
+        f"/api/v1/bookings/{booking_id}/request-partner-cancel", json={},
+        headers=ctx["headers"],
+    )
+    assert again.json()["partner_cancel_requested_at"] == requested_at
+
+    still_blocked = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
+    assert still_blocked.status_code == 409
+
+    waiting = await client.get(
+        "/api/v1/bookings", params={"awaiting_partner_cancel": True}, headers=ctx["headers"]
+    )
+    assert [b["id"] for b in waiting.json()["items"]] == [booking_id]
+
+    cancelled = await post(
+        client, partner, "/booking/cancel",
+        {"bookingIds": [{"externalBookingId": reference, "playoOrderId": "P-ASK",
+                         "price": "1200", "refundAtPlayo": "1200"}]},
+    )
+    assert cancelled.json()["requestStatus"] == "1"
+
+    waiting = await client.get(
+        "/api/v1/bookings", params={"awaiting_partner_cancel": True}, headers=ctx["headers"]
+    )
+    assert waiting.json()["items"] == []
+    free = await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))
+    assert free.status_code == 201
+
+
+async def test_only_a_manager_can_force_cancel_and_it_is_logged(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+    _, booking_id = await _playo_booking(client, ctx, partner, tenant_a, 9, "P-FORCE")
+
+    await make_user(tenant_a, email="desk@alpha.example.com", role=Role.RECEPTION)
+    desk = auth_headers(
+        await login(client, tenant_a, "desk@alpha.example.com", PASSWORD), tenant_a
+    )
+    refused = await client.post(
+        f"/api/v1/bookings/{booking_id}/cancel", json={"force": True}, headers=desk
+    )
+    assert refused.status_code == 403
+
+    forced = await client.post(
+        f"/api/v1/bookings/{booking_id}/cancel",
+        json={"force": True, "reason": "Playo confirmed by phone"},
+        headers=ctx["headers"],
+    )
+    assert forced.status_code == 200, forced.text
+    assert forced.json()["status"] == "cancelled"
+
+    timeline = await client.get(
+        f"/api/v1/bookings/{booking_id}/timeline", headers=ctx["headers"]
+    )
+    assert any("NOT notified" in (e["detail"] or "") for e in timeline.json())
+
+
+async def test_the_venues_own_website_is_not_a_platform(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A `native` partner — the venue's own site — sets `source_platform` too, but
+    the venue owns those customers and cancels their bookings like any other."""
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+    website = await make_partner(client, ctx, tenant_a, "Our Website", "website")
+    _, playo_id = await _playo_booking(client, ctx, partner, tenant_a, 9, "P-LIST")
+    own = await partner_book(client, website, court=ctx["court_1"], starts_at=counter_slot(10))
+    assert own.status_code == 201, own.text
+    own_id = one(own)["id"]
+
+    listed = await client.get("/api/v1/bookings", headers=ctx["headers"])
+    flags = {b["id"]: b["sold_on_platform"] for b in listed.json()["items"]}
+    assert flags == {playo_id: True, own_id: False}
+
+    cancelled = await client.post(
+        f"/api/v1/bookings/{own_id}/cancel", json={"reason": "Customer called"},
+        headers=ctx["headers"],
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["sold_on_platform"] is False
+
+
+async def test_a_walk_in_cannot_be_sent_to_a_platform(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    ctx = await setup_academy(client, tenant_a)
+    walkin = (await book(client, ctx, court=ctx["court_1"], starts_at=counter_slot(9))).json()
+
+    response = await client.post(
+        f"/api/v1/bookings/{walkin['id']}/request-partner-cancel", json={},
+        headers=ctx["headers"],
+    )
+    assert response.status_code == 409
+
+
+async def test_onboarding_sheet_lists_the_ids_playo_needs(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """`scripts/playo_onboarding.py` — the only place our court and sport UUIDs are
+    shown to a person, so it had better show the right ones."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "playo_onboarding.py"
+    spec = importlib.util.spec_from_file_location("playo_onboarding", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    ctx = await setup_academy(client, tenant_a)
+    partner = await playo(client, ctx, tenant_a)
+
+    text = await module.sheet(tenant_a.slug, "https://api.example.com/")
+
+    assert "https://api.example.com/api/v1/gateway" in text
+    assert ctx["court_1"] in text and ctx["court_2"] in text
+    assert ctx["sport_id"] in text
+    assert partner["api_key"] not in text
 
 
 @pytest.mark.parametrize(
@@ -620,4 +1011,4 @@ async def test_an_empty_request_is_refused_politely(
 
     response = await post(client, partner, path, {"userName": "X", **body})
     assert response.status_code == 200
-    assert response.json()["requestStatus"] == 0
+    assert response.json()["requestStatus"] == "0"

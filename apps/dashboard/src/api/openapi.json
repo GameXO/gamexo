@@ -1481,7 +1481,7 @@
           },
           "requestStatus": {
             "title": "Requeststatus",
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [
@@ -1944,6 +1944,11 @@
       },
       "BookingCancel": {
         "properties": {
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          },
           "reason": {
             "anyOf": [
               {
@@ -2189,7 +2194,7 @@
           },
           "requestStatus": {
             "title": "Requeststatus",
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [
@@ -2320,6 +2325,29 @@
             ],
             "title": "Notes"
           },
+          "partner_booking_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Booking Ref"
+          },
+          "partner_cancel_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Cancel Requested At"
+          },
           "payment_method": {
             "anyOf": [
               {
@@ -2337,6 +2365,11 @@
           "reference": {
             "title": "Reference",
             "type": "string"
+          },
+          "sold_on_platform": {
+            "default": false,
+            "title": "Sold On Platform",
+            "type": "boolean"
           },
           "source_platform": {
             "anyOf": [
@@ -2662,6 +2695,29 @@
             ],
             "title": "Notes"
           },
+          "partner_booking_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Booking Ref"
+          },
+          "partner_cancel_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Cancel Requested At"
+          },
           "payment_method": {
             "anyOf": [
               {
@@ -2679,6 +2735,11 @@
           "reference": {
             "title": "Reference",
             "type": "string"
+          },
+          "sold_on_platform": {
+            "default": false,
+            "title": "Sold On Platform",
+            "type": "boolean"
           },
           "source_platform": {
             "anyOf": [
@@ -7890,7 +7951,7 @@
           },
           "requestStatus": {
             "title": "Requeststatus",
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [
@@ -9456,7 +9517,7 @@
           },
           "requestStatus": {
             "title": "Requeststatus",
-            "type": "integer"
+            "type": "string"
           }
         },
         "required": [
@@ -9497,6 +9558,21 @@
       "PlayoSlotRequest": {
         "description": "One slot. Shared by `/order/create` and `/booking/create` \u2014 their spec sends\nthe same object under different names (`orders` vs `bookings`), and the only real\ndifference is whether the result is a hold or a confirmed booking.",
         "properties": {
+          "clubDiscount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clubdiscount"
+          },
           "courtId": {
             "title": "Courtid",
             "type": "string"
@@ -16762,6 +16838,18 @@
             }
           },
           {
+            "description": "Only platform bookings staff asked the platform to cancel that it has not cancelled yet \u2014 the follow-up list.",
+            "in": "query",
+            "name": "awaiting_partner_cancel",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only platform bookings staff asked the platform to cancel that it has not cancelled yet \u2014 the follow-up list.",
+              "title": "Awaiting Partner Cancel",
+              "type": "boolean"
+            }
+          },
+          {
             "description": "1-indexed page number",
             "in": "query",
             "name": "page",
@@ -17399,6 +17487,65 @@
         "summary": "Email a booking's invoice to the customer",
         "tags": [
           "finance"
+        ]
+      }
+    },
+    "/api/v1/bookings/{booking_id}/request-partner-cancel": {
+      "post": {
+        "description": "For bookings sold on Playo, Hudle or District, which the platform must cancel \u2014 it holds the customer's payment.\n\nRecords the request and **keeps the booking live**, so the court stays blocked: freeing it now would let it be resold under a customer who still holds a valid ticket. Staff then cancel it on the platform's side; when the platform's own cancel call arrives, the booking is cancelled through the normal path and the court frees.\n\nIdempotent: asking twice keeps the first request's time.",
+        "operationId": "booking_requestPartnerCancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Booking Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingCancel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Ask the selling platform to cancel a booking",
+        "tags": [
+          "booking"
         ]
       }
     },

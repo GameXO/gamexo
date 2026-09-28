@@ -417,6 +417,8 @@ export const api = {
     date_from?: string
     date_to?: string
     search?: string
+    /** Only platform bookings waiting on the platform to action a cancel request. */
+    awaiting_partner_cancel?: boolean
     page?: number
     size?: number
   }) => request<Ok<'/api/v1/bookings', 'get'>>('/api/v1/bookings', { query }),
@@ -488,9 +490,22 @@ export const api = {
       { method: 'POST', body: { additional_minutes: additionalMinutes } },
     ),
 
-  cancelBooking: (bookingId: string, reason?: string) =>
+  /**
+   * 409 for a booking sold on Playo, Hudle or District: the platform holds the
+   * customer's payment and would never hear about it. `force` overrides that for
+   * managers only (403 otherwise); prefer `requestPartnerCancel`.
+   */
+  cancelBooking: (bookingId: string, reason?: string, force?: boolean) =>
     request<Ok<'/api/v1/bookings/{booking_id}/cancel', 'post'>>(
       `/api/v1/bookings/${bookingId}/cancel`,
+      { method: 'POST', body: { reason, force } },
+    ),
+
+  /** Record that staff asked the selling platform to cancel. The booking stays live
+   *  and its court blocked until the platform's own cancel call arrives. Idempotent. */
+  requestPartnerCancel: (bookingId: string, reason?: string) =>
+    request<Ok<'/api/v1/bookings/{booking_id}/request-partner-cancel', 'post'>>(
+      `/api/v1/bookings/${bookingId}/request-partner-cancel`,
       { method: 'POST', body: { reason } },
     ),
 
