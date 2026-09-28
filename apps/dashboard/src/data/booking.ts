@@ -438,6 +438,17 @@ export type Booking = {
   payment: { method: string; status: string } | null
   status: 'checked-in' | 'confirmed' | 'completed'
   source: 'app' | 'counter'
+  /** Set when a third-party platform (Playo, Hudle, District) sold this booking —
+   *  not the venue's own website. Such a booking was paid for on the platform, so
+   *  only the platform can cancel and refund it; staff request that instead. */
+  platform?: {
+    slug: string
+    /** Their order id (Playo's `playoOrderId`). */
+    orderRef: string | null
+    /** Their booking id (Playo's `playoBookingId`), once they have mapped it. */
+    bookingRef: string | null
+    cancelRequestedAt: string | null
+  } | null
   createdAt: string
 }
 
@@ -452,6 +463,10 @@ export type Sale = {
   payment: { method: string; status: string } | null
   createdAt: string
 }
+
+/** "playo" → "Playo". The slug is all a booking carries once the integration is
+ *  gone, and every platform we integrate is named as a single word. */
+export const platformName = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
 
 // toPaise, not Math.round: a ₹2,194.80 booking with nothing paid owes ₹2,194.80,
 // not ₹2,195. The rounding here was silently altering what the counter collects.

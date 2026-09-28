@@ -566,6 +566,18 @@ class Booking(TenantScoped):
     #: one the other system is quoting, and conflating them silently mismatches rows.
     partner_booking_ref: Mapped[str | None] = mapped_column(String(120))
 
+    #: When staff asked the selling platform to cancel this booking. NULL means
+    #: nobody has.
+    #:
+    #: A platform booking cannot simply be cancelled here: the platform holds the
+    #: customer's money and has no way to hear about it, so the court would be resold
+    #: under a customer with a valid ticket. The booking stays live until the
+    #: platform's own cancel call arrives — which cancels it through the normal
+    #: gateway path — and this stays set afterwards as the record of who asked first.
+    partner_cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
     #: When an unconfirmed hold stops blocking the court. NULL for every real
     #: booking; set only while `status` is HELD.
     #:

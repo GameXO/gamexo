@@ -157,6 +157,16 @@ export function toBooking(b: BookingOut): Booking {
     payment: b.payment_method ? { method: b.payment_method, status: b.payment_status ?? 'due' } : null,
     status: BOOKING_STATUS[b.status ?? 'upcoming'] ?? 'confirmed',
     source: b.booking_type === 'online' ? 'app' : 'counter',
+    // `sold_on_platform`, not `source_platform`: the venue's own website sets the
+    // latter too, and those bookings are the venue's to cancel.
+    platform: b.sold_on_platform && b.source_platform
+      ? {
+          slug: b.source_platform,
+          orderRef: b.external_ref ?? null,
+          bookingRef: b.partner_booking_ref ?? null,
+          cancelRequestedAt: b.partner_cancel_requested_at ?? null,
+        }
+      : null,
     createdAt: b.created_at,
   }
 }
@@ -235,6 +245,7 @@ export const queryKeys = {
   bookings: (page: number) => ['bookings', page] as const,
   bookingsForDay: (dayISO: string) => ['bookings', 'day', dayISO] as const,
   bookingsRange: (fromISO: string, toISO: string) => ['bookings', 'range', fromISO, toISO] as const,
+  bookingsAwaitingPartnerCancel: ['bookings', 'awaiting-partner-cancel'] as const,
   invoices: (status?: string) => ['invoices', status ?? 'all'] as const,
   inventory: ['inventory'] as const,
   movements: (equipmentId: string) => ['movements', equipmentId] as const,
@@ -321,6 +332,22 @@ export function useBookings(page = 1, size = 50) {
       const res = await api.listBookings({ page, size })
       return { ...res, items: (res.items ?? []).map(toBooking) }
     },
+  })
+}
+
+/**
+ * Platform bookings staff asked the platform to cancel, which it has not yet.
+ * The follow-up list: each one is a court held for a customer the venue has
+ * already let go of, until someone chases Playo (or Hudle, or District).
+ */
+export function useBookingsAwaitingPartnerCancel() {
+  return useQuery({
+    queryKey: queryKeys.bookingsAwaitingPartnerCancel,
+    queryFn: async () => {
+      const res = await api.listBookings({ awaiting_partner_cancel: true, size: 100 })
+      return (res.items ?? []).map(toBooking)
+    },
+    staleTime: 60_000,
   })
 }
 
@@ -536,6 +563,17 @@ export function useUpdateBooking() {
       // anything showing the customer list is stale after this.
       qc.invalidateQueries({ queryKey: ['customers'] })
     },
+  })
+}
+
+/** Ask the platform that sold a booking to cancel it. The booking stays live —
+ *  its court blocked — until the platform's own cancel call arrives. */
+export function useRequestPartnerCancel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { bookingId: string; reason?: string }) =>
+      api.requestPartnerCancel(vars.bookingId, vars.reason),
+    onSuccess: () => invalidatePos(qc),
   })
 }
 

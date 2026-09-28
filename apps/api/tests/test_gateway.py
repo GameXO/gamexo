@@ -818,7 +818,7 @@ async def test_one_url_reaches_each_platforms_own_contract(
     )
     # Playo's envelope, not ours: a 200 carrying requestStatus, and camelCase.
     assert playo.status_code == 200, playo.text
-    assert playo.json()["requestStatus"] == 1
+    assert playo.json()["requestStatus"] == "1"
     assert playo.json()["orderIds"][0]["externalOrderId"]
 
 
@@ -852,7 +852,7 @@ async def test_the_one_shared_path_still_answers_in_each_platforms_shape(
     )
     assert theirs_response.status_code == 200, theirs_response.text
     body = theirs_response.json()
-    assert body["requestStatus"] == 1
+    assert body["requestStatus"] == "1"
     assert "courtId" in body["courts"][0]
 
 
@@ -948,7 +948,7 @@ async def test_repointing_a_partner_takes_effect_on_the_next_call(
         "/api/v1/gateway/order/create", json=body, headers=partner["headers"]
     )
     assert after.status_code == 200, after.text
-    assert after.json()["requestStatus"] == 1
+    assert after.json()["requestStatus"] == "1"
 
 
 async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
@@ -967,7 +967,7 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
         "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"},
         headers=partner["headers"],
     )
-    assert warmed.json()["requestStatus"] == 1
+    assert warmed.json()["requestStatus"] == "1"
 
     rotated = await client.post(
         f"/api/v1/partners/{partner['id']}/rotate-key", headers=ctx["headers"]
@@ -985,7 +985,7 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
         "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"}, headers=new_headers
     )
     assert fresh.status_code == 200, fresh.text
-    assert fresh.json()["requestStatus"] == 1
+    assert fresh.json()["requestStatus"] == "1"
 
 
 async def test_the_sandbox_refuses_a_dialect_its_key_cannot_drive(
