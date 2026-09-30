@@ -439,6 +439,10 @@ class BookingExtend(BaseModel):
 
 class BookingCancel(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
+    #: Cancel a platform booking (Playo, Hudle, District) here even though the
+    #: platform will not hear about it. Managers only. Without it such a booking is
+    #: refused with 409 — see `POST /bookings/{id}/request-partner-cancel`.
+    force: bool = False
 
 
 class EquipmentLineOut(BaseModel):
@@ -488,6 +492,17 @@ class BookingOut(BaseModel):
     source_platform: str | None = None
     #: That platform's own booking id, for reconciling their ledger against ours.
     external_ref: str | None = None
+    #: The platform's *second* id where it issues one (Playo's `playoBookingId`,
+    #: distinct from the order id above). What their support desk asks for.
+    partner_booking_ref: str | None = None
+    #: Set when staff asked the platform to cancel; the booking stays live, and its
+    #: court blocked, until the platform's own cancel arrives.
+    partner_cancel_requested_at: datetime | None = None
+    #: Sold by a third-party platform (Playo, Hudle, District) that holds the
+    #: customer's payment — so it cannot be cancelled here, only requested. False
+    #: for the venue's own website or app even though those set `source_platform`
+    #: too. Filled in by the bookings list and detail endpoints.
+    sold_on_platform: bool = False
 
     created_at: datetime
 

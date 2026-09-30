@@ -29,7 +29,7 @@ class SandboxDriver(Protocol):
     normalises the reply into `(ok, refs, message)`:
 
       ok       did the call succeed *in that dialect's terms*? Ours answers a taken
-               slot with 409; Playo's answers it with 200 + requestStatus 0. Both
+               slot with 409; Playo's answers it with 200 + requestStatus "0". Both
                mean "no", and the scenarios only care about the "no".
       refs     booking references the call returned, for the next step to use.
       message  human text, for the transcript when a step fails.

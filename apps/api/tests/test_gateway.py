@@ -818,7 +818,7 @@ async def test_one_url_reaches_each_platforms_own_contract(
     )
     # Playo's envelope, not ours: a 200 carrying requestStatus, and camelCase.
     assert playo.status_code == 200, playo.text
-    assert playo.json()["requestStatus"] == 1
+    assert playo.json()["requestStatus"] == "1"
     assert playo.json()["orderIds"][0]["externalOrderId"]
 
 
@@ -852,7 +852,7 @@ async def test_the_one_shared_path_still_answers_in_each_platforms_shape(
     )
     assert theirs_response.status_code == 200, theirs_response.text
     body = theirs_response.json()
-    assert body["requestStatus"] == 1
+    assert body["requestStatus"] == "1"
     assert "courtId" in body["courts"][0]
 
 
@@ -948,7 +948,7 @@ async def test_repointing_a_partner_takes_effect_on_the_next_call(
         "/api/v1/gateway/order/create", json=body, headers=partner["headers"]
     )
     assert after.status_code == 200, after.text
-    assert after.json()["requestStatus"] == 1
+    assert after.json()["requestStatus"] == "1"
 
 
 async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
@@ -967,7 +967,7 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
         "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"},
         headers=partner["headers"],
     )
-    assert warmed.json()["requestStatus"] == 1
+    assert warmed.json()["requestStatus"] == "1"
 
     rotated = await client.post(
         f"/api/v1/partners/{partner['id']}/rotate-key", headers=ctx["headers"]
@@ -985,7 +985,7 @@ async def test_rotating_a_key_does_not_leave_the_old_prefix_routing(
         "/api/v1/gateway/availability", params={"date": f"{_YEAR:04d}-{_MONTH:02d}-13"}, headers=new_headers
     )
     assert fresh.status_code == 200, fresh.text
-    assert fresh.json()["requestStatus"] == 1
+    assert fresh.json()["requestStatus"] == "1"
 
 
 async def test_the_sandbox_refuses_a_dialect_its_key_cannot_drive(
@@ -1613,3 +1613,56 @@ async def test_a_secret_key_is_not_throttled_at_a_publishable_rate(
             client, partner, court=ctx["court_1"], starts_at=at(14, hour), hold=True
         )
         assert response.status_code == 201, response.text
+
+
+# ── A key alone names the academy ───────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "path,params",
+    [
+        # Not a gateway path at all: the dispatcher never sees it.
+        ("/api/v1/health/tenant", {}),
+        # A canonical per-dialect path, which the dispatcher deliberately leaves alone.
+        ("/api/v1/gateway/playo/availability", {"date": f"{_YEAR:04d}-{_MONTH:02d}-13"}),
+    ],
+)
+async def test_a_key_alone_resolves_its_academy_on_a_cold_cache(
+    client: AsyncClient, tenant_a: TenantFixture, path: str, params: dict
+) -> None:
+    """A partner has no subdomain and no X-Tenant-ID — the key is all it sends.
+
+    The resolver used to reach the key only through the dispatcher's routing cache,
+    which only gateway paths warm. On anything else — the sandbox, a canonical
+    `/gateway/playo/…` path, the health probe — a key the process had not seen yet
+    was refused as invalid before its directory row was ever read. Found on staging,
+    where the sandbox run 401'd with a perfectly good key.
+    """
+    from app.modules.gateway.dispatch import invalidate_partner_cache
+
+    ctx = await setup_academy(client, tenant_a)
+    partner = await make_partner(client, ctx, tenant_a, "Playo", "playo", dialect="playo")
+    invalidate_partner_cache()
+
+    response = await client.get(
+        path, params=params, headers={"X-API-Key": partner["api_key"]}
+    )
+
+    assert response.status_code == 200, response.text
+    if path.endswith("/health/tenant"):
+        assert response.json()["slug"] == tenant_a.slug
+        assert response.json()["resolved_via"] == "api_key"
+    else:
+        assert response.json()["requestStatus"] == "1"
+
+
+async def test_an_unknown_key_alone_is_still_a_401(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """The fallback must not turn "no such key" into "could not determine the
+    academy" — that difference would tell a caller which prefixes exist."""
+    response = await client.get(
+        "/api/v1/health/tenant", headers={"X-API-Key": "gx_nobody_00000000.secret"}
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "Invalid or revoked API key."

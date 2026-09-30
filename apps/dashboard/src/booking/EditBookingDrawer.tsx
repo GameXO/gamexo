@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import Drawer from '../ui/Drawer'
 import { useCourts, useUpdateBooking } from '../api/hooks'
-import type { Booking } from '../data/booking'
+import { platformName, type Booking } from '../data/booking'
 
 /**
  * Reschedule a booking, move it to another court, or correct who was playing.
@@ -74,7 +74,12 @@ export default function EditBookingDrawer({
   // Saving past a half-typed schedule would quietly drop the reschedule and
   // write the other edits, so the whole form waits for it.
   const scheduleOk = startsAt !== null
-  const reprices = ['courtId', 'startsAt', 'durationMin'].some((k) => k in changes)
+  const moves = 'courtId' in changes || 'startsAt' in changes
+  // Mirrors the server: a platform booking that is only moved keeps the price the
+  // customer paid the platform. Changing its length still re-prices it.
+  const keepsPlatformPrice = !!booking.platform && moves && !('durationMin' in changes)
+  const reprices = !keepsPlatformPrice && (moves || 'durationMin' in changes)
+  const platform = booking.platform ? platformName(booking.platform.slug) : null
 
   const save = async () => {
     setError(null)
@@ -201,6 +206,14 @@ export default function EditBookingDrawer({
         they carry to their next visit. Their other bookings keep the details recorded
         at the time.
       </p>
+
+      {keepsPlatformPrice && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Sold on {platform}. Moving it is safe — {platform} sees the new slot straight away,
+          and the price the customer paid is kept. Their {platform} ticket will still show the
+          original slot, so let them know the new time.
+        </p>
+      )}
 
       {reprices && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">

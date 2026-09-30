@@ -10,9 +10,11 @@ from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
 from app.api_utils import Page, Params, get_or_404, paginate
-from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
-from app.core.errors import ConflictError, NotFoundError
+from app.auth.deps import Principal, RequireKiosk, RequireManager, RequireStaff
+from app.core.errors import ConflictError, NotFoundError, PermissionDeniedError
+from app.core.security import ROLE_HIERARCHY, Role
 from app.modules.booking import catalogue, service
+from app.modules.gateway.service import platform_slugs, selling_platform
 from app.modules.booking.models import (
     LIVE_STATUSES,
     Booking,
@@ -28,7 +30,7 @@ from app.modules.booking.models import (
     Sport,
 )
 from app.modules.admin.notify import EMAIL_BOOKING_CONFIRMATION, enqueue_email
-from app.modules.booking.pricing import money
+from app.modules.booking.pricing import money, tenant_zone
 from app.modules.finance.service import refresh_booking_payment_status
 from app.modules.booking.schemas import (
     BookingCancel,
@@ -534,8 +536,20 @@ async def list_bookings(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     search: str | None = None,
+    awaiting_partner_cancel: Annotated[
+        bool,
+        Query(
+            description="Only platform bookings staff asked the platform to cancel "
+            "that it has not cancelled yet — the follow-up list."
+        ),
+    ] = False,
 ) -> Page[BookingOut]:
     stmt = select(Booking).order_by(Booking.starts_at.desc())
+    if awaiting_partner_cancel:
+        stmt = stmt.where(
+            Booking.partner_cancel_requested_at.is_not(None),
+            Booking.status != BookingStatus.CANCELLED,
+        )
     if booking_status is not None:
         stmt = stmt.where(Booking.status == booking_status)
     else:
@@ -561,7 +575,12 @@ async def list_bookings(
             | Booking.customer_phone.ilike(like)
             | Booking.reference.ilike(like)
         )
-    return await paginate(db, stmt, params, BookingOut)
+    page = await paginate(db, stmt, params, BookingOut)
+    if any(item.source_platform for item in page.items):
+        slugs = await platform_slugs(db)
+        for item in page.items:
+            item.sold_on_platform = item.source_platform in slugs
+    return page
 
 
 async def _queue_booking_confirmation(db, booking: Booking) -> None:
@@ -904,6 +923,8 @@ async def update_booking(
             if customer is not None and updates["customer_phone"]:
                 customer.phone = updates["customer_phone"]
 
+    moved_note: str | None = None
+
     if reprice:
         court = (
             await get_or_404(db, Court, payload.court_id, label="Court")
@@ -914,7 +935,20 @@ async def update_booking(
         duration = payload.duration_min if "duration_min" in updates else booking.duration_min
         discount = payload.discount if "discount" in updates else booking.discount
 
-        if "equipment" in updates:
+        # A platform booking that is only being MOVED keeps the price the customer
+        # paid on the platform. Re-pricing it from our rate card would leave the
+        # counter asking for money the customer was never told about — or owing a
+        # refund nobody can issue, because the platform holds the money.
+        #
+        # Moving is otherwise safe with the platform: it reads availability from us,
+        # so it sees the old slot free and the new one taken on its next call, and
+        # its cancel call still finds this booking by the same id. What it cannot
+        # see is the new time, so the customer has to be told — hence the note.
+        platform = await selling_platform(db, booking)
+        keep_price = platform is not None and reprice <= {"court_id", "starts_at"}
+        if keep_price:
+            moved_note = await _moved_note(db, booking, court, starts_at, platform.name)
+        elif "equipment" in updates:
             # Explicitly sent — a replacement, including `[]` to clear the kit.
             quote_result, lines = await service.price_booking(
                 db,
@@ -944,7 +978,8 @@ async def update_booking(
         booking.starts_at = starts_at
         booking.ends_at = starts_at + timedelta(minutes=duration)
         booking.duration_min = duration
-        service._apply_quote(booking, quote_result, lines)
+        if not keep_price:
+            service._apply_quote(booking, quote_result, lines)
 
         await service.ensure_slot_free(
             db,
@@ -953,7 +988,8 @@ async def update_booking(
             ends_at=booking.ends_at,
             exclude_booking_id=booking.id,
         )
-        _resync_payment(booking)
+        if not keep_price:
+            _resync_payment(booking)
 
     if changed:
         await db.flush()
@@ -965,9 +1001,35 @@ async def update_booking(
             detail=f"Updated {', '.join(changed)}",
             actor_user_id=principal.id,
         )
+    if moved_note:
+        # Its own entry, like a price mismatch: something a person has to act on.
+        await service.record_event(
+            db,
+            booking,
+            kind=BookingEventKind.NOTE,
+            label="Moved by venue",
+            detail=moved_note,
+            actor_user_id=principal.id,
+        )
 
     await db.flush()
     return await _detail(db, booking)
+
+
+async def _moved_note(
+    db, booking: Booking, court: Court, starts_at: datetime, platform_name: str
+) -> str:
+    """"12 Oct 18:00 Court 1 → 12 Oct 19:00 Court 2", in the venue's own time, plus
+    the reminder that the platform's ticket did not move with it."""
+    zone = tenant_zone((await service.load_settings(db)).timezone)
+    old_court = await db.get(Court, booking.court_id)
+    was = booking.starts_at.astimezone(zone)
+    to = starts_at.astimezone(zone)
+    return (
+        f"{was:%d %b %H:%M} {old_court.name if old_court else ''} → "
+        f"{to:%d %b %H:%M} {court.name}. The customer's {platform_name} ticket still "
+        "shows the original slot — let them know."
+    )
 
 
 def _resync_payment(booking: Booking) -> None:
@@ -1099,11 +1161,117 @@ async def cancel_booking(
     booking_id: uuid.UUID, payload: BookingCancel, db: Db, principal: RequireStaff
 ) -> BookingDetail:
     booking = await get_or_404(db, Booking, booking_id, label="Booking")
+
+    # A booking sold on Playo, Hudle or District was paid for there, and only the
+    # platform can refund it. None of their contracts lets us tell them it was
+    # cancelled, so cancelling here would put the court back on sale while the
+    # customer still holds a valid ticket and the platform still pays the venue.
+    # Refused unless a manager says otherwise, knowingly.
+    platform = (
+        await selling_platform(db, booking)
+        if booking.status is not BookingStatus.CANCELLED
+        else None
+    )
+    detail_prefix = None
+    if platform is not None:
+        if not payload.force:
+            raise ConflictError(
+                f"This booking was made on {platform.name}, which holds the customer's "
+                f"payment. Cancel it on {platform.name} — it will sync here "
+                "automatically — or request the cancellation from this booking.",
+                details={
+                    "booking_id": str(booking.id),
+                    "source_platform": booking.source_platform,
+                    "resolution": "request-partner-cancel",
+                },
+            )
+        if not _is_manager(principal):
+            raise PermissionDeniedError(
+                f"Only a manager can cancel a {platform.name} booking without "
+                f"{platform.name} knowing."
+            )
+        detail_prefix = f"Cancelled here — {platform.name} NOT notified"
+
     # release_booking is a no-op on an already-cancelled booking, so pressing cancel
     # twice returns the same booking rather than double-returning its equipment.
     await service.release_booking(
-        db, booking, reason=payload.reason, actor_user_id=principal.id
+        db,
+        booking,
+        reason=payload.reason,
+        actor_user_id=principal.id,
+        detail_prefix=detail_prefix,
     )
+    return await _detail(db, booking)
+
+
+def _is_manager(principal: Principal) -> bool:
+    return principal.is_platform_admin or (
+        principal.role is not None
+        and ROLE_HIERARCHY[principal.role] >= ROLE_HIERARCHY[Role.MANAGER]
+    )
+
+
+@router.post(
+    "/bookings/{booking_id}/request-partner-cancel",
+    response_model=BookingDetail,
+    summary="Ask the selling platform to cancel a booking",
+    description=(
+        "For bookings sold on Playo, Hudle or District, which the platform must "
+        "cancel — it holds the customer's payment.\n\n"
+        "Records the request and **keeps the booking live**, so the court stays "
+        "blocked: freeing it now would let it be resold under a customer who still "
+        "holds a valid ticket. Staff then cancel it on the platform's side; when the "
+        "platform's own cancel call arrives, the booking is cancelled through the "
+        "normal path and the court frees.\n\n"
+        "Idempotent: asking twice keeps the first request's time."
+    ),
+)
+async def request_partner_cancel(
+    booking_id: uuid.UUID, payload: BookingCancel, db: Db, principal: RequireStaff
+) -> BookingDetail:
+    booking = await get_or_404(db, Booking, booking_id, label="Booking")
+    if booking.status is BookingStatus.CANCELLED:
+        raise ConflictError("This booking is already cancelled.")
+
+    platform = await selling_platform(db, booking)
+    if platform is None:
+        raise ConflictError(
+            "This booking was not sold on a partner platform — cancel it directly.",
+            details={"booking_id": str(booking.id)},
+        )
+    if booking.status is BookingStatus.HELD:
+        raise ConflictError(
+            f"This is still a checkout in progress on {platform.name}. It lapses on its "
+            "own if the customer does not pay."
+        )
+
+    if booking.partner_cancel_requested_at is None:
+        booking.partner_cancel_requested_at = datetime.now(UTC)
+        # Everything their support desk will ask for, in one place.
+        ids = ", ".join(
+            part
+            for part in (
+                f"{platform.name} order {booking.external_ref}" if booking.external_ref else None,
+                f"{platform.name} booking {booking.partner_booking_ref}"
+                if booking.partner_booking_ref
+                else None,
+                f"our ref {booking.reference}",
+            )
+            if part
+        )
+        await service.record_event(
+            db,
+            booking,
+            kind=BookingEventKind.NOTE,
+            label=f"Cancellation requested on {platform.name}",
+            detail=(
+                (f"{payload.reason} — " if payload.reason else "")
+                + f"Court stays blocked until {platform.name} cancels. Quote: {ids}."
+            ),
+            actor_user_id=principal.id,
+        )
+        await db.flush()
+
     return await _detail(db, booking)
 
 
@@ -1132,7 +1300,8 @@ async def _detail(db, booking: Booking) -> BookingDetail:
     sport = await db.get(Sport, booking.sport_id)
     court = await db.get(Court, booking.court_id)
     return BookingDetail(
-        **BookingOut.model_validate(booking).model_dump(),
+        **BookingOut.model_validate(booking).model_dump(exclude={"sold_on_platform"}),
         sport_name=sport.name if sport else None,
         court_name=court.name if court else None,
+        sold_on_platform=await selling_platform(db, booking) is not None,
     )

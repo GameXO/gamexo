@@ -147,7 +147,7 @@ async def _seed_tenant(identity: SeedIdentity) -> uuid.UUID:
             name=identity.tenant_name,
             admin_email=identity.admin_email,
             admin_password=identity.admin_password,
-            admin_full_name="XCourt Administrator",
+            admin_full_name="Administrator",
             business_name=BUSINESS_PROFILE["business_name"],
         )
         # The demo academy arrives fully configured, so it must not be sent through

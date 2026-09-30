@@ -847,6 +847,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/{booking_id}/request-partner-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the selling platform to cancel a booking
+         * @description For bookings sold on Playo, Hudle or District, which the platform must cancel — it holds the customer's payment.
+         *
+         *     Records the request and **keeps the booking live**, so the court stays blocked: freeing it now would let it be resold under a customer who still holds a valid ticket. Staff then cancel it on the platform's side; when the platform's own cancel call arrives, the booking is cancelled through the normal path and the court frees.
+         *
+         *     Idempotent: asking twice keeps the first request's time.
+         */
+        post: operations["booking_requestPartnerCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/{booking_id}/timeline": {
         parameters: {
             query?: never;
@@ -3156,7 +3180,7 @@ export interface components {
             /** Message */
             message: string;
             /** Requeststatus */
-            requestStatus: number;
+            requestStatus: string;
         };
         /** BatchCreate */
         BatchCreate: {
@@ -3288,6 +3312,11 @@ export interface components {
         };
         /** BookingCancel */
         BookingCancel: {
+            /**
+             * Force
+             * @default false
+             */
+            force?: boolean;
             /** Reason */
             reason?: string | null;
         };
@@ -3372,7 +3401,7 @@ export interface components {
             /** Message */
             message: string;
             /** Requeststatus */
-            requestStatus: number;
+            requestStatus: string;
         };
         /** BookingDetail */
         BookingDetail: {
@@ -3423,11 +3452,20 @@ export interface components {
             id: string;
             /** Notes */
             notes: string | null;
+            /** Partner Booking Ref */
+            partner_booking_ref?: string | null;
+            /** Partner Cancel Requested At */
+            partner_cancel_requested_at?: string | null;
             /** Payment Method */
             payment_method: string | null;
             payment_status: components["schemas"]["PaymentStatus"];
             /** Reference */
             reference: string;
+            /**
+             * Sold On Platform
+             * @default false
+             */
+            sold_on_platform?: boolean;
             /** Source Platform */
             source_platform?: string | null;
             /**
@@ -3559,11 +3597,20 @@ export interface components {
             id: string;
             /** Notes */
             notes: string | null;
+            /** Partner Booking Ref */
+            partner_booking_ref?: string | null;
+            /** Partner Cancel Requested At */
+            partner_cancel_requested_at?: string | null;
             /** Payment Method */
             payment_method: string | null;
             payment_status: components["schemas"]["PaymentStatus"];
             /** Reference */
             reference: string;
+            /**
+             * Sold On Platform
+             * @default false
+             */
+            sold_on_platform?: boolean;
             /** Source Platform */
             source_platform?: string | null;
             /**
@@ -5340,7 +5387,7 @@ export interface components {
             /** Orderids */
             orderIds?: components["schemas"]["OrderIdPair"][];
             /** Requeststatus */
-            requestStatus: number;
+            requestStatus: string;
         };
         /** OrderIdPair */
         OrderIdPair: {
@@ -5936,7 +5983,7 @@ export interface components {
             /** Message */
             message: string;
             /** Requeststatus */
-            requestStatus: number;
+            requestStatus: string;
         };
         /** PlayoSlot */
         PlayoSlot: {
@@ -5956,6 +6003,8 @@ export interface components {
          *     difference is whether the result is a hold or a confirmed booking.
          */
         PlayoSlotRequest: {
+            /** Clubdiscount */
+            clubDiscount?: number | string | null;
             /** Courtid */
             courtId: string;
             /**
@@ -8933,6 +8982,8 @@ export interface operations {
                 date_from?: string | null;
                 date_to?: string | null;
                 search?: string | null;
+                /** @description Only platform bookings staff asked the platform to cancel that it has not cancelled yet — the follow-up list. */
+                awaiting_partner_cancel?: boolean;
                 /** @description 1-indexed page number */
                 page?: number;
                 /** @description Items per page */
@@ -9316,6 +9367,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceEmailResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_requestPartnerCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingCancel"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingDetail"];
                 };
             };
             /** @description Validation Error */

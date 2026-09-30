@@ -121,15 +121,24 @@ async def get_tenant_context(
     }
 
     try:
-        context = resolve_tenant_cached(**args)
-        if context is None:
-            # Only now pay for the key lookup, and only if nothing higher in the
-            # priority order already answered. `routing_for` caches, so this costs
-            # one query per key per TTL rather than one per request.
-            if args["api_key_tenant"] is None and raw_key:
-                args["api_key_tenant"] = await load_tenant_reference_for_key(raw_key)
-                if args["api_key_tenant"] is not None:
-                    context = resolve_tenant_cached(**args)
+        try:
+            context = resolve_tenant_cached(**args)
+        except TenantResolutionError:
+            # Nothing higher in the priority order names an academy, so only now pay
+            # for the key lookup. `routing_for` caches, so this costs one query per
+            # key per TTL rather than one per request.
+            #
+            # It has to happen HERE, on the failure, not after a None: with no key
+            # tenant known, planning raises rather than returning None. This used to
+            # be reachable only when GatewayDispatch had already warmed the cache —
+            # which it does for gateway paths alone — so the sandbox, canonical
+            # `/gateway/playo/…` paths and the health probe refused a valid key.
+            if args["api_key_tenant"] is not None or not raw_key:
+                raise
+            args["api_key_tenant"] = await load_tenant_reference_for_key(raw_key)
+            if args["api_key_tenant"] is None:
+                raise
+            context = resolve_tenant_cached(**args)
 
         if context is None:
             async with untenanted_session() as session:

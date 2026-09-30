@@ -60,7 +60,7 @@ class GatewayError(Exception):
 
     Deliberately not an `AppError`: those map to an HTTP status, and the right status
     depends on the dialect. Our own contract answers a taken slot with 409; Playo's
-    answers it with a 200 carrying `requestStatus: 0`, because their client treats a
+    answers it with a 200 carrying `requestStatus: "0"`, because their client treats a
     non-2xx as a transport fault and retries — and a sold court never becomes
     available by retrying. The dialect decides; the core just says what went wrong.
     """
@@ -99,6 +99,10 @@ class SlotRequest:
     #: How much the partner already collected. Becomes `amount_paid`, so anything
     #: short shows as a balance the desk collects on arrival.
     amount_paid: Decimal = Decimal(0)
+
+    #: Anything else the partner sent that someone may need to see later but that
+    #: changes nothing here. Appended to the booking's "created" timeline entry.
+    note: str | None = None
 
     @property
     def duration_min(self) -> int:
@@ -207,6 +211,44 @@ async def owned(
     return (
         await db.execute(scoped.where(Booking.external_ref == cleaned))
     ).scalar_one_or_none()
+
+
+async def selling_platform(
+    db: AsyncSession, booking: Booking
+) -> IntegrationPartner | None:
+    """The third-party platform that sold this booking, if one did.
+
+    What makes it matter: a platform booking was paid for on *their* side, so only
+    they can refund it, and their contracts give the venue no way to tell them about
+    a change. Staff screens use this to route cancellations through the platform
+    rather than silently diverging from it.
+
+    Decided by the partner's dialect, not `source_platform`: that is the partner's
+    slug, which is a label anyone creating an integration can type. `native`
+    partners — a venue's own website — are not platforms; the venue owns those
+    customers and can cancel their bookings like any other.
+    """
+    if booking.created_by_partner_id is None:
+        return None
+    # Local import: the dialects import this module.
+    from app.modules.gateway.dialects import PLATFORMS
+
+    partner = await db.get(IntegrationPartner, booking.created_by_partner_id)
+    if partner is None or partner.dialect not in PLATFORMS:
+        return None
+    return partner
+
+
+async def platform_slugs(db: AsyncSession) -> set[str]:
+    """Slugs of this academy's partners that are third-party platforms — what a
+    booking's `source_platform` is matched against when labelling a whole list,
+    where `selling_platform` would cost a lookup per row."""
+    from app.modules.gateway.dialects import PLATFORMS
+
+    rows = await db.execute(
+        select(IntegrationPartner.slug).where(IntegrationPartner.dialect.in_(PLATFORMS))
+    )
+    return set(rows.scalars().all())
 
 
 async def _by_external_ref(
@@ -392,6 +434,7 @@ async def _claim_one(
         detail=(
             f"Via {partner.name}"
             + (f" (ref {slot.external_ref})" if slot.external_ref else "")
+            + (f" — {slot.note}" if slot.note else "")
         ),
         actor_user_id=None,
     )

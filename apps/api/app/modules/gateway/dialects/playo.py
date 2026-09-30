@@ -20,9 +20,10 @@ API works:
    no offset anywhere. That means the *venue's* local time, which is why every
    conversion here goes through the tenant's timezone and never the server's.
 
-`requestStatus` is documented as `0 - failed, 1 - successful` while their sample
-payloads type it `"string"`. Integers are what the prose specifies and what the field
-means, so integers are what we send. Worth confirming with them before go-live.
+`requestStatus` is a *string* — `"1"` or `"0"`. Earlier revisions of their spec
+said `0 - failed, 1 - successful` in prose and typed it `"string"` in the samples;
+the current v2.0 text settles it: "Use string requestStatus values". Their client
+compares against the string, so an integer `1` reads as a failure on their side.
 """
 
 from __future__ import annotations
@@ -55,14 +56,25 @@ router = APIRouter(tags=["gateway"])
 #: that the key was actually issued for 'playo' — see `deps.speaking`.
 Partner = Annotated[IntegrationPartner, Depends(speaking("playo"))]
 
-#: Playo's own default when a slot request omits `endTime`, which their spec marks
-#: optional. Refusing the booking over a field they document as optional would be
-#: our bug, and every court here is sold by the hour.
+#: Slot length when the venue has not set `booking_rules.min_duration_minutes`. It
+#: sizes the slots in Fetch Availability, and fills in a slot request's `endTime`,
+#: which their spec marks optional — refusing a booking over a field they document
+#: as optional would be our bug.
 DEFAULT_SLOT_MINUTES = 60
 
-PLAYO = ConfigDict(populate_by_name=True, serialize_by_alias=True)
-SUCCESS = 1
-FAILURE = 0
+#: What Playo's generic client sends in place of the customer's number when the
+#: venue's "share user info" switch is off on their side (the email stand-in is
+#: `playo@playo.co`, but we do not store emails). Stored as-is, 9999999999 would sit
+#: on the counter board looking like a number somebody could ring.
+PLACEHOLDER_MOBILES = frozenset({"9999999999", "+919999999999"})
+
+#: `coerce_numbers_to_str`: `/booking/create` sends `playoOrderId` as a bare
+#: integer while every other endpoint quotes it. Pydantic v2 will not turn an int
+#: into a `str` field on its own, so without this their direct-booking flow is a
+#: 422 on every request.
+PLAYO = ConfigDict(populate_by_name=True, serialize_by_alias=True, coerce_numbers_to_str=True)
+SUCCESS = "1"
+FAILURE = "0"
 
 
 # ── Wire format ─────────────────────────────────────────────────────────────
@@ -70,7 +82,7 @@ FAILURE = 0
 
 class PlayoEnvelope(BaseModel):
     model_config = PLAYO
-    request_status: int = Field(alias="requestStatus")
+    request_status: str = Field(alias="requestStatus")
     message: str
 
 
@@ -112,11 +124,16 @@ class PlayoSlotRequest(BaseModel):
     paid_at_playo: Decimal = Field(default=Decimal("0"), alias="paidAtPlayo")
 
     #: Their id for this order, and our idempotency key. Typed as a string because
-    #: their samples send it both quoted and bare.
+    #: their samples send it both quoted and bare (see `PLAYO`).
     playo_order_id: str = Field(alias="playoOrderId")
 
     #: Accepted and ignored — we sell whole courts, not tickets.
     num_tickets: int | None = Field(default=None, alias="numTickets")
+
+    #: Sent by their generic `/booking/create` client. What it means — a discount
+    #: already inside `price`, or one to take off it — is unconfirmed, so it is
+    #: recorded on the booking's timeline and never applied to the price.
+    club_discount: Decimal | None = Field(default=None, alias="clubDiscount")
 
 
 class OrderCreateRequest(BaseModel):
@@ -216,8 +233,34 @@ def _parse_local(day: str, clock: str, *, timezone_name: str, label: str) -> dat
     return datetime.combine(parsed_day, parsed, tzinfo=tenant_zone(timezone_name)).astimezone(UTC)
 
 
+def _slot_minutes(settings) -> int:
+    """The venue's own slot length, from Settings → Booking Rules.
+
+    Playo shows whatever grid Fetch Availability returns, so a venue that sells
+    half-hour slots must hand them half-hour slots — not the hourly grid every other
+    venue happens to use.
+    """
+    rules = settings.booking_rules or {}
+    try:
+        minutes = int(rules.get("min_duration_minutes") or DEFAULT_SLOT_MINUTES)
+    except (TypeError, ValueError):
+        return DEFAULT_SLOT_MINUTES
+    return minutes if 15 <= minutes <= 240 else DEFAULT_SLOT_MINUTES
+
+
+def _real_contact(value: str | None, placeholders: frozenset[str]) -> str | None:
+    """`None` for the stand-ins Playo sends when user-info sharing is off."""
+    cleaned = (value or "").strip()
+    return None if not cleaned or cleaned in placeholders else cleaned
+
+
 def _to_slot_request(
-    item: PlayoSlotRequest, *, timezone_name: str, user_name: str, user_mobile: str | None
+    item: PlayoSlotRequest,
+    *,
+    timezone_name: str,
+    user_name: str,
+    user_mobile: str | None,
+    slot_minutes: int = DEFAULT_SLOT_MINUTES,
 ) -> SlotRequest:
     starts_at = _parse_local(
         item.date, item.start_time, timezone_name=timezone_name, label="startTime"
@@ -231,7 +274,7 @@ def _to_slot_request(
         if ends_at <= starts_at:
             ends_at += timedelta(days=1)
     else:
-        ends_at = starts_at + timedelta(minutes=DEFAULT_SLOT_MINUTES)
+        ends_at = starts_at + timedelta(minutes=slot_minutes)
 
     raw_court = str(item.court_id).strip().strip('"')
     try:
@@ -248,9 +291,10 @@ def _to_slot_request(
         ends_at=ends_at,
         external_ref=str(item.playo_order_id).strip().strip('"'),
         customer_name=user_name,
-        customer_phone=user_mobile,
+        customer_phone=_real_contact(user_mobile, PLACEHOLDER_MOBILES),
         price=item.price,
         amount_paid=item.paid_at_playo,
+        note=f"clubDiscount {item.club_discount}" if item.club_discount else None,
     )
 
 
@@ -309,9 +353,19 @@ async def playo_availability(
             if await db.get(Sport, sport_uuid) is None:
                 raise GatewayError(f"Unknown sport {sport_id!r}.")
 
+        minutes = _slot_minutes(settings)
         rows = await service.availability(
-            db, on_date=on_date, duration_min=60, sport_id=sport_uuid, slot_minutes=60
+            db,
+            on_date=on_date,
+            duration_min=minutes,
+            sport_id=sport_uuid,
+            slot_minutes=minutes,
         )
+        # Their schema requires at least one court on a success. An empty list with
+        # `requestStatus: "1"` is a response their validator rejects, and a venue with
+        # nothing to sell for this sport is better said plainly.
+        if not rows:
+            raise GatewayError("No courts for this sport.")
     except GatewayError as exc:
         return _fail(AvailabilityResponse, str(exc))
 
@@ -352,6 +406,7 @@ async def _create(db, partner, items, payload, *, hold: bool, model):
                     timezone_name=settings.timezone,
                     user_name=payload.user_name,
                     user_mobile=payload.user_mobile,
+                    slot_minutes=_slot_minutes(settings),
                 )
                 for item in items
             ]
