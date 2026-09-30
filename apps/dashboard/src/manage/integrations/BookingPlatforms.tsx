@@ -23,12 +23,6 @@ import {
   useUpdatePartner,
 } from './hooks'
 
-/** A partner row shows what it speaks, so "why is Playo getting 404s?" is one
- *  glance rather than a database query. Falls back to the raw slug if the registry
- *  has not loaded, or if a partner was onboarded onto a dialect since removed. */
-const dialectLabel = (all: DialectOut[] | undefined, slug: string) =>
-  all?.find((d) => d.slug === slug)?.label ?? slug
-
 /** The one URL, whoever is asking.
  *
  *  The API reports the same `base_path` for every dialect, deliberately — the key
@@ -173,22 +167,6 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
     }
   }
 
-  /** Re-point a live integration at another contract, keeping its key.
-   *
-   *  The repair for having picked the wrong one at setup. Deleting and re-adding is
-   *  not an alternative — the booking FK is RESTRICT, so a platform that has booked
-   *  anything cannot be deleted at all. */
-  const repoint = async (partner: PartnerOut, slug: string) => {
-    if (slug === partner.dialect) return
-    try {
-      setError(null)
-      await update.mutateAsync({ id: partner.id, dialect: slug })
-      onNotify(`${partner.name} now speaks ${dialectLabel(dialects.data, slug)}.`)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not change that platform’s API.')
-    }
-  }
-
   const doDelete = async (partner: PartnerOut) => {
     setConfirmDelete(null)
     try {
@@ -227,13 +205,13 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
 
       {/* {rows.length > 0 && <GatewayUrl url={gatewayUrl(dialects.data)} />} */}
 
-      {/* {freshKey && (
+      {freshKey && (
         <FreshKeyPanel
           partner={freshKey}
           url={gatewayUrl(dialects.data)}
           onDone={() => setFreshKey(null)}
         />
-      )} */}
+      )}
 
       {adding && (
         <div className="mt-4 rounded-2xl border border-border-card bg-white p-4">
@@ -648,7 +626,9 @@ function FreshKeyPanel({
         up later — a lost key needs a rotation.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-lg border border-lime/60 bg-white px-3 py-2 font-mono text-xs text-ink">
+        {/* Wrapped, never truncated: this is the one chance to read it, and someone
+            copying it by hand or checking the paste needs every character. */}
+        <code className="min-w-0 flex-1 rounded-lg border border-lime/60 bg-white px-3 py-2 font-mono text-xs break-all text-ink select-all">
           {partner.api_key}
         </code>
         <button
