@@ -9,9 +9,11 @@ import {
 } from 'recharts'
 import { useRevenueTrend } from '../api/hooks'
 import { formatINRCompact, lastNMonthLabels, monthsAgoStart } from '../dashboard/insights'
-import chartHistogram from '../assets/figma/chart-histogram.svg'
-import legendDotRevenue from '../assets/figma/legend-dot-c.svg'
-import legendDotBookings from '../assets/figma/legend-dot-d.svg'
+import { asset } from '../lib/asset'
+
+const chartHistogram = asset('dashboard/chart-histogram.svg')
+const legendDotRevenue = asset('dashboard/legend-dot-c.svg')
+const legendDotBookings = asset('dashboard/legend-dot-d.svg')
 
 function CustomTooltip({
   active,

@@ -1,4 +1,6 @@
-import backspaceIcon from '../assets/figma/checkin/backspace.svg'
+import { asset } from '../lib/asset'
+
+const backspaceIcon = asset('pos/checkin/backspace.svg')
 
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 

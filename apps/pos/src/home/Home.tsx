@@ -4,11 +4,13 @@ import type { View } from '../App'
 import { TopBar } from '../ui/TopBar'
 import { useAuth } from '../auth/AuthProvider'
 import { usePosServices } from '../api/hooks'
-import checkinIllustration from '../assets/figma/home/checkin-illustration.png'
-import shopIllustration from '../assets/figma/home/shop-illustration.png'
-import academyIllustration from '../assets/figma/home/academy-illustration.png'
-import membershipIllustration from '../assets/figma/home/membership-illustration.png'
-import checkoutIcon from '../assets/figma/checkin/checkout.svg'
+import { asset } from '../lib/asset'
+
+const checkinIllustration = asset('pos/home/checkin-illustration.png')
+const shopIllustration = asset('pos/home/shop-illustration.png')
+const academyIllustration = asset('pos/home/academy-illustration.png')
+const membershipIllustration = asset('pos/home/membership-illustration.png')
+const checkoutIcon = asset('pos/checkin/checkout.svg')
 
 function Tile({
   image,

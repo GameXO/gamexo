@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { pad } from '../lib/format'
-import homeNav from '../assets/figma/checkin/home-nav-2.svg'
+import { asset } from '../lib/asset'
+
+const homeNav = asset('pos/checkin/home-nav-2.svg')
 
 export const HOME_COUNTDOWN_SECONDS = 15
 

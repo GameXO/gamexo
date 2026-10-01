@@ -4,7 +4,9 @@ import { api } from '../api/client'
 import { useAllCourts, useSports } from '../api/hooks'
 import { channelOf, formatINR, type ChannelKey } from '../dashboard/insights'
 import type { View } from '../App'
-import calendar05 from '../assets/figma/calendar-05.svg'
+import { asset } from '../lib/asset'
+
+const calendar05 = asset('dashboard/calendar-05.svg')
 
 const STATUS_TONE: Record<string, string> = {
   held: 'bg-amber-50 text-amber-700',

@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import Keypad from '../../checkin/Keypad'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 const MAX_LEN = 10
 

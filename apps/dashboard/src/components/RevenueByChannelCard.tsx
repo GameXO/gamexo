@@ -6,7 +6,9 @@ import {
   type ChannelKey,
   type DashboardRange,
 } from '../dashboard/insights'
-import storeManagement from '../assets/figma/store-management.svg'
+import { asset } from '../lib/asset'
+
+const storeManagement = asset('dashboard/store-management.svg')
 
 const CHANNEL_GRADIENT: Record<ChannelKey, string> = {
   walkin: 'linear-gradient(to right, #336b4c, #07ad52)',

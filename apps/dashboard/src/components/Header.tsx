@@ -4,9 +4,11 @@ import DateRangePicker from './DateRangePicker'
 import type { View } from '../App'
 import type { DashboardRange } from '../dashboard/insights'
 
-import dashboardSquareHeader from '../assets/figma/dashboard-square-header.svg'
-import bell from '../assets/figma/bell.svg'
-import calendarPlus from '../assets/figma/calendar-plus.svg'
+import { asset } from '../lib/asset'
+
+const dashboardSquareHeader = asset('dashboard/dashboard-square-header.svg')
+const bell = asset('dashboard/bell.svg')
+const calendarPlus = asset('dashboard/calendar-plus.svg')
 
 const today = new Date().toLocaleDateString('en-US', {
   day: '2-digit',

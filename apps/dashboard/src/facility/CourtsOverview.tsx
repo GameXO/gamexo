@@ -3,7 +3,9 @@ import { Plus } from 'lucide-react'
 import { FACILITY_SPORTS, FACILITY_COURTS, facilitySportById } from './facilityData'
 import SportIcon from './SportIcon'
 import { money } from '../data/booking'
-import chevronDown from '../assets/figma/chevron-down.svg'
+import { asset } from '../lib/asset'
+
+const chevronDown = asset('dashboard/chevron-down.svg')
 
 export default function CourtsOverview({ onStartBooking }: { onStartBooking: () => void }) {
   const [sportFilter, setSportFilter] = useState<string | null>(null)

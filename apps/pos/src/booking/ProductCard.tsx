@@ -1,8 +1,10 @@
 import { ImageOff } from 'lucide-react'
 import { money } from '../lib/format'
 import type { Offer } from './offers'
-import addIcon from '../assets/figma/shop/add.svg'
-import removeIcon from '../assets/figma/shop/remove.svg'
+import { asset } from '../lib/asset'
+
+const addIcon = asset('pos/shop/add.svg')
+const removeIcon = asset('pos/shop/remove.svg')
 
 /** One tile per offer (Rent / Buy / Pack), shared by the dedicated Add-Ons step and
  *  the Payment step's upsell rail — same catalogue, same stock rules, same card. */

@@ -11,11 +11,12 @@
     "deploy:build": "./deploy/build.sh",
     "deploy:cf": "pnpm deploy:build && wrangler deploy --config deploy/wrangler.jsonc",
     "docs:dev": "pnpm --filter @gamexo/docs dev",
-    "docs:build": "pnpm --filter @gamexo/docs build",
+    "docs:build": "NEXT_PUBLIC_ASSET_BASE_URL=${NEXT_PUBLIC_ASSET_BASE_URL:-https://cdn.turfleo.com} pnpm --filter @gamexo/docs build",
     "docs:deploy": "pnpm docs:build && wrangler deploy --config deploy/wrangler.docs.jsonc",
     "website:dev": "pnpm --filter @gamexo/website dev",
     "website:build": "./deploy/build-website.sh",
-    "website:deploy": "pnpm website:build && wrangler deploy --config deploy/wrangler.website.jsonc"
+    "website:deploy": "pnpm website:build && wrangler deploy --config deploy/wrangler.website.jsonc",
+    "assets:sync": "bash deploy/sync-assets.sh"
   },
   "devDependencies": {
     "turbo": "^2.5.6",

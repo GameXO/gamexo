@@ -95,7 +95,7 @@ const ICONS: Record<string, (props: IconProps) => React.JSX.Element> = {
   tennis: TennisIcon,
   badminton: BadmintonIcon,
   pickleball: PickleballIcon,
-  tabletennis: TableTennisIcon,
+  'table-tennis': TableTennisIcon,
   swimming: SwimmingIcon,
   gym: GymIcon,
 }

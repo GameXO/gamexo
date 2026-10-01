@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useBookingsInRange, useKpis } from '../api/hooks'
 import { channelOf, formatINRCompact, type DashboardRange } from '../dashboard/insights'
-import cardIcon from '../assets/figma/card-icon.svg'
+import { asset } from '../lib/asset'
+
+const cardIcon = asset('dashboard/card-icon.svg')
 
 /** Counter activity over the selected period, read straight off its raw
  *  bookings — no invented "memberships renewed" or "equipment issued" figures

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
-import logoMark from '../assets/figma/logo-mark.svg'
-import languageIcon from '../assets/figma/checkin/language.svg'
+import { asset } from '../lib/asset'
 import { getStoredLanguage, LANGUAGES, loadGoogleTranslate, setLanguage, type LangCode } from '../lib/googleTranslate'
+
+const logoMark = asset('brand/logo-mark.svg')
+const languageIcon = asset('pos/checkin/language.svg')
 
 /** Machine-translates the whole app via Google's free Website Translator widget — this
  *  button drives its hidden <select> directly instead of showing Google's own UI. */

@@ -10,6 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type MembershipPlanBody } from './client'
 import type { components } from './schema'
+import { asset } from '../lib/asset'
 import {
   addOnKey,
   parseAddOnKey,
@@ -19,13 +20,6 @@ import {
   type Draft,
   type Sport,
 } from '../data/booking'
-
-import football from '../assets/figma/sports/football.png'
-import cricket from '../assets/figma/sports/cricket.png'
-import tennis from '../assets/figma/sports/tennis.png'
-import badminton from '../assets/figma/sports/badminton.png'
-import pickleball from '../assets/figma/sports/pickleball.png'
-import tableTennis from '../assets/figma/sports/table-tennis.png'
 
 type SportOut = components['schemas']['SportOut']
 type CourtWithStatus = components['schemas']['CourtWithStatus']
@@ -42,18 +36,12 @@ export type RevenuePoint = components['schemas']['RevenuePoint']
 
 /**
  * The API has no sport imagery — it carries `icon`/`color`, while the UI is built
- * around these photographs. Matched on slug, so a sport the backend adds that we
- * have no art for still renders (without a photo) rather than breaking the grid.
+ * around photographs. Each sport's photo lives on the asset CDN at
+ * `sports/<slug>.jpg` (see /assets/README.md), so adding one is an upload, not a
+ * deploy. A sport with no photo — one a venue created itself, say — 404s there,
+ * and the sport card shows the sport's own icon instead.
  */
-const SPORT_IMAGES: Record<string, string> = {
-  football,
-  cricket,
-  tennis,
-  badminton,
-  pickleball,
-  'table-tennis': tableTennis,
-  tabletennis: tableTennis,
-}
+const sportImage = (slug: string) => asset(`sports/${slug}.jpg`)
 
 /** Money crosses the wire as a decimal string; JS renders a number. */
 const money = (v: string | number | null | undefined) => Number(v ?? 0)
@@ -64,7 +52,9 @@ export function toSport(s: SportOut, courtCount?: number): Sport {
     name: s.name,
     fieldsLabel: courtCount === undefined ? '' : `${courtCount} ${courtCount === 1 ? 'Court' : 'Courts'}`,
     from: money(s.price_base),
-    image: SPORT_IMAGES[s.slug] ?? '',
+    image: sportImage(s.slug),
+    icon: s.icon ?? '',
+    bgColor: s.bg_color ?? '',
     isActive: s.is_active ?? true,
   }
 }

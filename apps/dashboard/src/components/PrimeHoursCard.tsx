@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useBookingsInRange, useSports } from '../api/hooks'
 import { formatHourRange, primeHoursBySport, type DashboardRange } from '../dashboard/insights'
-import bolt from '../assets/figma/bolt.svg'
+import { asset } from '../lib/asset'
+
+const bolt = asset('dashboard/bolt.svg')
 
 /** The single busiest hour of day per sport over the selected period — the slot
  *  a turf prices its peak rate around. Read straight off each booking's own

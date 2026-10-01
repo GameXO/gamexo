@@ -24,3 +24,5 @@ yarn-error.log*
 .env*.local
 .vercel
 next-env.d.ts
+# Dev-only link to /assets, served at /cdn (see package.json "dev").
+/public/cdn

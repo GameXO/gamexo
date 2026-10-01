@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import Keypad from '../checkin/Keypad'
-import arrowRight from '../assets/figma/checkin/arrow-right-check.svg'
-import reloadIcon from '../assets/figma/checkin/reload.svg'
+import { asset } from '../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
+const reloadIcon = asset('pos/checkin/reload.svg')
 
 /** The boxed-digit + keypad pattern from the check-in OTP screen, generalized so the
  *  checkout flow's admin-authorization step can reuse it verbatim instead of forking it. */
