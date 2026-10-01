@@ -10,7 +10,9 @@ import {
   type DashboardRange,
   type SportRevenueRow,
 } from '../dashboard/insights'
-import chartPie from '../assets/figma/chart-pie.svg'
+import { asset } from '../lib/asset'
+
+const chartPie = asset('dashboard/chart-pie.svg')
 
 const TRACK_HEIGHT = 120
 const BAR_WIDTH = 56

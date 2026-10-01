@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
-import arrowLeft from '../assets/figma/checkin/arrow-left.svg'
-import homeNav from '../assets/figma/checkin/home-nav.svg'
+import { asset } from '../lib/asset'
+
+const arrowLeft = asset('pos/checkin/arrow-left.svg')
+const homeNav = asset('pos/checkin/home-nav.svg')
 
 function NavPill({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
   return (

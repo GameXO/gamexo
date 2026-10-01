@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { customPreset, monthPreset, todayPreset, type DashboardRange } from '../dashboard/insights'
-import calendarPlus from '../assets/figma/calendar-plus.svg'
+import { asset } from '../lib/asset'
+
+const calendarPlus = asset('dashboard/calendar-plus.svg')
 
 const toInputDate = (iso: string) => {
   const d = new Date(iso)

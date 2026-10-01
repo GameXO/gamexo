@@ -1,6 +1,8 @@
 import { money } from '../../lib/format'
 import { useUpiQrCode } from '../useCheckout'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 const UPI_ID = import.meta.env.VITE_UPI_ID ?? ''
 const PAYEE_NAME = 'XCSports'

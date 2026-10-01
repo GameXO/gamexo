@@ -4,7 +4,9 @@ import { useAuth } from './AuthProvider'
 // `goToOps` is not imported: the signpost that used it is commented out below.
 // Re-add it there if the link comes back. The #/ops route itself still works.
 import { isOpsRoute, subscribeToOpsRoute } from './opsRoute'
-import brandLogo from '../assets/figma/brand-logo.svg'
+import { asset } from '../lib/asset'
+
+const brandLogo = asset('brand/brand-logo.svg')
 
 export default function LoginPage() {
   const { login } = useAuth()

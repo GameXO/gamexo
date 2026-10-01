@@ -1,14 +1,16 @@
 import type { View } from '../App'
 
-import dashboardSquare from '../assets/figma/dashboard-square.svg'
-import dices from '../assets/figma/dices.svg'
-import shoppingCartAdd from '../assets/figma/shopping-cart-add.svg'
-import calendar from '../assets/figma/calendar.svg'
-import storeManagement from '../assets/figma/store-management.svg'
-import packageDelivered from '../assets/figma/package-delivered.svg'
-import mortarboard from '../assets/figma/mortarboard.svg'
-import olympicTorch from '../assets/figma/olympic-torch.svg'
-import userPlusDark from '../assets/figma/user-plus-dark.svg'
+import { asset } from '../lib/asset'
+
+const dashboardSquare = asset('dashboard/dashboard-square.svg')
+const dices = asset('dashboard/dices.svg')
+const shoppingCartAdd = asset('dashboard/shopping-cart-add.svg')
+const calendar = asset('dashboard/calendar.svg')
+const storeManagement = asset('dashboard/store-management.svg')
+const packageDelivered = asset('dashboard/package-delivered.svg')
+const mortarboard = asset('dashboard/mortarboard.svg')
+const olympicTorch = asset('dashboard/olympic-torch.svg')
+const userPlusDark = asset('dashboard/user-plus-dark.svg')
 
 export type NavItem = { label: string; icon: string; view?: View; submenu?: boolean }
 

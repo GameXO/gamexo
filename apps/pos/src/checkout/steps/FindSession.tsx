@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import Keyboard from '../../ui/Keyboard'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 /**
  * Find the session to settle.

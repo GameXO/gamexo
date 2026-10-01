@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
 import Keypad from '../Keypad'
 import { COUNTRIES, flagEmoji, type Country } from '../countries'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 export default function EnterNumber({
   phone,

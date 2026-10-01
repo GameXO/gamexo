@@ -7,8 +7,10 @@
  * like a page load.
  */
 import type { ReactNode } from 'react'
-import illustration from '../assets/he.png'
+import { asset } from '../lib/asset'
 import { Logo, Progress } from '../ui/primitives'
+
+const illustration = asset('website/he.png')
 
 export function WizardShell({
   step,

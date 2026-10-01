@@ -3,7 +3,9 @@ import { money, formalDate } from '../../lib/format'
 import { timeLabel, bookingTypeLabel, type CheckinBooking } from '../useCheckIn'
 import SuccessGraphic from '../SuccessGraphic'
 import HomeCountdownButton from '../../ui/HomeCountdown'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 function Found({
   booking,

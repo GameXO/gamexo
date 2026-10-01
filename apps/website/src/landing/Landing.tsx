@@ -8,8 +8,10 @@
  */
 import { useEffect, useState } from 'react'
 import { DASHBOARD_URL_FALLBACK, api, rupees, type Plan } from '../api/client'
-import illustration from '../assets/he.png'
+import { asset } from '../lib/asset'
 import { Button, ChevronRight, Logo } from '../ui/primitives'
+
+const illustration = asset('website/he.png')
 
 const FEATURES = [
   {

@@ -10,7 +10,9 @@ import { courtById, emptyDraft, type Draft } from '../data/booking'
 import { useBookingQuote, useCreateBooking } from '../api/hooks'
 import { ApiError } from '../api/client'
 import * as db from '../lib/db'
-import arrowRight from '../assets/figma/arrow-right-01.svg'
+import { asset } from '../lib/asset'
+
+const arrowRight = asset('dashboard/arrow-right-01.svg')
 
 function canContinue(step: number, draft: Draft, courtListOpen: boolean) {
   if (step === 1) return courtListOpen && !!draft.courtId

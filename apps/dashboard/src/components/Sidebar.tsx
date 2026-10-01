@@ -6,11 +6,13 @@ import { setImpersonatedTenant } from '../auth/platform'
 import { useAuth } from '../auth/AuthProvider'
 import type { View } from '../App'
 
-import brandLogo from '../assets/figma/brand-logo.svg'
-import bolt from '../assets/figma/bolt.svg'
-import chevronRight from '../assets/figma/chevron-right.svg'
-import helpSquareRounded from '../assets/figma/help-square-rounded.svg'
-import settings from '../assets/figma/settings.svg'
+import { asset } from '../lib/asset'
+
+const brandLogo = asset('brand/brand-logo.svg')
+const bolt = asset('dashboard/bolt.svg')
+const chevronRight = asset('dashboard/chevron-right.svg')
+const helpSquareRounded = asset('dashboard/help-square-rounded.svg')
+const settings = asset('dashboard/settings.svg')
 
 export default function Sidebar({
   open,

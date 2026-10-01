@@ -1,5 +1,7 @@
 import type { Trend } from '../dashboard/insights'
-import dotSeparator from '../assets/figma/dot-separator.svg'
+import { asset } from '../lib/asset'
+
+const dotSeparator = asset('dashboard/dot-separator.svg')
 
 export default function StatCard({
   label,

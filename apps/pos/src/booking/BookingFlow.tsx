@@ -14,7 +14,9 @@ import { useCreateBooking, useInvoiceBooking, useRecordPayment, type BookingDeta
 import { startsAtISO } from '../lib/format'
 import { buildConfirmedInvoice } from './invoice'
 import { emptyDraft, type Draft } from './types'
-import arrowRight from '../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 const STEP_TITLES = ['Select Sport & Court', 'Date & Time', 'Player Details', 'Add Ons', 'Payment']
 const TOTAL_STEPS = STEP_TITLES.length

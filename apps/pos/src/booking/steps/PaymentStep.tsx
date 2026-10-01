@@ -6,7 +6,9 @@ import type { PaymentMethodId } from '../../lib/paymentMethods'
 import { buildProvisionalInvoice } from '../invoice'
 import { traySelections } from '../offers'
 import type { Draft } from '../types'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 const METHODS: { id: PaymentMethodId; label: string }[] = [
   { id: 'card', label: 'CC' },

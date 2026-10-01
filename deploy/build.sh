@@ -15,12 +15,16 @@ set -euo pipefail
 API_BASE_URL="${VITE_API_BASE_URL:-https://gamexo-i6mt.onrender.com}"
 TENANT_SLUG="${VITE_TENANT_SLUG:-xcourt}"
 UPI_ID="${VITE_UPI_ID:-xcourtsports@upi}"
+# Where every image and icon is served from — the R2 bucket's public domain (see
+# assets/README.md). Overridable like the rest: VITE_ASSET_BASE_URL=... pnpm deploy:build
+ASSET_BASE_URL="${VITE_ASSET_BASE_URL:-https://cdn.turfleo.com}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/deploy/dist"
 
 echo "==> API base URL: $API_BASE_URL"
 echo "==> tenant slug:  $TENANT_SLUG"
+echo "==> asset CDN:    $ASSET_BASE_URL"
 
 # Stale output would otherwise survive as orphaned files in the asset upload —
 # a renamed page leaves its old bundle behind and Wrangler happily ships both.
@@ -37,12 +41,14 @@ rm -rf "$OUT"
 echo "==> building @gamexo/dashboard"
 VITE_API_BASE_URL="$API_BASE_URL" \
 VITE_TENANT_SLUG="$TENANT_SLUG" \
+VITE_ASSET_BASE_URL="$ASSET_BASE_URL" \
   pnpm --filter @gamexo/dashboard build
 
 echo "==> building @gamexo/pos"
 VITE_API_BASE_URL="$API_BASE_URL" \
 VITE_TENANT_SLUG="$TENANT_SLUG" \
 VITE_UPI_ID="$UPI_ID" \
+VITE_ASSET_BASE_URL="$ASSET_BASE_URL" \
   pnpm --filter @gamexo/pos build
 
 # apps/website is NOT built here. It ships as its own Worker now — see

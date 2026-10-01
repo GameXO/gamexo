@@ -22,12 +22,15 @@ set -euo pipefail
 # passed this variable at all).
 API_BASE_URL="${VITE_API_BASE_URL:-https://gamexo-i6mt.onrender.com}"
 DASHBOARD_URL="${VITE_DASHBOARD_URL:-https://gamexo-dash.gamexo.workers.dev}"
+# The asset CDN — see deploy/build.sh.
+ASSET_BASE_URL="${VITE_ASSET_BASE_URL:-https://cdn.turfleo.com}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/apps/website/dist"
 
 echo "==> API base URL: $API_BASE_URL"
 echo "==> dashboard URL: $DASHBOARD_URL"
+echo "==> asset CDN:     $ASSET_BASE_URL"
 
 # Stale output would otherwise survive as orphaned files in the asset upload —
 # a renamed page leaves its old bundle behind and Wrangler happily ships both.
@@ -36,6 +39,7 @@ rm -rf "$OUT"
 echo "==> building @gamexo/website"
 VITE_API_BASE_URL="$API_BASE_URL" \
 VITE_DASHBOARD_URL="$DASHBOARD_URL" \
+VITE_ASSET_BASE_URL="$ASSET_BASE_URL" \
   pnpm --filter @gamexo/website build
 
 [ -s "$OUT/index.html" ] || { echo "ERROR: $OUT/index.html missing or empty — build failed" >&2; exit 1; }

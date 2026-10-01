@@ -1,5 +1,7 @@
-import calendarCheckIn from '../../assets/figma/checkin/calendar-check-in.svg'
-import passport from '../../assets/figma/checkin/passport.svg'
+import { asset } from '../../lib/asset'
+
+const calendarCheckIn = asset('pos/checkin/calendar-check-in.svg')
+const passport = asset('pos/checkin/passport.svg')
 
 function MethodCard({
   icon,

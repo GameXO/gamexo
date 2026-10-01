@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import bookingImage from '@/assests/iamgebooking.png';
-import paymentsImage from '@/assests/payments.png';
+import { asset } from '@/lib/asset';
+
+const bookingImage = asset('docs/iamgebooking.png');
+const paymentsImage = asset('docs/payments.png');
 
 const entries = [
   {
@@ -41,7 +43,7 @@ export default function HomePage() {
               className="border-fd-border bg-fd-card hover:border-fd-primary/40 group overflow-hidden border transition-colors"
             >
               <img
-                src={entry.image.src}
+                src={entry.image}
                 alt=""
                 className="aspect-video w-full object-cover"
               />

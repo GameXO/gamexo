@@ -6,8 +6,10 @@ import { offersFor, unitsClaimed, type Offer } from '../booking/offers'
 import { TopBar } from '../ui/TopBar'
 import { CheckinFooter } from '../checkin/Chrome'
 import CheckoutSheet from './CheckoutSheet'
-import addIcon from '../assets/figma/shop/add.svg'
-import removeIcon from '../assets/figma/shop/remove.svg'
+import { asset } from '../lib/asset'
+
+const addIcon = asset('pos/shop/add.svg')
+const removeIcon = asset('pos/shop/remove.svg')
 
 function ProductCard({
   offer,

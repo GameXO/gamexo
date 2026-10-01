@@ -16,7 +16,7 @@ export const FACILITY_SPORTS: FacilitySport[] = [
   { id: 'tennis', label: 'Tennis' },
   { id: 'badminton', label: 'Badminton' },
   { id: 'pickleball', label: 'Pickleball' },
-  { id: 'tabletennis', label: 'Table Tennis' },
+  { id: 'table-tennis', label: 'Table Tennis' },
   { id: 'swimming', label: 'Swimming' },
   { id: 'gym', label: 'Gym' },
 ]
@@ -38,8 +38,8 @@ export const FACILITY_COURTS: FacilityCourt[] = [
   { id: 'fc-badminton-1', sportId: 'badminton', name: 'Court 1', price: 400 },
   { id: 'fc-badminton-2', sportId: 'badminton', name: 'Court 2', price: 400 },
   { id: 'fc-pickleball-1', sportId: 'pickleball', name: 'Court 1', price: 500 },
-  { id: 'fc-tabletennis-1', sportId: 'tabletennis', name: 'Table 1', price: 200 },
-  { id: 'fc-tabletennis-2', sportId: 'tabletennis', name: 'Table 2', price: 200 },
+  { id: 'fc-table-tennis-1', sportId: 'table-tennis', name: 'Table 1', price: 200 },
+  { id: 'fc-table-tennis-2', sportId: 'table-tennis', name: 'Table 2', price: 200 },
   { id: 'fc-swimming-pool', sportId: 'swimming', name: 'Main Pool', price: 300 },
   { id: 'fc-gym-floor', sportId: 'gym', name: 'Strength Floor', price: 250 },
 ]

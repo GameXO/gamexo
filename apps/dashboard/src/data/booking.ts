@@ -1,10 +1,12 @@
 import * as db from '../lib/db'
-import football from '../assets/figma/sports/football.png'
-import cricket from '../assets/figma/sports/cricket.png'
-import tennis from '../assets/figma/sports/tennis.png'
-import badminton from '../assets/figma/sports/badminton.png'
-import pickleball from '../assets/figma/sports/pickleball.png'
-import tableTennis from '../assets/figma/sports/table-tennis.png'
+import { asset } from '../lib/asset'
+
+const football = asset('sports/football.jpg')
+const cricket = asset('sports/cricket.jpg')
+const tennis = asset('sports/tennis.jpg')
+const badminton = asset('sports/badminton.jpg')
+const pickleball = asset('sports/pickleball.jpg')
+const tableTennis = asset('sports/table-tennis.jpg')
 
 export const GST_RATE = 0.18
 export const VENUE_OPENS = 6
@@ -16,6 +18,10 @@ export type Sport = {
   fieldsLabel: string
   from: number
   image: string
+  /** The sport's emoji and tint from the API — the fallback when there is no photo.
+   *  Absent on the static mock rows below, which all have photos. */
+  icon?: string
+  bgColor?: string
   /** Undefined for the static mock rows below, which are all offered. Carried
    *  from the API so a picker can label a retired sport rather than omitting it
    *  and silently blanking whatever was attached to it. */
@@ -28,7 +34,7 @@ export const SPORTS: Sport[] = [
   { id: 'tennis', name: 'Tennis', fieldsLabel: '6 Fields', from: 800, image: tennis },
   { id: 'badminton', name: 'Badminton', fieldsLabel: '6 Fields', from: 800, image: badminton },
   { id: 'pickleball', name: 'Pickleball', fieldsLabel: '6 Fields', from: 800, image: pickleball },
-  { id: 'tabletennis', name: 'Table Tennis', fieldsLabel: '6 Fields', from: 800, image: tableTennis },
+  { id: 'table-tennis', name: 'Table Tennis', fieldsLabel: '6 Fields', from: 800, image: tableTennis },
 ]
 
 export type Court = {
@@ -70,7 +76,7 @@ export const COURTS: Court[] = [
   ...courtsFor('tennis', 'Artificial Turf', 800, 4, ['Floodlights', 'Changing room', 'Parking']),
   ...courtsFor('badminton', 'BWF synthetic mat', 800, 4, ['Air conditioning', 'Locker', 'Parking']),
   ...courtsFor('pickleball', 'Cushioned acrylic', 800, 4, ['Floodlights', 'Paddles included', 'Parking']),
-  ...courtsFor('tabletennis', 'Stag tournament table', 800, 4, ['Air conditioning', 'Locker', 'Parking']),
+  ...courtsFor('table-tennis', 'Stag tournament table', 800, 4, ['Air conditioning', 'Locker', 'Parking']),
 ]
 
 export const sportById = (id: string) => SPORTS.find((s) => s.id === id)
@@ -152,7 +158,7 @@ export const EQUIPMENT: Equipment[] = [
   seed({ id: 'shuttle', name: 'Shuttlecock', price: 40, sports: ['badminton'], hint: 'Tube of 3', stock: 60, returnable: false }),
   seed({ id: 'bat', name: 'Cricket Bat', price: 200, sports: ['cricket'], hint: 'English willow', stock: 10, returnable: true, deposit: 500 }),
   seed({ id: 'pads', name: 'Pads & Gloves', price: 150, sports: ['cricket'], hint: 'Batting set', stock: 8, returnable: true, deposit: 400 }),
-  seed({ id: 'paddle', name: 'Paddle', price: 90, sports: ['pickleball', 'tabletennis'], hint: 'Composite face', stock: 14, returnable: true, deposit: 300 }),
+  seed({ id: 'paddle', name: 'Paddle', price: 90, sports: ['pickleball', 'table-tennis'], hint: 'Composite face', stock: 14, returnable: true, deposit: 300 }),
   seed({ id: 'coach', name: 'Coach', price: 500, sports: ['football', 'cricket', 'tennis', 'badminton'], hint: 'Per hour, book ahead', stock: 3, returnable: false }),
   seed({ id: 'towel', name: 'Towel', price: 30, sports: [], hint: 'Fresh, cotton', stock: 50, returnable: false }),
   seed({ id: 'bottle', name: 'Water Bottle', price: 20, sports: [], hint: '1 litre, chilled', stock: 100, returnable: false }),

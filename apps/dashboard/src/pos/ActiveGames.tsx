@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CircleDot, Circle, CalendarCheck2, IndianRupee } from 'lucide-react'
 import { balanceOf, courtById, equipmentForSport, money } from '../data/booking'
-import chevronDown from '../assets/figma/chevron-down.svg'
+import { asset } from '../lib/asset'
 import {
   useAllCourts,
   useExtendBooking,
@@ -19,6 +19,8 @@ import { useNow } from './useNow'
 import Tile from './Tile'
 import CourtCard from './CourtCard'
 import CourtPanel from './CourtPanel'
+
+const chevronDown = asset('dashboard/chevron-down.svg')
 
 type ViewMode = 'courts' | 'customers'
 type Filter = 'all' | 'live' | 'upcoming' | 'free'

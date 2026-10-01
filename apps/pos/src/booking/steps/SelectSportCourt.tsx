@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { useCourts, useSports } from '../../api/hooks'
 import { money } from '../../lib/format'
 import type { Draft } from '../types'
-import arrowRight from '../../assets/figma/checkin/arrow-right-check.svg'
+import { asset } from '../../lib/asset'
+
+const arrowRight = asset('pos/checkin/arrow-right-check.svg')
 
 function Status({ error, empty, what }: { error?: unknown; empty?: boolean; what: string }) {
   if (error) {
@@ -51,9 +54,7 @@ export default function SelectSportCourt({
                 onClick={() => pickSport(sport.id)}
                 className="flex flex-col items-start overflow-hidden rounded-2xl bg-surface text-left transition-transform hover:-translate-y-0.5"
               >
-                <div className="h-[clamp(6rem,12vw,8.5rem)] w-full bg-surface-muted">
-                  {sport.image && <img src={sport.image} alt="" className="size-full object-cover" />}
-                </div>
+                <SportArt image={sport.image} icon={sport.icon} bgColor={sport.bgColor} />
                 <div className="flex w-full flex-col items-start gap-1.5 p-[clamp(0.875rem,1.6vw,1.125rem)]">
                   <p className="text-[clamp(1.05rem,1.6vw,1.25rem)] font-bold text-ink">{sport.name}</p>
                   <p className="text-[clamp(0.8125rem,1vw,0.875rem)] font-medium text-muted">{sport.fieldsLabel}</p>
@@ -124,6 +125,30 @@ export default function SelectSportCourt({
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+
+/**
+ * The sport's photo from the asset CDN, or — when it has none (a sport a venue
+ * created itself, or one nobody has uploaded a photo for) — its own icon on its own
+ * tint. The photo URL always exists; only loading it says whether there is one.
+ */
+function SportArt({ image, icon, bgColor }: { image: string; icon?: string; bgColor?: string }) {
+  const [missing, setMissing] = useState(false)
+  return (
+    <div
+      className="flex h-[clamp(6rem,12vw,8.5rem)] w-full items-center justify-center bg-surface-muted"
+      style={missing && bgColor ? { backgroundColor: bgColor } : undefined}
+    >
+      {missing ? (
+        <span aria-hidden className="text-[clamp(2.5rem,5vw,3.5rem)] leading-none">
+          {icon || '🏅'}
+        </span>
+      ) : (
+        <img src={image} alt="" className="size-full object-cover" onError={() => setMissing(true)} />
       )}
     </div>
   )

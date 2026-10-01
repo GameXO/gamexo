@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { useAuth } from './AuthProvider'
-import brandLogo from '../assets/figma/brand-logo.svg'
+import { asset } from '../lib/asset'
+
+const brandLogo = asset('brand/brand-logo.svg')
 
 export default function LoginPage() {
   const { login } = useAuth()

@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useBookingsInRange, useSports } from '../api/hooks'
 import { formatINRCompact, revenueBySport, type DashboardRange } from '../dashboard/insights'
-import discountTag from '../assets/figma/discount-tag.svg'
+import { asset } from '../lib/asset'
+
+const discountTag = asset('dashboard/discount-tag.svg')
 
 /** Revenue by sport over the selected period — summed straight off each
  *  booking's own `total`, not a booking-count proxy for it. */

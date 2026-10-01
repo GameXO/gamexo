@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 5176",
-    "build": "next build",
+    "dev": "mkdir -p public && ln -sfn ../../../assets public/cdn && next dev --port 5176",
+    "build": "test -n \"$NEXT_PUBLIC_ASSET_BASE_URL\" || { echo 'NEXT_PUBLIC_ASSET_BASE_URL is not set: point it at the asset CDN (see assets/README.md)' >&2; exit 1; } && rm -f public/cdn && next build",
     "start": "serve out",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "oxlint"

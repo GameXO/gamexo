@@ -28,18 +28,20 @@ import * as db from './lib/db'
 import { useAuth } from './auth/AuthProvider'
 import LoginPage from './auth/LoginPage'
 import { todayPreset, type DashboardRange } from './dashboard/insights'
-import dashboardSquareHeader from './assets/figma/dashboard-square-header.svg'
-import bolt from './assets/figma/bolt.svg'
-import calendar from './assets/figma/calendar.svg'
-import shoppingCartAdd from './assets/figma/shopping-cart-add.svg'
-import dices from './assets/figma/dices.svg'
-import storeManagement from './assets/figma/store-management.svg'
-import userPlusDark from './assets/figma/user-plus-dark.svg'
-import mortarboard from './assets/figma/mortarboard.svg'
-import packageDelivered from './assets/figma/package-delivered.svg'
-import helpSquareRounded from './assets/figma/help-square-rounded.svg'
-import settings from './assets/figma/settings.svg'
-import olympicTorch from './assets/figma/olympic-torch.svg'
+import { asset } from './lib/asset'
+
+const dashboardSquareHeader = asset('dashboard/dashboard-square-header.svg')
+const bolt = asset('dashboard/bolt.svg')
+const calendar = asset('dashboard/calendar.svg')
+const shoppingCartAdd = asset('dashboard/shopping-cart-add.svg')
+const dices = asset('dashboard/dices.svg')
+const storeManagement = asset('dashboard/store-management.svg')
+const userPlusDark = asset('dashboard/user-plus-dark.svg')
+const mortarboard = asset('dashboard/mortarboard.svg')
+const packageDelivered = asset('dashboard/package-delivered.svg')
+const helpSquareRounded = asset('dashboard/help-square-rounded.svg')
+const settings = asset('dashboard/settings.svg')
+const olympicTorch = asset('dashboard/olympic-torch.svg')
 
 export type View =
   | 'dashboard'
