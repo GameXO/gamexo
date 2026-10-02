@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.db.session import bind_session_to
 from app.models.tenant import Tenant, TenantSettings, TenantStatus
+from app.modules.branches.models import Branch
 from app.models.user import AccountDirectory, PlatformAdmin, User, UserStatus
 
 # A real bcrypt hash of a value nobody will guess. Verifying against it when the
@@ -206,6 +207,17 @@ async def provision_tenant(
                 business_name=business_name or name,
                 currency=currency.upper(),
                 timezone=timezone,
+            )
+        )
+        # Every academy has at least one branch, because every court belongs to one.
+        # It starts out carrying the business's own name; the owner fills in the
+        # address under Settings -> General, and adds further sites there too.
+        session.add(
+            Branch(
+                tenant_id=tenant.id,
+                name=business_name or name,
+                is_default=True,
+                is_active=True,
             )
         )
 

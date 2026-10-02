@@ -32,7 +32,7 @@ export default function Coupons() {
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
       <p className="text-lg text-ink">Discount Coupons</p>
 
-      <div className="flex w-full flex-col gap-3 rounded-2xl border border-border-card bg-white p-5 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)] sm:flex-row sm:items-end">
+      <div className="flex w-full flex-col gap-3 rounded-2xl border border-border-card bg-white p-5 shadow-card sm:flex-row sm:items-end">
         <label className="flex flex-1 flex-col gap-1.5 text-sm">
           <span className="text-slate">Code</span>
           <input
@@ -71,7 +71,7 @@ export default function Coupons() {
         </button>
       </div>
 
-      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
+      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-card">
         {coupons.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted">No coupons generated yet.</p>
         ) : (

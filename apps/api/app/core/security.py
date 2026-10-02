@@ -53,6 +53,16 @@ class Role(StrEnum):
     ADMIN = "admin"
     MANAGER = "manager"
     RECEPTION = "reception"
+    #: Reads and records the money side — fees, dues, payroll — at the front-desk
+    #: level for everything else. Not a rung *above* reception: an accountant has no
+    #: business editing a coach or a plan, so the extra reach is granted by name
+    #: (see `auth.deps.RequirePayroll`), not by sitting higher in the ladder.
+    ACCOUNTANT = "accountant"
+    #: A coach's own login. Sits *below* the counter tablet: the tablet takes walk-in
+    #: bookings and payments, which are not a coach's job. A coach reaches only the
+    #: register endpoints (guarded `RequireRegister`) and their own workspace under
+    #: `/academy/me` — nothing that lists the academy's students, fees or staff.
+    COACH = "coach"
     KIOSK = "kiosk"
 
 
@@ -67,6 +77,8 @@ ROLE_HIERARCHY: dict[Role, int] = {
     Role.ADMIN: 30,
     Role.MANAGER: 20,
     Role.RECEPTION: 10,
+    Role.ACCOUNTANT: 10,
+    Role.COACH: 4,
     Role.KIOSK: 5,
 }
 

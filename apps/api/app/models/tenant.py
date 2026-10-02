@@ -237,6 +237,13 @@ class TenantSettings(TenantScoped):
     # Indian academy's evening peak by 5h30m into the wrong bucket entirely.
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata", nullable=False)
 
+    #: What this academy calls each rung of the ladder — {"competitive": "Elite Squad"}.
+    #: Only the labels change; the stored values stay `beginner` … `competitive`, so
+    #: renaming a level never rewrites a student's history.
+    academy_level_names: Mapped[dict[str, str]] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
+
     # ── Document-shaped config ───────────────────────────────────────────────
     operating_hours: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=_default_operating_hours, nullable=False

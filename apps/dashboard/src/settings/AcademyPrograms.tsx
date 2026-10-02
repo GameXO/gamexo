@@ -15,7 +15,7 @@
  *   the UI says which is which rather than making them look alike.
  */
 import { useState } from 'react'
-import { Check, GraduationCap, Loader2, Pencil, Plus, X } from 'lucide-react'
+import { Check, Loader2, Pencil, Plus, X } from 'lucide-react'
 import {
   AGE_BANDS,
   DEFAULT_AGE_BOUNDS,
@@ -122,10 +122,10 @@ function ProgramForm({
   const priced = PLAN_DURATIONS.filter((d) => Number(draft.fees[d] || 0) > 0)
 
   return (
-    <div className="rounded-2xl border border-border-card bg-surface p-5">
+    <div className="rounded-xl border border-border-card bg-white p-5 xl:col-span-2">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-ink">Programme name</span>
+          <span className="text-[12px] font-medium text-ink">Programme name</span>
           <input
             value={draft.name}
             onChange={(e) => set('name', e.target.value)}
@@ -134,7 +134,7 @@ function ProgramForm({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-ink">Sport</span>
+          <span className="text-[12px] font-medium text-ink">Sport</span>
           <select
             value={draft.sport_id}
             onChange={(e) => set('sport_id', e.target.value)}
@@ -152,7 +152,7 @@ function ProgramForm({
       </div>
 
       <div className="mt-5 rounded-xl border border-border-soft bg-surface-muted/40 p-4">
-        <p className="text-[13px] font-medium text-ink">Who it's for</p>
+        <p className="text-[12px] font-medium text-ink">Who it's for</p>
         <p className="mt-1 text-xs leading-relaxed text-slate">
           Enforced at enrolment against the student's date of birth, judged on the
           first day of the term. Leave it unset to admit any age.
@@ -217,7 +217,7 @@ function ProgramForm({
       </div>
 
       <div className="mt-5">
-        <p className="text-[13px] font-medium text-ink">Level</p>
+        <p className="text-[12px] font-medium text-ink">Level</p>
         <p className="mt-1 text-xs leading-relaxed text-slate">
           A guide, not a gate — a student below this level can still be enrolled,
           and staff see a note when they are.
@@ -252,7 +252,7 @@ function ProgramForm({
       </div>
 
       <div className="mt-5">
-        <p className="text-[13px] font-medium text-ink">Fees by term</p>
+        <p className="text-[12px] font-medium text-ink">Fees by term</p>
         <p className="mt-1 text-xs leading-relaxed text-slate">
           Leave a term at zero and it is not offered.
         </p>
@@ -274,7 +274,7 @@ function ProgramForm({
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-ink">Head coach</span>
+          <span className="text-[12px] font-medium text-ink">Head coach</span>
           <select
             value={draft.coach_id}
             onChange={(e) => set('coach_id', e.target.value)}
@@ -289,7 +289,7 @@ function ProgramForm({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-ink">Max students</span>
+          <span className="text-[12px] font-medium text-ink">Max students</span>
           <input
             inputMode="numeric"
             value={draft.max_students}
@@ -298,7 +298,7 @@ function ProgramForm({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-ink">Sessions</span>
+          <span className="text-[12px] font-medium text-ink">Sessions</span>
           <input
             value={draft.session_freq}
             onChange={(e) => set('session_freq', e.target.value)}
@@ -386,19 +386,11 @@ export function AcademyPrograms() {
   }
 
   return (
-    <section className="rounded-2xl border border-border-card bg-surface p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-lime/20 text-lime-ink">
-            <GraduationCap size={20} />
-          </div>
-          <div>
-            <h2 className="font-display text-lg font-semibold text-ink">Academy Programmes</h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate">
-              Courses this academy runs, who they're for, and what a term costs.
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-slate">
+          {(programs ?? []).length} {(programs ?? []).length === 1 ? 'programme' : 'programmes'}
+        </p>
         {editing === null && (
           <button
             type="button"
@@ -407,7 +399,7 @@ export function AcademyPrograms() {
               setError(null)
               setEditing('new')
             }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white"
           >
             <Plus size={15} />
             New programme
@@ -415,7 +407,7 @@ export function AcademyPrograms() {
         )}
       </div>
 
-      <div className="mt-5 flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {editing === 'new' && (
           <ProgramForm
             draft={draft}
@@ -427,10 +419,10 @@ export function AcademyPrograms() {
           />
         )}
 
-        {isLoading && <p className="text-sm text-muted">Loading programmes…</p>}
+        {isLoading && <p className="text-sm text-muted xl:col-span-2">Loading programmes…</p>}
 
         {!isLoading && (programs ?? []).length === 0 && editing === null && (
-          <p className="text-sm text-muted">
+          <p className="rounded-xl border border-dashed border-border-card bg-white px-6 py-10 text-center text-sm text-muted xl:col-span-2">
             No programmes yet. Start with one per sport and age group — kids and
             adults football, say — then add levels as the academy grows.
           </p>
@@ -454,7 +446,7 @@ export function AcademyPrograms() {
           return (
             <article
               key={p.id}
-              className="flex items-start justify-between gap-4 rounded-2xl border border-border-card p-4"
+              className="flex items-start justify-between gap-4 rounded-xl border border-border-card bg-white p-5"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -515,6 +507,6 @@ export function AcademyPrograms() {
           )
         })}
       </div>
-    </section>
+    </div>
   )
 }

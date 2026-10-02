@@ -1,5 +1,5 @@
 /**
- * Data for Manage → Integrations.
+ * Data for Settings → Integrations.
  *
  * Kept beside the screen rather than in api/hooks.ts: nothing else in the app reads
  * a payment credential or a partner key, and the shared hooks file is already the

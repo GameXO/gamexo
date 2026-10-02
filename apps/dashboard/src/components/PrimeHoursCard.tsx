@@ -21,7 +21,7 @@ export default function PrimeHoursCard({ range }: { range: DashboardRange }) {
   const loading = bookings.isPending || sports.isPending
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5">
+    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
       <div className="flex w-full items-center gap-6">
         <div className="flex flex-1 items-center gap-2.5">
           <img src={bolt} alt="" className="size-5" />

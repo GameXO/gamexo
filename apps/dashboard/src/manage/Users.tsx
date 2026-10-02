@@ -9,7 +9,7 @@ export default function Users() {
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
       <p className="text-lg text-ink">Users</p>
 
-      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
+      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-card">
         {customers.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted">No customers recorded yet.</p>
         ) : (

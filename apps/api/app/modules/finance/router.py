@@ -19,6 +19,8 @@ from app.core.mail_templates import invoice_raised
 from app.models.tenant import TenantSettings
 from app.modules.booking.models import Booking, BookingEventKind, Customer
 from app.modules.booking.pricing import money, tenant_zone
+from app.modules.branches.models import Branch
+from app.modules.branches.service import branch_info
 from app.modules.admin.notify import (
     EMAIL_INVOICE,
     EMAIL_PAYMENT_RECEIPT,
@@ -131,9 +133,12 @@ async def get_invoice(invoice_id: uuid.UUID, db: Db, _: RequireStaff) -> Invoice
         .all()
     )
     methods = {p.method.value for p in payments}
+    branch = await db.get(Branch, invoice.branch_id) if invoice.branch_id else None
+    tenant_settings = (await db.execute(select(TenantSettings))).scalar_one()
     return InvoiceDetail(
         **InvoiceOut.model_validate(invoice).model_dump(),
         payments=[PaymentOut.model_validate(p) for p in payments],
+        branch=branch_info(branch, tenant_settings),
         payment_method=(
             None if not methods else (methods.pop() if len(methods) == 1 else "split")
         ),
@@ -209,8 +214,10 @@ async def email_booking_invoice(
         )
 
     tenant_settings = (await db.execute(select(TenantSettings))).scalar_one()
+    branch = await db.get(Branch, invoice.branch_id) if invoice.branch_id else None
     subject, text, html = invoice_raised(
         tenant_settings,
+        branch=branch,
         invoice_no=invoice.invoice_no,
         customer_name=invoice.customer_name,
         items=list(invoice.items or []),

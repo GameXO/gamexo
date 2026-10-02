@@ -1334,3 +1334,49 @@ async def test_checkout_lookup_404s_for_a_booking_that_has_not_started_yet(
         "/api/v1/bookings/checkout-lookup", params={"code": code}, headers=ctx["headers"]
     )
     assert missed.status_code == 404, missed.text
+
+
+
+async def test_a_sport_carries_its_own_photo_description_and_gallery(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """A sport the venue invented has no CDN photo, so the picture and the facility
+    description live on the sport itself and survive a round trip."""
+    token = await login(client, tenant_a, tenant_a.admin_email, PASSWORD)
+    h = auth_headers(token, tenant_a)
+
+    created = await client.post(
+        "/api/v1/sports",
+        json={
+            "name": "Squash",
+            "price_base": "0",
+            "price_peak": "0",
+            "price_weekend": "0",
+            "image_url": "https://cdn.example/squash.jpg",
+        },
+        headers=h,
+    )
+    assert created.status_code == 201, created.text
+    sport = created.json()
+    assert sport["image_url"] == "https://cdn.example/squash.jpg"
+    assert sport["images"] == []
+    assert sport["description"] is None
+
+    patched = await client.patch(
+        f"/api/v1/sports/{sport['id']}",
+        json={
+            "description": "Two glass-backed courts, air conditioned.",
+            "images": ["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"],
+        },
+        headers=h,
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["description"] == "Two glass-backed courts, air conditioned."
+    assert len(patched.json()["images"]) == 2
+
+    too_many = await client.patch(
+        f"/api/v1/sports/{sport['id']}",
+        json={"images": [f"https://cdn.example/{i}.jpg" for i in range(9)]},
+        headers=h,
+    )
+    assert too_many.status_code == 422

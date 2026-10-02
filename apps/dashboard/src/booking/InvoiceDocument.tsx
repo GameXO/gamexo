@@ -45,15 +45,21 @@ export default function InvoiceDocument({
         <div className="flex w-full items-start justify-between gap-4">
           <div>
             <p className="font-sans text-lg font-semibold text-ink">{invoice.facility.name}</p>
-            <p className="mt-1 text-xs text-slate">{invoice.facility.addressLine}</p>
-            <p className="text-xs text-slate">{invoice.facility.pincode}</p>
-            <p className="text-xs text-slate">GSTIN {invoice.facility.gstin}</p>
+            {invoice.facility.branchName && (
+              <p className="mt-0.5 text-xs font-medium text-ink">{invoice.facility.branchName}</p>
+            )}
+            {invoice.facility.addressLine && (
+              <p className="mt-1 text-xs text-slate">{invoice.facility.addressLine}</p>
+            )}
+            {invoice.facility.phone && <p className="text-xs text-slate">{invoice.facility.phone}</p>}
+            {invoice.facility.gstin && <p className="text-xs text-slate">GSTIN {invoice.facility.gstin}</p>}
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-flame">
               {confirmed ? 'Due' : 'Provisional'}
             </p>
             <p className="mt-1 text-xs text-slate">{invoice.formalDate}</p>
+            {invoice.source && <p className="text-xs text-slate">Source: {invoice.source}</p>}
           </div>
         </div>
 
@@ -61,12 +67,12 @@ export default function InvoiceDocument({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted">Billed to</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted">Billed to</p>
             <p className="mt-1 text-sm text-ink">{invoice.customer.name || '—'}</p>
             <p className="text-xs text-slate">{invoice.customer.phone ? `+91 ${invoice.customer.phone}` : '—'}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted">Playing</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted">Playing</p>
             <p className="mt-1 text-sm text-ink">
               {invoice.dateLabel}
               {invoice.timeRange ? `, ${invoice.timeRange}` : ''}
@@ -80,7 +86,7 @@ export default function InvoiceDocument({
         <div className="border-t border-dashed border-border-card" />
 
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted">
+          <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted">
             <span>Item</span>
             <span>Amount</span>
           </div>

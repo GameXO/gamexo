@@ -116,6 +116,7 @@ app/
   auth/          login, refresh, me, RBAC guards, platform control plane
   models/        the registry — a model not imported here gets no table and no policy
   modules/
+    branches/    the physical sites an academy trades from
     booking/     sports, courts, equipment, customers, bookings, availability
     finance/     invoices, per-tenant numbering, payments, memberships
     academy/     coaches, programmes, batches, students, sessions, attendance
@@ -127,8 +128,55 @@ app/
 alembic/         migrations, including the RLS and GRANT statements
 alembic_rls.py   shared RLS/GRANT DDL used by every migration after the first
 scripts/         export_openapi.py
-tests/           163 tests
+tests/           500+ tests
 ```
+
+## Branches
+
+An academy trades from one or more physical sites. Every academy has at least one:
+`provision_tenant` creates a default branch named after the business, and the
+`b5d2e8a41c96` migration backfilled one for each existing academy from its
+`tenant_settings` details.
+
+- **A court belongs to exactly one branch** (`court.branch_id`, required). Omit it on
+  `POST /courts` to use the default branch; `GET /courts?branch_id=` filters to one
+  site, which is how the counter tablet shows only its own courts.
+- **A booking snapshots its court's branch** (`booking.branch_id`) so moving a court
+  later does not re-home history.
+- **An invoice prints the branch it was raised at** (`invoice.branch_id`, nullable —
+  ad contracts have no site). Booking and invoice detail responses carry a `branch`
+  object (`BranchInfo`) with the GSTIN already resolved: the branch's own, or the
+  academy's from Settings when it has none. Invoice emails use the same.
+- **Exactly one default**, enforced by a partial unique index. Branch names are unique
+  per academy, case-insensitively. A branch is never deleted, only deactivated; the
+  default cannot be deactivated, nor can a branch that still has bookable courts.
+
+| Endpoint | Who | |
+|---|---|---|
+| `GET /branches` | kiosk and up | Active branches, default first. Reception and up may pass `include_inactive`. |
+| `POST /branches` | admin | Add a branch. `gstin` is format-checked (15 characters). |
+| `PATCH /branches/{id}` | admin | Edit, deactivate, or make default. |
+
+### Booking source
+
+`booking.booked_via` records which desk took a booking: `counter` (the shared kiosk
+login), `office_desk` (staff at the dashboard) or `partner` (arrived through the
+gateway). It is stamped by the server from who is logged in and is never read from the
+request body. It is `NULL` on bookings that predate the column and could not be
+attributed. Not to be confused with `booking_type` (walk-in, advance, …) or
+`source_platform` (which marketplace, for partner bookings).
+
+## Sports and courts
+
+A sport has a name, colours/icon, three rates and a default slot length, plus its own
+**`image_url`** (cover photo — wins over the CDN's `sports/<slug>.jpg`, which is how a
+sport the venue made up gets a picture), a **`description`** of the facility and an
+**`images`** gallery (max 8). `GET /sports/catalogue` is the stock menu a sport is picked
+from; selecting one creates the row. A court belongs to a sport and carries its own rates,
+`images` (max 5), `amenities`, `is_bookable` and `operating_hours` (`{open, close}`,
+`HH:MM`; a close at or before the open means it runs past midnight, and `24:00` is not
+valid — it silently falls back to the default). A court with bookings cannot be deleted,
+only disabled.
 
 ## Background worker
 

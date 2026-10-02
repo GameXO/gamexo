@@ -12,7 +12,7 @@ export default function BulkActionBar({
   if (count === 0) return null
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-border-card bg-white px-4 py-3 shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
+    <div className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-border-card bg-white px-4 py-3 shadow-card">
       <p className="text-sm font-medium text-ink">{count} selected</p>
       <button type="button" onClick={onClear} className="text-xs text-muted hover:text-ink">
         Clear

@@ -15,12 +15,12 @@ export default function ConfirmDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-[60] flex animate-fade-in items-center justify-center bg-black/30 p-4"
       onClick={onCancel}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+        className="w-full max-w-sm animate-rise rounded-2xl border border-border-card bg-white p-5 shadow-pop"
       >
         <p className="text-base font-semibold text-ink">{title}</p>
         <p className="mt-2 text-sm text-slate">{message}</p>
@@ -28,7 +28,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-border-input px-4 py-2 text-sm text-ink"
+            className="rounded-lg border border-border-input px-4 py-2 text-sm text-ink hover:bg-hover"
           >
             Cancel
           </button>

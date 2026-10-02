@@ -50,7 +50,7 @@ export default function RevenueTrendChart() {
   const hasData = data.some((d) => d.revenue > 0 || d.bookings > 0)
 
   return (
-    <div className="flex w-full shrink-0 flex-col items-center gap-6 overflow-hidden rounded-xl border border-border-input bg-surface p-4 sm:p-6">
+    <div className="flex w-full shrink-0 flex-col items-center gap-6 overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
       <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex flex-1 items-center gap-2.5">
           <img src={chartHistogram} alt="" className="size-5" />

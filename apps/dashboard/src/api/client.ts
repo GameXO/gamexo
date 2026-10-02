@@ -8,7 +8,7 @@
  * Two things every request needs and none of the call sites should have to
  * remember: the bearer token, and the tenant. Both are attached here.
  */
-import type { paths } from './schema'
+import type { components, paths } from './schema'
 import { getTokens, setTokens, clearTokens } from './auth'
 import { getImpersonatedTenant, isPlatformSession } from '../auth/platform'
 
@@ -16,7 +16,7 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').
 const TENANT = import.meta.env.VITE_TENANT_SLUG ?? 'xcourt'
 
 /** The API's own origin, for the one place a URL is shown rather than called:
- *  Manage → Integrations, where it is copied and handed to a booking platform. */
+ *  Settings → Integrations, where it is copied and handed to a booking platform. */
 export const apiOrigin = BASE_URL
 
 /**
@@ -39,7 +39,7 @@ export const apiOrigin = BASE_URL
  *
  * So resolution is left to the two mechanisms that cannot be wrong about it: the
  * host subdomain where one exists, and the signed `tid` claim where it does not.
- * `TENANT` is still exported because Manage → Integrations displays it.
+ * `TENANT` is still exported because Settings → Integrations displays it.
  */
 
 /** The shared error envelope from the API — see app/core/errors.py::_envelope. */
@@ -52,8 +52,120 @@ type ErrorEnvelope = {
  *  it at 0; see the membership-plan comments below for what 0 means. */
 export type PlanDuration = '1m' | '3m' | '6m' | '12m'
 
+/** Filters for the students table. Everything is optional and combines with AND. */
+export type RosterQuery = {
+  page?: number
+  size?: number
+  search?: string
+  status?: 'active' | 'paused' | 'completed' | 'inactive'
+  sport_id?: string
+  batch_id?: string
+  coach_id?: string
+  level?: 'beginner' | 'intermediate' | 'advanced' | 'competitive'
+  fee_status?: 'paid' | 'due' | 'none'
+  attention?: 'repeat_absentee' | 'low_attendance' | 'renewal_due' | 'promotion_ready'
+  sort?: 'name' | 'attendance' | 'rating' | 'renewal'
+  desc?: boolean
+}
+
+export type AssessmentBody = {
+  sport_id?: string | null
+  assessed_on?: string
+  rating: number
+  skills: { name: string; score: number }[]
+  comment?: string | null
+}
+
+/** A person who signs in to this venue. `kiosk` is the counter tablet and is created
+ *  with the academy, never added here. */
+export type StaffRole = 'admin' | 'manager' | 'reception' | 'accountant' | 'coach'
+export type StaffStatus = 'active' | 'on-leave' | 'inactive'
+
+export type StaffCreateBody = {
+  email: string
+  password: string
+  full_name: string
+  role: StaffRole
+  phone?: string | null
+  shift?: string | null
+}
+
+export type StaffUpdateBody = {
+  full_name?: string
+  role?: StaffRole
+  phone?: string | null
+  shift?: string | null
+  status?: StaffStatus
+}
+
+export type PayModel = 'fixed' | 'hourly' | 'commission' | 'hybrid'
+export type CoachType = 'full-time' | 'part-time' | 'guest' | 'visiting'
+
+/** A coach as the add/edit form sends it. Money is a string, like everywhere else,
+ *  so a rupee amount never takes a trip through a float. Which of `salary`,
+ *  `hourly_rate` and `commission_pct` counts is decided by `pay_model`. */
+export type CoachBody = {
+  name: string
+  phone?: string | null
+  email?: string | null
+  gender?: string | null
+  specialization?: string | null
+  type?: CoachType
+  experience_years?: number
+  joining_date?: string | null
+  bio?: string | null
+  sport_ids?: string[]
+  morning_available?: boolean
+  evening_available?: boolean
+  status?: 'active' | 'inactive' | 'on-leave'
+  pay_model?: PayModel
+  salary?: string
+  hourly_rate?: string
+  commission_pct?: string
+}
+
+export type CoachReviewBody = {
+  rating: number
+  comment?: string | null
+  student_id?: string | null
+  reviewer_name?: string | null
+  reviewed_on?: string
+}
+
+export type PayoutBody = {
+  /** "YYYY-MM" */
+  month: string
+  /** Signed: a bonus is positive, a deduction negative. Needs `adjustment_note`. */
+  adjustment?: string
+  adjustment_note?: string | null
+  method?: 'cash' | 'upi' | 'bank' | 'cheque'
+  reference?: string | null
+  paid_on?: string
+  note?: string | null
+}
+
+/** A branch as the add/edit form sends it. Optional text fields take `null` to
+ *  clear them; an empty GSTIN means "print the business's own". */
+/** What the Sports & Courts screens send. Prices cross the wire as numbers or
+ *  decimal strings; the API accepts either. */
+export type SportBody = components['schemas']['SportCreate']
+export type SportPatch = components['schemas']['SportUpdate']
+export type CourtBody = components['schemas']['CourtCreate']
+export type CourtPatch = components['schemas']['CourtUpdate']
+
+export type BranchBody = {
+  name: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+  phone?: string | null
+  email?: string | null
+  gstin?: string | null
+}
+
 /** The progression ladder. Ordered, and compared as such on the server. */
-export type SkillLevel = 'beginner' | 'intermediate' | 'advanced'
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'competitive'
 
 /** Kids or adults. `null` on a programme means it admits any age. */
 export type AgeBand = 'kids' | 'adults'
@@ -217,7 +329,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     // token and audit-logs every request made under it.
     const impersonating = getImpersonatedTenant()
     if (impersonating) headers['X-Impersonate-Tenant'] = impersonating
-    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    // FormData sets its own Content-Type, with the multipart boundary; setting
+    // one here would drop the boundary and the server could not parse the body.
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData
+    if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
     if (!anonymous) {
       const token = getTokens()?.access_token
       if (token) headers.Authorization = `Bearer ${token}`
@@ -225,7 +340,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     return fetch(`${BASE_URL}${withQuery(path, query)}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     })
   }
 
@@ -396,6 +511,15 @@ export const api = {
   updateSettings: (body: {
     enabled_services?: Record<string, boolean>
     business_name?: string
+    phone?: string | null
+    email?: string | null
+    gst_number?: string | null
+    address?: string | null
+    city?: string | null
+    /** `#RRGGBB`. The API rejects anything else. */
+    brand_primary?: string
+    brand_accent?: string
+    brand_background?: string
   }) =>
     request<Ok<'/api/v1/settings', 'patch'>>('/api/v1/settings', {
       method: 'PATCH',
@@ -406,9 +530,67 @@ export const api = {
   listSports: (query?: { include_inactive?: boolean }) =>
     request<Ok<'/api/v1/sports', 'get'>>('/api/v1/sports', { query }),
 
+  /** The fixed menu of sports a turf can pick from. Manager and above. Not this
+   *  academy's sports — `listSports` is that. */
+  sportCatalogue: () =>
+    request<Ok<'/api/v1/sports/catalogue', 'get'>>('/api/v1/sports/catalogue'),
+
+  createSport: (body: SportBody) =>
+    request<Ok<'/api/v1/sports', 'post', 201>>('/api/v1/sports', { method: 'POST', body }),
+
+  updateSport: (sportId: string, body: SportPatch) =>
+    request<Ok<'/api/v1/sports/{sport_id}', 'patch'>>(`/api/v1/sports/${sportId}`, {
+      method: 'PATCH',
+      body,
+    }),
+
+  /** Only a sport with no courts. Otherwise deactivate it with `updateSport`. */
+  deleteSport: (sportId: string) =>
+    request<void>(`/api/v1/sports/${sportId}`, { method: 'DELETE' }),
+
+  createCourt: (body: CourtBody) =>
+    request<Ok<'/api/v1/courts', 'post', 201>>('/api/v1/courts', { method: 'POST', body }),
+
+  updateCourt: (courtId: string, body: CourtPatch) =>
+    request<Ok<'/api/v1/courts/{court_id}', 'patch'>>(`/api/v1/courts/${courtId}`, {
+      method: 'PATCH',
+      body,
+    }),
+
+  /** Only a court with no bookings. Otherwise switch it off with `updateCourt`. */
+  deleteCourt: (courtId: string) =>
+    request<void>(`/api/v1/courts/${courtId}`, { method: 'DELETE' }),
+
   /** Plain array too. `at` asks for occupancy as of an instant. */
-  listCourts: (query?: { sport_id?: string; at?: string }) =>
+  listCourts: (query?: { sport_id?: string; branch_id?: string; at?: string }) =>
     request<Ok<'/api/v1/courts', 'get'>>('/api/v1/courts', { query }),
+
+  /** Move a court to another branch. Bookings already taken keep the branch they
+   *  were taken at; only new ones follow the court. */
+  moveCourt: (courtId: string, branchId: string) =>
+    request<Ok<'/api/v1/courts/{court_id}', 'patch'>>(`/api/v1/courts/${courtId}`, {
+      method: 'PATCH',
+      body: { branch_id: branchId },
+    }),
+
+  /** Active branches, default first. `include_inactive` shows closed ones too. */
+  listBranches: (query?: { include_inactive?: boolean }) =>
+    request<Ok<'/api/v1/branches', 'get'>>('/api/v1/branches', { query }),
+
+  /** Admin only. */
+  createBranch: (body: BranchBody) =>
+    request<Ok<'/api/v1/branches', 'post', 201>>('/api/v1/branches', { method: 'POST', body }),
+
+  /** Admin only. `is_default: true` moves the default flag here; the default itself
+   *  can be neither unset nor deactivated — promote another branch instead. */
+  updateBranch: (
+    branchId: string,
+    body: Partial<BranchBody> & { is_active?: boolean; is_default?: boolean },
+  ) =>
+    request<Ok<'/api/v1/branches/{branch_id}', 'patch'>>(`/api/v1/branches/${branchId}`, {
+      method: 'PATCH',
+      body,
+    }),
 
   /** The one paged endpoint of the three — `{ items, total, page, size, pages }`. */
   listBookings: (query?: {
@@ -611,7 +793,7 @@ export const api = {
       { query },
     ),
 
-  /* ── Manage → Integrations ─────────────────────────────────────────────────
+  /* ── Settings → Integrations ─────────────────────────────────────────────────
    * Two halves of one screen. Payment gateways are the academy's own Razorpay /
    * Cashfree / PhonePe accounts; booking platforms are the outbound API keys that
    * let Playo and Hudle sell our courts.
@@ -891,8 +1073,140 @@ export const api = {
       body,
     }),
 
+  /** The students table. Attendance, fee state and `flags` are derived server-side;
+   *  `attendance_pct` is null (not 0) when nothing was marked in the last 30 days. */
+  roster: (query?: RosterQuery) =>
+    request<Ok<'/api/v1/academy/roster', 'get'>>('/api/v1/academy/roster', { query }),
+
+  /** Repeat absentees, low attendance, terms ending, promotion candidates. */
+  attention: () => request<Ok<'/api/v1/academy/attention', 'get'>>('/api/v1/academy/attention'),
+
+  /** Everything about one student in a single call. */
+  studentProfile: (studentId: string) =>
+    request<Ok<'/api/v1/academy/students/{student_id}/profile', 'get'>>(
+      `/api/v1/academy/students/${studentId}/profile`,
+    ),
+
+  /** Manager and above. The newest review is mirrored onto the student. */
+  addAssessment: (studentId: string, body: AssessmentBody) =>
+    request<Ok<'/api/v1/academy/students/{student_id}/assessments', 'post', 201>>(
+      `/api/v1/academy/students/${studentId}/assessments`,
+      { method: 'POST', body },
+    ),
+
+  updateStudent: (
+    studentId: string,
+    body: { photo_url?: string | null; status?: 'active' | 'paused' | 'completed' | 'inactive' },
+  ) =>
+    request<Ok<'/api/v1/academy/students/{student_id}', 'patch'>>(
+      `/api/v1/academy/students/${studentId}`,
+      { method: 'PATCH', body },
+    ),
+
+  academyOverview: () => request<Ok<'/api/v1/academy/overview', 'get'>>('/api/v1/academy/overview'),
+
+  /** PNG, JPEG or WebP, up to 5 MB. Manager and above. Returns a URL to store on
+   *  whatever the image belongs to — uploading does not attach it to anything. */
+  uploadImage: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<Ok<'/api/v1/uploads', 'post', 201>>('/api/v1/uploads', { method: 'POST', body: form })
+  },
+
   coaches: (query?: { page?: number; size?: number; sport_id?: string }) =>
     request<Ok<'/api/v1/academy/coaches', 'get'>>('/api/v1/academy/coaches', { query }),
+
+  /* ── Staff ───────────────────────────────────────────────────────────────── */
+
+  /** Reception and above may read the list; adding and editing are admin only. */
+  staff: (query?: { search?: string; page?: number; size?: number }) =>
+    request<Ok<'/api/v1/staff', 'get'>>('/api/v1/staff', { query }),
+
+  /** The login name is generated and comes back in the response — it is the only
+   *  time it is shown, so the screen must hand it over then. 409 when the email is
+   *  already used at this academy. */
+  createStaff: (body: StaffCreateBody) =>
+    request<Ok<'/api/v1/staff', 'post', 201>>('/api/v1/staff', { method: 'POST', body }),
+
+  /** Refused (409) if an admin tries to demote or deactivate themselves. */
+  updateStaff: (userId: string, body: StaffUpdateBody) =>
+    request<Ok<'/api/v1/staff/{user_id}', 'patch'>>(`/api/v1/staff/${userId}`, { method: 'PATCH', body }),
+
+  /* ── Academy: coaches ────────────────────────────────────────────────────── */
+
+  /** A coach's whole page in one call. `pay` is null — and the pay fields on
+   *  `coach` are zero — for anyone below manager. */
+  coachProfile: (coachId: string) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/profile', 'get'>>(
+      `/api/v1/academy/coaches/${coachId}/profile`,
+    ),
+
+  createCoach: (body: CoachBody) =>
+    request<Ok<'/api/v1/academy/coaches', 'post', 201>>('/api/v1/academy/coaches', {
+      method: 'POST',
+      body,
+    }),
+
+  updateCoach: (coachId: string, body: Partial<CoachBody>) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}', 'patch'>>(`/api/v1/academy/coaches/${coachId}`, {
+      method: 'PATCH',
+      body,
+    }),
+
+  /** Hands open batches to `reassignTo` (or to nobody), then deletes the coach —
+   *  or, when they have sessions, reviews, students or pay on record, makes them
+   *  inactive. The result's `outcome` says which. */
+  removeCoach: (coachId: string, reassignTo?: string) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}', 'delete'>>(`/api/v1/academy/coaches/${coachId}`, {
+      method: 'DELETE',
+      query: reassignTo ? { reassign_to: reassignTo } : undefined,
+    }),
+
+  /** The batches' students and upcoming sessions move with them. */
+  assignBatches: (coachId: string, batchIds: string[]) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/assign', 'post'>>(
+      `/api/v1/academy/coaches/${coachId}/assign`,
+      { method: 'POST', body: { batch_ids: batchIds } },
+    ),
+
+  unassignBatches: (coachId: string, batchIds: string[]) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/unassign', 'post'>>(
+      `/api/v1/academy/coaches/${coachId}/unassign`,
+      { method: 'POST', body: { batch_ids: batchIds } },
+    ),
+
+  addCoachReview: (coachId: string, body: CoachReviewBody) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/reviews', 'post', 201>>(
+      `/api/v1/academy/coaches/${coachId}/reviews`,
+      { method: 'POST', body },
+    ),
+
+  deleteCoachReview: (reviewId: string) =>
+    request<void>(`/api/v1/academy/coach-reviews/${reviewId}`, { method: 'DELETE' }),
+
+  /** Manager and above. `month` is "YYYY-MM"; omitted means this month. */
+  coachEarnings: (coachId: string, month?: string) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/earnings', 'get'>>(
+      `/api/v1/academy/coaches/${coachId}/earnings`,
+      { query: month ? { month } : undefined },
+    ),
+
+  payroll: (month?: string) =>
+    request<Ok<'/api/v1/academy/payroll', 'get'>>('/api/v1/academy/payroll', {
+      query: month ? { month } : undefined,
+    }),
+
+  /** The server works out the amount; the client sends only an optional bonus or
+   *  deduction (with a reason). 409 when that month is already paid. */
+  recordPayout: (coachId: string, body: PayoutBody) =>
+    request<Ok<'/api/v1/academy/coaches/{coach_id}/payouts', 'post', 201>>(
+      `/api/v1/academy/coaches/${coachId}/payouts`,
+      { method: 'POST', body },
+    ),
+
+  /** Admin only. Removes a payout recorded in error so the month can be paid again. */
+  deletePayout: (payoutId: string) =>
+    request<void>(`/api/v1/academy/payouts/${payoutId}`, { method: 'DELETE' }),
 
   /* ── Academy: enrolment and the ladder ───────────────────────────────────── */
 

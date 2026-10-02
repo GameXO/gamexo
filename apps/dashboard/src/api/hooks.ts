@@ -7,10 +7,21 @@
  * rewrite of its JSX — and this file is the only place that knows the API uses
  * UUIDs, decimal strings and no sport imagery.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type MembershipPlanBody } from './client'
+import { useCallback } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  api,
+  type AssessmentBody,
+  type CourtBody,
+  type CourtPatch,
+  type MembershipPlanBody,
+  type RosterQuery,
+  type SportBody,
+  type SportPatch,
+} from './client'
 import type { components } from './schema'
 import { asset } from '../lib/asset'
+import { useActiveBranchId } from '../branch/activeBranch'
 import {
   addOnKey,
   parseAddOnKey,
@@ -23,9 +34,15 @@ import {
 
 type SportOut = components['schemas']['SportOut']
 type CourtWithStatus = components['schemas']['CourtWithStatus']
+export type SportRecord = SportOut
+export type CourtRecord = CourtWithStatus
+export type CatalogueSport = Awaited<ReturnType<typeof api.sportCatalogue>>[number]
 /** Exported for the dashboard's aggregates — see `useBookingsInRange` below,
  *  which hands out this raw shape rather than the counter UI's `Booking`. */
 export type BookingOut = components['schemas']['BookingOut']
+export type BranchOut = components['schemas']['BranchOut']
+export type BranchInfo = components['schemas']['BranchInfo']
+export type BookingSource = NonNullable<BookingOut['booked_via']>
 type EquipmentOut = components['schemas']['EquipmentOut']
 /** What `POST /bookings/quote` returns — the server's price for a draft. */
 export type BookingQuote = components['schemas']['QuoteOut']
@@ -52,7 +69,8 @@ export function toSport(s: SportOut, courtCount?: number): Sport {
     name: s.name,
     fieldsLabel: courtCount === undefined ? '' : `${courtCount} ${courtCount === 1 ? 'Court' : 'Courts'}`,
     from: money(s.price_base),
-    image: sportImage(s.slug),
+    // The venue's own upload wins; the CDN photo is the fallback for stock sports.
+    image: s.image_url || sportImage(s.slug),
     icon: s.icon ?? '',
     bgColor: s.bg_color ?? '',
     isActive: s.is_active ?? true,
@@ -64,6 +82,7 @@ export function toCourt(c: CourtWithStatus): Court {
   return {
     id: c.id,
     sportId: c.sport_id,
+    branchId: c.branch_id,
     name: c.name,
     price: money(c.hourly_rate),
     surface: c.sport_name ?? '',
@@ -147,6 +166,8 @@ export function toBooking(b: BookingOut): Booking {
     payment: b.payment_method ? { method: b.payment_method, status: b.payment_status ?? 'due' } : null,
     status: BOOKING_STATUS[b.status ?? 'upcoming'] ?? 'confirmed',
     source: b.booking_type === 'online' ? 'app' : 'counter',
+    branchId: b.branch_id,
+    bookedVia: b.booked_via ?? null,
     // `sold_on_platform`, not `source_platform`: the venue's own website sets the
     // latter too, and those bookings are the venue's to cancel.
     platform: b.sold_on_platform && b.source_platform
@@ -232,6 +253,8 @@ export function stockStatus(item: Pick<InventoryItem, 'qtyAvailable' | 'isLowSto
 export const queryKeys = {
   sports: ['sports'] as const,
   courts: (sportId?: string) => ['courts', sportId ?? 'all'] as const,
+  branches: (includeInactive: boolean) => ['branches', includeInactive] as const,
+  businessSettings: ['settings', 'business'] as const,
   bookings: (page: number) => ['bookings', page] as const,
   bookingsForDay: (dayISO: string) => ['bookings', 'day', dayISO] as const,
   bookingsRange: (fromISO: string, toISO: string) => ['bookings', 'range', fromISO, toISO] as const,
@@ -252,6 +275,10 @@ export const queryKeys = {
   coaches: ['coaches'] as const,
   studentLevels: (studentId: string) => ['student-levels', studentId] as const,
   studentPromotions: (studentId: string) => ['student-promotions', studentId] as const,
+  roster: (query: RosterQuery) => ['roster', query] as const,
+  attention: ['attention'] as const,
+  studentProfile: (studentId: string) => ['student-profile', studentId] as const,
+  academyOverview: ['academy-overview'] as const,
 }
 
 /** Everything POS touches, invalidated together. Issuing kit against a booking
@@ -293,12 +320,168 @@ export function useSports(includeInactive = false) {
   }
 }
 
-/** Every court, unfiltered — the one query the whole app shares. */
+/**
+ * A `select` that narrows a list to the branch the dashboard is looking at.
+ *
+ * Filtering here rather than in each `queryFn` keeps one cached copy of the
+ * unfiltered data, so switching branch is instant and needs no refetch. `pick` must
+ * be a stable (module-level) function: it is a dependency of the memoised selector,
+ * and an unstable one would make React Query re-run `select` on every render.
+ */
+function useBranchSelect<T>(pick: (item: T) => string | null | undefined) {
+  const branchId = useActiveBranchId()
+  return useCallback(
+    (items: T[]): T[] => (branchId ? items.filter((item) => pick(item) === branchId) : items),
+    [branchId, pick],
+  )
+}
+
+const courtBranch = (c: Court) => c.branchId
+const courtRecordBranch = (c: CourtWithStatus) => c.branch_id
+const bookingBranch = (b: Booking) => b.branchId
+const bookingOutBranch = (b: BookingOut) => b.branch_id
+
+/** Every court — the one query the whole app shares, narrowed to the active branch. */
 export function useAllCourts() {
   return useQuery({
     queryKey: queryKeys.courts(),
     queryFn: async () => (await api.listCourts()).map(toCourt),
+    select: useBranchSelect(courtBranch),
   })
+}
+
+/* ── Sports & Courts management ─────────────────────────────────────────────
+ * The management screens work on the API's own records rather than the counter's
+ * lossy `Sport`/`Court` view (no per-day hours, no images, no active flag), so they
+ * get their own hooks. The sports query shares its cache entry with
+ * `useSports(true)`; courts live under a sibling key so both are refreshed by the
+ * same `['courts']` invalidation. */
+
+/** Every sport, retired ones included, as the API sends them. */
+export function useManagedSports() {
+  return useQuery({
+    queryKey: [...queryKeys.sports, 'all'],
+    queryFn: () => api.listSports({ include_inactive: true }),
+  })
+}
+
+/**
+ * Every court as the API sends it — rates, hours, images, bookable flag. Narrowed to
+ * the active branch unless `scoped` is false, which the code generator needs: a court
+ * code is unique across the whole academy, not just the branch on screen.
+ */
+export function useManagedCourts(scoped = true) {
+  const inBranch = useBranchSelect(courtRecordBranch)
+  return useQuery({
+    queryKey: ['courts', 'raw'] as const,
+    queryFn: () => api.listCourts(),
+    select: scoped ? inBranch : undefined,
+  })
+}
+
+/** The fixed menu offered when adding a sport. Rarely changes. */
+export function useSportCatalogue() {
+  return useQuery({
+    queryKey: [...queryKeys.sports, 'catalogue'] as const,
+    queryFn: () => api.sportCatalogue(),
+    staleTime: 10 * 60_000,
+  })
+}
+
+/**
+ * Refresh the lists in the background.
+ *
+ * Not returned from the mutation callbacks on purpose: a mutation waits for whatever
+ * its `onSuccess`/`onSettled` hands back, and this used to return the refetches. Every
+ * save then cost the PATCH *plus* a full re-fetch of sports and courts before the
+ * screen reacted — two sequential round trips to a remote database for flipping a
+ * switch. Now the change is shown at once and the lists catch up behind it.
+ */
+function useRefreshFacility() {
+  const qc = useQueryClient()
+  return (which: { sports?: boolean; courts?: boolean }) => {
+    if (which.sports) void qc.invalidateQueries({ queryKey: ['sports'] })
+    if (which.courts) void qc.invalidateQueries({ queryKey: ['courts'] })
+  }
+}
+
+const RAW_COURTS_KEY = ['courts', 'raw'] as const
+
+/**
+ * Create or update a sport. An update is applied to the cached lists immediately and
+ * rolled back if the server refuses it, so switching a sport on or off feels instant.
+ * A create has nothing to show until the server has issued its id, so it waits.
+ */
+export function useSaveSport() {
+  const qc = useQueryClient()
+  const refresh = useRefreshFacility()
+  return useMutation({
+    mutationFn: (vars: { sportId?: string; body: SportBody } | { sportId: string; body: SportPatch }) =>
+      vars.sportId ? api.updateSport(vars.sportId, vars.body as SportPatch) : api.createSport(vars.body as SportBody),
+    onMutate: async (vars) => {
+      if (!vars.sportId) return undefined
+      await qc.cancelQueries({ queryKey: queryKeys.sports })
+      const previous = qc.getQueriesData<SportOut[]>({ queryKey: queryKeys.sports })
+      // `['sports', 'catalogue']` shares the prefix but its rows have no `id`, so the
+      // match below leaves it alone.
+      qc.setQueriesData<SportOut[]>({ queryKey: queryKeys.sports }, (old) =>
+        Array.isArray(old)
+          ? old.map((s) => (s.id === vars.sportId ? ({ ...s, ...vars.body } as SportOut) : s))
+          : old,
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      for (const [key, data] of ctx?.previous ?? []) qc.setQueryData(key, data)
+    },
+    // A rename also changes `sport_name` on every court of the sport.
+    onSettled: (_data, _err, vars) =>
+      refresh({ sports: true, courts: !vars.sportId || 'name' in vars.body }),
+  })
+}
+
+export function useDeleteSport() {
+  const refresh = useRefreshFacility()
+  return useMutation({
+    mutationFn: (sportId: string) => api.deleteSport(sportId),
+    onSuccess: () => refresh({ sports: true }),
+  })
+}
+
+/** Same shape as `useSaveSport`: an update shows at once, a create waits for its id. */
+export function useSaveCourt() {
+  const qc = useQueryClient()
+  const refresh = useRefreshFacility()
+  return useMutation({
+    mutationFn: (vars: { courtId?: string; body: CourtBody } | { courtId: string; body: CourtPatch }) =>
+      vars.courtId ? api.updateCourt(vars.courtId, vars.body as CourtPatch) : api.createCourt(vars.body as CourtBody),
+    onMutate: async (vars) => {
+      if (!vars.courtId) return undefined
+      await qc.cancelQueries({ queryKey: ['courts'] })
+      const previous = qc.getQueryData<CourtWithStatus[]>(RAW_COURTS_KEY)
+      qc.setQueryData<CourtWithStatus[]>(RAW_COURTS_KEY, (old) =>
+        old?.map((c) => (c.id === vars.courtId ? ({ ...c, ...vars.body } as CourtWithStatus) : c)),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(RAW_COURTS_KEY, ctx.previous)
+    },
+    onSettled: () => refresh({ courts: true }),
+  })
+}
+
+export function useDeleteCourt() {
+  const refresh = useRefreshFacility()
+  return useMutation({
+    mutationFn: (courtId: string) => api.deleteCourt(courtId),
+    onSuccess: () => refresh({ courts: true }),
+  })
+}
+
+/** Uploads one image and resolves to its URL — it is not attached to anything yet. */
+export function useUploadImage() {
+  return useMutation({ mutationFn: (file: File) => api.uploadImage(file) })
 }
 
 /**
@@ -314,14 +497,93 @@ export function useCourts(sportId?: string) {
   }
 }
 
+/**
+ * Branches, default first. Closed ones are fetched under their own key, same as
+ * `useSports`: pickers want what is open today, while Settings needs to show — and
+ * let an owner reopen — the ones that are not.
+ */
+export function useBranches(includeInactive = false) {
+  return useQuery({
+    queryKey: queryKeys.branches(includeInactive),
+    queryFn: () => api.listBranches(includeInactive ? { include_inactive: true } : undefined),
+  })
+}
+
+/**
+ * Create or update a branch, then move any courts the form picked onto it.
+ *
+ * One mutation rather than three calls in the component, so a half-finished save
+ * (branch created, courts not moved) is reported as one failure and the form can
+ * stay open on the branch that now exists instead of creating it twice on retry.
+ */
+export function useSaveBranch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      branchId?: string
+      body: Parameters<typeof api.createBranch>[0] & { is_active?: boolean }
+      bringCourtIds: string[]
+    }) => {
+      const { is_active, ...fields } = vars.body
+      const saved = vars.branchId
+        ? await api.updateBranch(vars.branchId, vars.body)
+        : await api.createBranch(fields)
+      for (const courtId of vars.bringCourtIds) await api.moveCourt(courtId, saved.id)
+      // A new branch is always created open; honour a "closed" pick afterwards.
+      if (!vars.branchId && is_active === false) await api.updateBranch(saved.id, { is_active })
+      return saved
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['branches'] })
+      qc.invalidateQueries({ queryKey: ['courts'] })
+    },
+  })
+}
+
+/** Promote a branch to default. */
+export function useMakeDefaultBranch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (branchId: string) => api.updateBranch(branchId, { is_default: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['branches'] }),
+  })
+}
+
+/** The academy's own details — the legal entity above its branches. */
+export function useBusinessSettings() {
+  return useQuery({
+    queryKey: queryKeys.businessSettings,
+    queryFn: () => api.getSettings(),
+  })
+}
+
+export function useSaveBusinessSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.updateSettings>[0]) => api.updateSettings(body),
+    onSuccess: (saved) => {
+      qc.setQueryData(queryKeys.businessSettings, saved)
+      // Branches without a GSTIN of their own print this one on invoices.
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+    },
+  })
+}
+
 /** Returns the page envelope with `items` already mapped to the UI's Booking shape. */
 export function useBookings(page = 1, size = 50) {
+  const branchId = useActiveBranchId()
+  const select = useCallback(
+    <T extends { items: Booking[] }>(res: T): T =>
+      branchId ? { ...res, items: res.items.filter((b) => bookingBranch(b) === branchId) } : res,
+    [branchId],
+  )
   return useQuery({
     queryKey: queryKeys.bookings(page),
     queryFn: async () => {
       const res = await api.listBookings({ page, size })
       return { ...res, items: (res.items ?? []).map(toBooking) }
     },
+    select,
   })
 }
 
@@ -337,6 +599,7 @@ export function useBookingsAwaitingPartnerCancel() {
       const res = await api.listBookings({ awaiting_partner_cancel: true, size: 100 })
       return (res.items ?? []).map(toBooking)
     },
+    select: useBranchSelect(bookingBranch),
     staleTime: 60_000,
   })
 }
@@ -370,6 +633,7 @@ export function useTodaysBookings() {
       // folds `cancelled` into `completed` and the distinction is gone after it.
       return (res.items ?? []).filter((b) => b.status !== 'cancelled').map(toBooking)
     },
+    select: useBranchSelect(bookingBranch),
     // The board shows who is on court right now, so it should not go stale the way
     // the reference data does.
     staleTime: 15_000,
@@ -410,6 +674,7 @@ export function useBookingsInRange(dateFromISO: string, dateToISO: string) {
   return useQuery({
     queryKey: queryKeys.bookingsRange(dateFromISO, dateToISO),
     queryFn: () => fetchAllBookings(dateFromISO, dateToISO),
+    select: useBranchSelect(bookingOutBranch),
     staleTime: 60_000,
   })
 }
@@ -418,10 +683,11 @@ export function useBookingsInRange(dateFromISO: string, dateToISO: string) {
  *  "Available Courts" stat. Kept separate from `useAllCourts`: that hook feeds
  *  screens built around `Court`, whose mapping has no `status` field. */
 export function useCourtStatusSummary() {
+  const branchId = useActiveBranchId()
   return useQuery({
-    queryKey: ['courts', 'status-summary'],
+    queryKey: ['courts', 'status-summary', branchId ?? 'all'],
     queryFn: async () => {
-      const courts = await api.listCourts()
+      const courts = await api.listCourts(branchId ? { branch_id: branchId } : undefined)
       const available = courts.filter((c) => c.status === 'available').length
       const occupied = courts.filter((c) => c.status === 'occupied').length
       const maintenance = courts.filter((c) => c.status === 'maintenance').length
@@ -1046,10 +1312,17 @@ export type StudentOut = components['schemas']['StudentOut']
 export type CoachOut = components['schemas']['CoachOut']
 export type StudentLevelOut = components['schemas']['StudentLevelOut']
 export type PromotionOut = components['schemas']['PromotionOut']
-export type SkillLevel = 'beginner' | 'intermediate' | 'advanced'
+export type StudentRow = components['schemas']['StudentRow']
+export type StudentProfile = components['schemas']['StudentProfile']
+export type AssessmentOut = components['schemas']['AssessmentOut']
+export type AttentionOut = components['schemas']['AttentionOut']
+export type AttentionItem = components['schemas']['AttentionItem']
+export type AttentionFlag = StudentRow['flags'][number]
+export type AcademyOverview = components['schemas']['AcademyOverview']
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'competitive'
 export type AgeBand = 'kids' | 'adults'
 
-export const SKILL_LEVELS: SkillLevel[] = ['beginner', 'intermediate', 'advanced']
+export const SKILL_LEVELS: SkillLevel[] = ['beginner', 'intermediate', 'advanced', 'competitive']
 export const AGE_BANDS: AgeBand[] = ['kids', 'adults']
 
 /** Mirrors `DEFAULT_AGE_BOUNDS` in app/modules/academy/models.py. Shown as
@@ -1112,11 +1385,149 @@ export function useCoaches() {
   return useQuery({ queryKey: queryKeys.coaches, queryFn: () => api.coaches({ size: 100 }) })
 }
 
+/* ── Academy: coaches ──────────────────────────────────────────────────────── */
+
+export type CoachProfile = components['schemas']['CoachProfile']
+export type CoachBatchRow = components['schemas']['CoachBatchRow']
+export type CoachReviewOut = components['schemas']['CoachReviewOut']
+export type CoachPayoutOut = components['schemas']['CoachPayoutOut']
+export type CoachEarnings = components['schemas']['CoachEarnings']
+export type Payroll = components['schemas']['Payroll']
+export type PayrollRow = components['schemas']['PayrollRow']
+export type CoachRemoval = components['schemas']['CoachRemoval']
+
+/** Everything that shows a coach: the list, a profile, the payroll, and the batches
+ *  and students that carry a coach's name. A change to a coach, a batch assignment or a
+ *  payout can move several at once, so they travel as a set. */
+function invalidateCoaches(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.coaches })
+  qc.invalidateQueries({ queryKey: ['coach-profile'] })
+  qc.invalidateQueries({ queryKey: ['payroll'] })
+  qc.invalidateQueries({ queryKey: ['batches'] })
+  qc.invalidateQueries({ queryKey: ['programs'] })
+  invalidateAcademy(qc)
+}
+
+export function useCoachProfile(coachId: string | null) {
+  return useQuery({
+    queryKey: ['coach-profile', coachId ?? ''] as const,
+    queryFn: () => api.coachProfile(coachId!),
+    enabled: Boolean(coachId),
+  })
+}
+
+export function useSaveCoach() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId?: string; body: Parameters<typeof api.createCoach>[0] }) =>
+      vars.coachId ? api.updateCoach(vars.coachId, vars.body) : api.createCoach(vars.body),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+/** Reactivate (or deactivate) a coach without re-sending the rest of the form. */
+export function useSetCoachStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId: string; status: 'active' | 'inactive' | 'on-leave' }) =>
+      api.updateCoach(vars.coachId, { status: vars.status }),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+export function useRemoveCoach() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId: string; reassignTo?: string }) =>
+      api.removeCoach(vars.coachId, vars.reassignTo),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+export function useAssignBatches() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId: string; batchIds: string[]; unassign?: boolean }) =>
+      vars.unassign
+        ? api.unassignBatches(vars.coachId, vars.batchIds)
+        : api.assignBatches(vars.coachId, vars.batchIds),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+export function useAddCoachReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId: string; body: Parameters<typeof api.addCoachReview>[1] }) =>
+      api.addCoachReview(vars.coachId, vars.body),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+export function useDeleteCoachReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reviewId: string) => api.deleteCoachReview(reviewId),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+/** One month's earnings for every coach. Manager and above — pass `enabled: false`
+ *  for anyone else so the request is never made. Leave `month` undefined for the
+ *  academy's current month: the server knows which that is in the academy's own
+ *  timezone, and the browser's clock may not agree. */
+export function usePayroll(month: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['payroll', month ?? 'current'] as const,
+    queryFn: () => api.payroll(month),
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** What one coach would be paid for a month, itemised — read by the payout form so
+ *  the amount on screen is the one the server will record. */
+export function useCoachEarnings(coachId: string | null, month: string) {
+  return useQuery({
+    queryKey: ['payroll', 'coach', coachId ?? '', month] as const,
+    queryFn: () => api.coachEarnings(coachId!, month),
+    enabled: Boolean(coachId),
+  })
+}
+
+export function useRecordPayout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { coachId: string; body: Parameters<typeof api.recordPayout>[1] }) =>
+      api.recordPayout(vars.coachId, vars.body),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+export function useDeletePayout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payoutId: string) => api.deletePayout(payoutId),
+    onSuccess: () => invalidateCoaches(qc),
+  })
+}
+
+/** Everything on the Academy screen that is derived from students, enrolments,
+ *  registers or payments. A change to any one of them can move the table, the
+ *  attention lists, a profile and the summary at once, so they travel as a set. */
+function invalidateAcademy(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['students'] })
+  qc.invalidateQueries({ queryKey: ['roster'] })
+  qc.invalidateQueries({ queryKey: ['attention'] })
+  qc.invalidateQueries({ queryKey: ['student-profile'] })
+  qc.invalidateQueries({ queryKey: queryKeys.academyOverview })
+}
+
 export function useCreateStudent() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: Parameters<typeof api.createStudent>[0]) => api.createStudent(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['students'] }),
+    onSuccess: () => invalidateAcademy(qc),
   })
 }
 
@@ -1135,7 +1546,7 @@ export function useEnrolStudent() {
   return useMutation({
     mutationFn: (body: Parameters<typeof api.enrolStudent>[0]) => api.enrolStudent(body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['students'] })
+      invalidateAcademy(qc)
       qc.invalidateQueries({ queryKey: ['batches'] })
       qc.invalidateQueries({ queryKey: ['invoices'] })
     },
@@ -1166,7 +1577,58 @@ export function usePromoteStudent() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.studentLevels(vars.studentId) })
       qc.invalidateQueries({ queryKey: queryKeys.studentPromotions(vars.studentId) })
+      // A promotion moves the level shown in the table and resets the clock on
+      // "ready for promotion".
+      invalidateAcademy(qc)
     },
+  })
+}
+
+/** The students table. The previous page stays on screen while the next loads, so
+ *  changing a filter does not blank the table and jolt the layout. */
+export function useRoster(query: RosterQuery) {
+  return useQuery({
+    queryKey: queryKeys.roster(query),
+    queryFn: () => api.roster(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useAttention() {
+  return useQuery({ queryKey: queryKeys.attention, queryFn: () => api.attention() })
+}
+
+export function useAcademyOverview() {
+  return useQuery({ queryKey: queryKeys.academyOverview, queryFn: () => api.academyOverview() })
+}
+
+export function useStudentProfile(studentId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.studentProfile(studentId ?? ''),
+    queryFn: () => api.studentProfile(studentId!),
+    enabled: Boolean(studentId),
+  })
+}
+
+export function useAddAssessment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { studentId: string; body: AssessmentBody }) =>
+      api.addAssessment(vars.studentId, vars.body),
+    onSuccess: () => invalidateAcademy(qc),
+  })
+}
+
+/** Upload, then attach: the upload endpoint only returns a URL. Two calls in one
+ *  mutation so a failure at either step is one error on the screen. */
+export function useUploadStudentPhoto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { studentId: string; file: File }) => {
+      const uploaded = await api.uploadImage(vars.file)
+      return api.updateStudent(vars.studentId, { photo_url: uploaded.url })
+    },
+    onSuccess: () => invalidateAcademy(qc),
   })
 }
 
@@ -1191,5 +1653,35 @@ export function useCreateCustomer() {
   return useMutation({
     mutationFn: (body: Parameters<typeof api.createCustomer>[0]) => api.createCustomer(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  })
+}
+
+
+/* ── Staff ─────────────────────────────────────────────────────────────────── */
+
+export type StaffOut = components['schemas']['UserOut']
+
+export function useStaff(search?: string) {
+  return useQuery({
+    queryKey: ['staff', search ?? ''] as const,
+    queryFn: () => api.staff({ size: 100, ...(search ? { search } : {}) }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreateStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createStaff>[0]) => api.createStaff(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
+  })
+}
+
+export function useUpdateStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { userId: string; body: Parameters<typeof api.updateStaff>[1] }) =>
+      api.updateStaff(vars.userId, vars.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['staff'] }),
   })
 }

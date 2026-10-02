@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { type Draft } from '../../data/booking'
-import { useCourts, useSports } from '../../api/hooks'
+import { useBranches, useCourts, useSports } from '../../api/hooks'
 import { asset } from '../../lib/asset'
 
 const arrowRight = asset('dashboard/arrow-right-01.svg')
@@ -48,6 +48,11 @@ export default function SelectSportCourt({
 }) {
   const sportsQuery = useSports()
   const courtsQuery = useCourts(draft.sportId || undefined)
+  const { data: branches } = useBranches()
+  // A branch filter only earns its place once there is more than one to choose from.
+  const [branchFilter, setBranchFilter] = useState<string>('all')
+  const multiBranch = (branches?.length ?? 0) > 1
+  const branchNames = new Map((branches ?? []).map((b) => [b.id, b.name]))
 
   const pickSport = (sportId: string) => {
     setDraft({ sportId, courtId: null, startHour: null })
@@ -90,7 +95,9 @@ export default function SelectSportCourt({
   }
 
   const sport = sportsQuery.data?.find((s) => s.id === draft.sportId)
-  const courts = courtsQuery.data ?? []
+  const courts = (courtsQuery.data ?? []).filter(
+    (c) => !multiBranch || branchFilter === 'all' || c.branchId === branchFilter,
+  )
 
   return (
     <div className="flex w-full flex-col gap-5">
@@ -98,6 +105,24 @@ export default function SelectSportCourt({
         <p className="text-[clamp(1rem,1.3vw,1.125rem)] font-medium text-ink">{sport?.name}</p>
         <OfflineBadge />
       </div>
+
+      {multiBranch && (
+        <div className="flex flex-wrap gap-2">
+          {[{ id: 'all', name: 'All branches' }, ...(branches ?? [])].map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setBranchFilter(b.id)}
+              aria-pressed={branchFilter === b.id}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                branchFilter === b.id ? 'bg-ink text-white' : 'bg-surface text-slate hover:text-ink'
+              }`}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {courtsQuery.isPending || courtsQuery.error || courts.length === 0 ? (
         <Status error={courtsQuery.error} empty={!courtsQuery.isPending && courts.length === 0} what="courts" />
@@ -124,6 +149,11 @@ export default function SelectSportCourt({
                   </p>
                 </div>
                 <p className="text-[clamp(0.875rem,1vw,0.9375rem)] font-medium text-muted">{court.surface}</p>
+                {multiBranch && court.branchId && (
+                  <p className="text-[clamp(0.8125rem,0.95vw,0.875rem)] font-medium text-ink">
+                    {branchNames.get(court.branchId)}
+                  </p>
+                )}
                 <p className="text-[clamp(0.8125rem,0.95vw,0.875rem)] text-muted">{court.amenities.join(' · ')}</p>
               </button>
 

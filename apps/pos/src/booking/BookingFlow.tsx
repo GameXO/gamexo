@@ -10,7 +10,14 @@ import { traySelections } from './offers'
 import PaymentStep from './steps/PaymentStep'
 import Confirmation from './steps/Confirmation'
 import { ApiError } from '../api/client'
-import { useCreateBooking, useInvoiceBooking, useRecordPayment, type BookingDetail, type InvoiceOut } from '../api/hooks'
+import {
+  useCreateBooking,
+  useInvoiceBooking,
+  usePosBusinessName,
+  useRecordPayment,
+  type BookingDetail,
+  type InvoiceOut,
+} from '../api/hooks'
 import { startsAtISO } from '../lib/format'
 import { buildConfirmedInvoice } from './invoice'
 import { emptyDraft, type Draft } from './types'
@@ -42,6 +49,7 @@ function ProgressDots({ step }: { step: number }) {
 }
 
 export default function BookingFlow({ onDone, initialCourtId }: { onDone: () => void; initialCourtId?: string }) {
+  const businessName = usePosBusinessName()
   const [step, setStep] = useState(initialCourtId ? 2 : 1)
   const [courtListOpen, setCourtListOpen] = useState(!!initialCourtId)
   const [draft, setDraftState] = useState<Draft>(() =>
@@ -132,7 +140,7 @@ export default function BookingFlow({ onDone, initialCourtId }: { onDone: () => 
   }
 
   if (result) {
-    const invoice = buildConfirmedInvoice(result.booking, draft, result.invoice)
+    const invoice = buildConfirmedInvoice(result.booking, draft, result.invoice, businessName)
     return (
       <div className="flex h-full w-full flex-col overflow-hidden">
         <TopBar onLogoClick={reset} />

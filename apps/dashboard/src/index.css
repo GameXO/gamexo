@@ -3,24 +3,37 @@
 @import "@fontsource/geist-sans/400.css";
 @import "@fontsource/geist-sans/500.css";
 @import "@fontsource/geist-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/700.css";
 
+/*
+ * Design language: flat, bordered, quiet — a working interface rather than a
+ * decorated one. White surfaces on a light-grey page, hairline borders, tight
+ * grotesk type with slightly negative tracking, and a single accent used for the
+ * one action that matters. The colours are still the academy's own (`--color-lime`
+ * and `--color-lime-ink` are what `theme/brand.ts` recolours per academy); only the
+ * system around them — type, density, borders, motion — follows this language.
+ */
 @theme {
   --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Same face as the body: the display weight is set by `.font-display` below
+     rather than by a second family, which is what keeps headings and body reading
+     as one voice. */
+  --font-display: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-page: #f2f2f2;
-  --color-surface: #fdfdfd;
-  --color-surface-muted: #f7f7f7;
+  /* Near-white page, white cards, and borders that do all the separating. The
+     neutrals carry no blue: warm greys read as paper, cool ones as a form. */
+  --color-page: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f3;
+  /* Hover, and the active row in navigation and lists. */
+  --color-hover: #f1f1ef;
 
-  --color-ink: #1a1a1a;
-  --color-slate: #525866;
-  --color-muted: #8c8c8c;
+  --color-ink: #232323;
+  --color-slate: #5a5a58;
+  --color-muted: #868684;
 
-  --color-border-soft: #e0e0e0;
-  --color-border-card: #e7ebf0;
-  --color-border-input: #ececec;
+  --color-border-soft: #e7e7e4;
+  --color-border-card: #e7e7e4;
+  --color-border-input: #e2e2df;
 
   --color-lime: #b5e770;
   --color-lime-ink: #06393c;
@@ -31,6 +44,95 @@
 
   --color-bone: #e9e5dc;
   --color-flame: #f58161;
+
+  /* No shadows anywhere. These stay defined, as `none`, so every `shadow-card`,
+     `shadow-control` and `shadow-pop` already in the app resolves to nothing instead
+     of to a missing variable. Surfaces are told apart by their border and fill. */
+  --shadow-card: none;
+  --shadow-control: none;
+  --shadow-pop: none;
+
+  /* Motion. One curve everywhere — a fast start that settles softly — and three
+     durations: feedback (hover, press), movement (menus, drawers) and ambience. */
+  --ease-spring: cubic-bezier(0.19, 1, 0.22, 1);
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 2000ms;
+
+  /* Type scale, in pixels, not rem. Pixels so that changing the root size (above) moves
+     spacing without silently moving the type, and so the scale can be read off the
+     page. 11px is the smallest step; nothing in the app is set below 10px. Line heights
+     keep Tailwind's ratios. */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 21px;
+  --text-3xl: 27px;
+  --text-4xl: 33px;
+  --text-5xl: 44px;
+
+  --animate-section-in: section-in 260ms var(--ease-spring);
+  --animate-fade-in: fade-in 200ms var(--ease-spring);
+  --animate-slide-in: slide-in-right 340ms var(--ease-spring);
+  --animate-pop: pop-in 200ms var(--ease-spring);
+  --animate-rise: rise-in 260ms var(--ease-spring);
+
+  @keyframes section-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0.6;
+      transform: translateX(32px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+html {
+  /* Spacing, radii and row heights are in rem, so this is what sets how roomy the
+     interface is. Type no longer follows it — the scale below is in pixels. */
+  font-size: 15px;
 }
 
 html,
@@ -44,12 +146,127 @@ body {
   background: var(--color-page);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 13px;
+  /* A touch tighter than default, as the display faces in this language are. */
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/*
+ * Unlayered on purpose. Tailwind's utilities live in a cascade layer, and unlayered
+ * rules beat every layer — so these set the *house* values for headings and for
+ * interaction, and a one-off still overrides them by being more specific (an id, an
+ * inline style) rather than by a utility class.
+ */
+.font-display {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+/* Medium is the heaviest weight this language uses for emphasis: figures, headings
+   and labels are 500, and 600 is kept for the rare thing that must shout. Remapping
+   the two utilities lowers the whole app at once instead of editing hundreds of
+   class lists. */
+.font-semibold {
+  font-weight: 500;
+}
+.font-bold {
+  font-weight: 600;
+}
+
+/* No shadows. A surface is separated by its border and its fill; anything that
+   still asks for a shadow — there are a few dozen, written before this rule — gets
+   none. Rings are a different property and are left alone. */
+[class*="shadow-"] {
+  box-shadow: none !important;
+}
+
+/* Feedback: everything you can press eases between states on the same curve. */
+button,
+a,
+input,
+select,
+textarea,
+summary,
+[role="tab"],
+[role="option"],
+[role="menuitem"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, translate, scale;
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-spring);
+}
+
+button:not(:disabled),
+[role="tab"],
+[role="option"] {
+  cursor: pointer;
+}
+
+/* A very small press, so a click registers before the result does. */
+button:not(:disabled):active,
+[role="tab"]:active {
+  scale: 0.985;
+  transition-duration: var(--duration-fast);
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Keyboard focus: a visible ring on controls, a soft halo on fields (which already
+   change their border on focus). */
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--color-lime-ink);
+  outline-offset: 2px;
+}
+
+/* Fields already change their border on focus; this adds a thin outline so the
+   state survives on a field whose border is the same colour as its surroundings.
+   `.no-ring` is for the borderless fields that live inside a bordered shell, where
+   the shell is the control and an outline around the bare input would be a second
+   box inside it. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-lime-ink) 30%, transparent);
+  outline-offset: 0;
+}
+
+.no-ring:focus-visible {
+  outline: none;
+}
+
+/* Loading: a soft sweep rather than a blink. Replaces Tailwind's opacity pulse for
+   every skeleton in the app without touching any of them. */
+@keyframes shimmer {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+.animate-pulse {
+  animation: shimmer 1.6s linear infinite;
+  background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.7) 50%, transparent 70%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-lime) 55%, transparent);
 }
 
 ::-webkit-scrollbar {
@@ -62,8 +279,28 @@ body {
   border-radius: 8px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: #c4c4c4;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Anyone who asks for less motion gets none of the above — state changes still
+   happen, they just stop animating. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-pulse {
+    background-image: none;
+  }
 }
 
 @media print {

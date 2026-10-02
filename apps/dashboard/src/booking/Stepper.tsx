@@ -29,14 +29,14 @@ export default function Stepper({
               >
                 <p
                   className={`font-semibold leading-none ${active ? 'text-white' : done ? 'text-lime-ink' : 'text-muted'}`}
-                  style={{ fontSize: 'clamp(0.65rem, 1.1vw, 0.8125rem)' }}
+                  style={{ fontSize: 'clamp(11px, 1.1vw, 11px)' }}
                 >
                   {step}
                 </p>
               </div>
               <p
                 className={`hidden whitespace-nowrap leading-[1.2] sm:inline ${active ? 'font-semibold text-ink' : done ? 'text-slate' : 'text-muted'}`}
-                style={{ fontSize: 'clamp(0.75rem, 1.3vw, 1rem)' }}
+                style={{ fontSize: 'clamp(11px, 1.3vw, 14px)' }}
               >
                 {label}
               </p>

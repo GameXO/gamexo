@@ -1,4 +1,3 @@
-import { FACILITY_PROFILE } from '../facility/facilityData'
 import { courtById, hour12, money, priceDraft, sportById, toISO, toPaise, type Draft } from '../data/booking'
 import type { BookingQuote } from '../api/hooks'
 
@@ -20,6 +19,53 @@ export function formalDate(iso: string) {
 
 const num = (v: string | number | null | undefined) => Number(v ?? 0)
 
+/** Who a bill is from: the business, and the branch it was raised at. Built from the
+ *  server's own records (see `useIssuer`) — nothing here is a constant of the bundle. */
+export type Issuer = {
+  /** The business — the legal entity. */
+  name: string
+  /** The site the booking was taken for; null when the academy has just the one and
+   *  has never named it apart from the business. */
+  branchName: string | null
+  addressLine: string
+  phone: string | null
+  /** Already resolved: the branch's own, else the business's. */
+  gstin: string | null
+}
+
+type BranchLike = {
+  name: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+  phone?: string | null
+  gstin?: string | null
+  effective_gstin?: string | null
+}
+
+export const NO_ISSUER: Issuer = { name: '', branchName: null, addressLine: '', phone: null, gstin: null }
+
+/** "Survey 42, Kondapur, Hyderabad, Telangana 500084" — whatever of it exists. */
+export const addressOf = (b: Pick<BranchLike, 'address' | 'city' | 'state' | 'pincode'>) =>
+  [b.address, b.city, [b.state, b.pincode].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+
+export function issuerFrom(
+  business: { name: string; phone?: string | null; address?: string | null; city?: string | null; gstin?: string | null },
+  branch?: BranchLike | null,
+): Issuer {
+  const branchAddress = branch ? addressOf(branch) : ''
+  return {
+    name: business.name,
+    // Hidden when it just repeats the business name — a single-site academy whose
+    // only branch is called after itself should not print its name twice.
+    branchName: branch && branch.name.trim().toLowerCase() !== business.name.trim().toLowerCase() ? branch.name : null,
+    addressLine: branchAddress || [business.address, business.city].filter(Boolean).join(', '),
+    phone: branch?.phone || business.phone || null,
+    gstin: branch?.effective_gstin ?? branch?.gstin ?? business.gstin ?? null,
+  }
+}
+
 /**
  * `quote` is the server's price for this draft. When it is present the invoice
  * bills from it, because peak and weekend rating happen in the backend and the
@@ -30,7 +76,13 @@ const num = (v: string | number | null | undefined) => Number(v ?? 0)
  */
 export function buildInvoice(
   draft: Draft,
-  opts: { bookingId?: string | null; quote?: BookingQuote | null } = {},
+  opts: {
+    bookingId?: string | null
+    quote?: BookingQuote | null
+    issuer?: Issuer | null
+    /** "Office Desk" for anything booked from this app — see `sourceLabel`. */
+    source?: string | null
+  } = {},
 ) {
   const court = draft.courtId ? courtById(draft.courtId) : null
   const sport = draft.sportId ? sportById(draft.sportId) : null
@@ -78,7 +130,8 @@ export function buildInvoice(
   ]
 
   return {
-    facility: FACILITY_PROFILE,
+    facility: opts.issuer ?? NO_ISSUER,
+    source: opts.source ?? null,
     bookingId: opts.bookingId ?? null,
     court,
     sport,
@@ -105,6 +158,10 @@ export type InvoiceData = ReturnType<typeof buildInvoice>
 export function invoiceSummaryText(inv: InvoiceData) {
   const lines = [
     inv.facility.name,
+    ...(inv.facility.branchName ? [inv.facility.branchName] : []),
+    ...(inv.facility.addressLine ? [inv.facility.addressLine] : []),
+    ...(inv.facility.gstin ? [`GSTIN ${inv.facility.gstin}`] : []),
+    ...(inv.source ? [`Source: ${inv.source}`] : []),
     inv.bookingId ? `Booking ${inv.bookingId} · Confirmed` : 'Provisional invoice',
     `${inv.sport?.name ?? ''} · ${inv.court?.name ?? ''}`,
     `${inv.dateLabel}${inv.timeRange ? `, ${inv.timeRange}` : ''}`,

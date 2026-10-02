@@ -156,7 +156,7 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
                 }`}
               >
                 {seg.label} · {formatINRCompact(value)}
-                <span className="block text-[10px] font-normal text-white/70">{periodLabel}</span>
+                <span className="block text-[11px] font-normal text-white/70">{periodLabel}</span>
               </div>
             </div>
           ) : null,
@@ -166,7 +166,7 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
   )
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-6 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5">
+    <div className="flex h-full flex-1 flex-col items-start gap-6 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
       <div className="flex items-center gap-2.5 py-[9px]">
         <img src={chartPie} alt="" className="size-5" />
         <p className="text-sm font-medium text-ink">
@@ -176,7 +176,7 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
 
       <div className="flex w-full flex-col items-start gap-1">
         <div className="flex items-baseline gap-2.5">
-          <p className="text-[28px] font-semibold leading-[1.2] tracking-[0.28px] text-ink">
+          <p className="text-[27px] font-semibold leading-[1.2] tracking-[0.28px] text-ink">
             {formatINRCompact(achieved)}
           </p>
           <span

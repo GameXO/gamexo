@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, mo
 
 from app.modules.booking.models import (
     BookingEventKind,
+    BookingSource,
     BookingStatus,
     BookingType,
     EquipmentCondition,
@@ -22,10 +23,16 @@ from app.modules.booking.models import (
     PaymentStatus,
 )
 
+from app.modules.branches.schemas import BranchInfo
+
 ORM = ConfigDict(from_attributes=True)
 
 
 # ── Sport ───────────────────────────────────────────────────────────────────
+
+
+#: Photos on a sport's own page. Interface policy, like MAX_COURT_IMAGES.
+MAX_SPORT_IMAGES = 8
 
 
 class SportBase(BaseModel):
@@ -39,6 +46,9 @@ class SportBase(BaseModel):
     price_weekend: Decimal = Field(ge=0)
     is_active: bool = True
     display_order: int = 0
+    image_url: str | None = Field(default=None, max_length=2048)
+    description: str | None = Field(default=None, max_length=4000)
+    images: list[str] = Field(default_factory=list, max_length=MAX_SPORT_IMAGES)
 
 
 class SportCreate(SportBase):
@@ -56,6 +66,9 @@ class SportUpdate(BaseModel):
     price_weekend: Decimal | None = Field(default=None, ge=0)
     is_active: bool | None = None
     display_order: int | None = None
+    image_url: str | None = Field(default=None, max_length=2048)
+    description: str | None = Field(default=None, max_length=4000)
+    images: list[str] | None = Field(default=None, max_length=MAX_SPORT_IMAGES)
 
 
 class SportOut(SportBase):
@@ -114,10 +127,13 @@ class CourtBase(BaseModel):
 
 class CourtCreate(CourtBase):
     code: str = Field(min_length=1, max_length=50)
+    #: Which site the court is at. Omit for the academy's default branch.
+    branch_id: uuid.UUID | None = None
 
 
 class CourtUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
+    branch_id: uuid.UUID | None = None
     sport_id: uuid.UUID | None = None
     hourly_rate: Decimal | None = Field(default=None, ge=0)
     peak_rate: Decimal | None = Field(default=None, ge=0)
@@ -145,6 +161,7 @@ class CourtOut(CourtBase):
     model_config = ORM
     id: uuid.UUID
     code: str
+    branch_id: uuid.UUID
 
 
 class CourtWithStatus(CourtOut):
@@ -469,6 +486,8 @@ class BookingOut(BaseModel):
     customer_phone: str | None
     sport_id: uuid.UUID
     court_id: uuid.UUID
+    #: The site it was played at, copied from the court when it was booked.
+    branch_id: uuid.UUID
     starts_at: datetime
     ends_at: datetime
     duration_min: int
@@ -490,6 +509,9 @@ class BookingOut(BaseModel):
     #: counter, the dashboard, or the seed. Denormalised from the partner at creation
     #: so the answer survives the integration being revoked or deleted.
     source_platform: str | None = None
+    #: Which desk took it: `counter` (POS tablet), `office_desk` (dashboard) or
+    #: `partner`. NULL on bookings that predate this and could not be attributed.
+    booked_via: BookingSource | None = None
     #: That platform's own booking id, for reconciling their ledger against ours.
     external_ref: str | None = None
     #: The platform's *second* id where it issues one (Playo's `playoBookingId`,
@@ -510,6 +532,8 @@ class BookingOut(BaseModel):
 class BookingDetail(BookingOut):
     sport_name: str | None = None
     court_name: str | None = None
+    #: Where it was played, as it prints on the bill (GSTIN already resolved).
+    branch: BranchInfo | None = None
 
 
 class BookingEventOut(BaseModel):

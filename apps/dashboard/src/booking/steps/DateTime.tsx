@@ -48,7 +48,7 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
             >
               <span className={`text-[11px] font-medium ${active ? 'text-white/60' : 'text-muted'}`}>{d.label}</span>
               <span className="text-[clamp(1rem,1.4vw,1.0625rem)] font-bold leading-none">{d.dayNum}</span>
-              <span className={`text-[10px] font-medium uppercase tracking-wide ${active ? 'text-white/50' : 'text-muted'}`}>
+              <span className={`text-[11px] font-medium uppercase tracking-wide ${active ? 'text-white/50' : 'text-muted'}`}>
                 {d.monthShort}
               </span>
             </button>
@@ -106,7 +106,7 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
             <p className="text-[clamp(1.375rem,2vw,1.5rem)] font-bold leading-none text-ink">{money(totals.slotTotal)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[13px] text-slate">Play for</span>
+            <span className="text-[12px] text-slate">Play for</span>
             {[1, 2, 3].map((h) => {
               const active = draft.hours === h
               const allowed = h <= maxHours
@@ -130,7 +130,7 @@ export default function DateTime({ draft, setDraft }: { draft: Draft; setDraft: 
             })}
           </div>
           {maxHours < 3 && (
-            <p className="text-[12px] text-muted">
+            <p className="text-[11px] text-muted">
               The next hour is taken, so this slot runs up to {maxHours} hour{maxHours > 1 ? 's' : ''}.
             </p>
           )}

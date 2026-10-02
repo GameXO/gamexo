@@ -5,7 +5,7 @@ import type { InvoiceData } from './invoice'
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-0.5 text-sm text-ink">{value}</p>
     </div>
   )
@@ -18,7 +18,10 @@ export default function BookingTicket({ invoice, className = '' }: { invoice: In
     <div className={`flex w-full flex-col gap-5 rounded-2xl bg-white p-6 font-mono ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-muted">{invoice.facility.name}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            {invoice.facility.name}
+            {invoice.facility.branchName ? ` · ${invoice.facility.branchName}` : ''}
+          </p>
           <p className="font-sans text-xl font-semibold text-ink">
             {invoice.sport?.name} · {invoice.court?.name}
           </p>

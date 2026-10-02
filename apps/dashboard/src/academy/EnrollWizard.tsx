@@ -222,7 +222,7 @@ export default function EnrollWizard({
         ) : (
           <div className="flex flex-col gap-5 px-5 py-5">
             <section className="flex flex-col gap-3">
-              <p className="text-[13px] font-medium text-ink">Who is paying</p>
+              <p className="text-[12px] font-medium text-ink">Who is paying</p>
               <input
                 className={inputClass}
                 placeholder="Phone (10 digits)"
@@ -263,7 +263,7 @@ export default function EnrollWizard({
             </section>
 
             <section className="flex flex-col gap-3">
-              <p className="text-[13px] font-medium text-ink">Programme</p>
+              <p className="text-[12px] font-medium text-ink">Programme</p>
               <select
                 className={inputClass}
                 value={sportId}

@@ -201,7 +201,7 @@ export default function CourtPanel({
                       className="rounded-lg border border-border-input bg-white px-2.5 py-1.5 text-xs font-medium text-ink disabled:opacity-30"
                     >
                       + {item.name}
-                      <span className="ml-1 text-[10px] text-muted">({remaining})</span>
+                      <span className="ml-1 text-[11px] text-muted">({remaining})</span>
                     </button>
                   )
                 })}

@@ -6,20 +6,25 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
 from app.api_utils import Page, Params, get_or_404, paginate
-from app.auth.deps import RequireKiosk, RequireManager, RequireStaff
-from app.core.errors import ConflictError
-from app.modules.academy import service
+from app.auth.deps import Principal, RequireAdmin, RequireKiosk, RequireManager, RequireStaff
+from app.core.security import ROLE_HIERARCHY, Role
+from app.core.errors import ConflictError, InvalidInputError
+from app.modules.academy import insights, payroll, service
 from app.modules.academy.models import (
     Attendance,
     AttendanceStatus,
     Batch,
+    BatchStatus,
     Coach,
     CoachingSession,
+    CoachPayout,
+    CoachReview,
     CoachSport,
     CoachStatus,
     CoachType,
@@ -27,6 +32,8 @@ from app.modules.academy.models import (
     Program,
     SessionStatus,
     Student,
+    SkillLevel,
+    StudentAssessment,
     StudentEnrollment,
     StudentPromotion,
     StudentSportLevel,
@@ -34,17 +41,30 @@ from app.modules.academy.models import (
 )
 from app.modules.academy.schemas import (
     AcademyOverview,
+    AssessmentCreate,
+    AssessmentOut,
     AttendanceBulkMark,
     AttendanceOut,
+    AttentionOut,
     BatchCreate,
     BatchOut,
+    BatchAssign,
     BatchUpdate,
     CoachCreate,
+    CoachEarnings,
     CoachOut,
+    CoachPayoutOut,
+    CoachProfile,
+    CoachRemoval,
+    CoachReviewCreate,
+    CoachReviewOut,
     CoachUpdate,
     EnrollmentCreate,
     EnrollmentOut,
     EnrollmentWithInvoice,
+    PayoutCreate,
+    Payroll,
+    PayrollRow,
     ProgramCreate,
     ProgramOut,
     ProgramUpdate,
@@ -58,8 +78,11 @@ from app.modules.academy.schemas import (
     StudentDetail,
     StudentLevelOut,
     StudentOut,
+    StudentProfile,
+    StudentRow,
     StudentUpdate,
 )
+from app.modules.booking.models import Sport
 from app.modules.booking.pricing import money
 from app.modules.booking.service import initials
 from app.modules.finance.models import CounterKind, Invoice, Payment
@@ -71,6 +94,15 @@ router = APIRouter(prefix="/academy", tags=["academy"])
 
 
 # ── Coaches ─────────────────────────────────────────────────────────────────
+
+
+def _can_see_pay(principal: Principal) -> bool:
+    """Salaries, rates and payroll are for a manager or above — not the front desk."""
+    if principal.is_platform_admin:
+        return True
+    return principal.role is not None and (
+        ROLE_HIERARCHY[principal.role] >= ROLE_HIERARCHY[Role.MANAGER]
+    )
 
 
 async def _coach_out(db, coach: Coach, sports: dict, workload: dict) -> CoachOut:
@@ -88,7 +120,7 @@ async def _coach_out(db, coach: Coach, sports: dict, workload: dict) -> CoachOut
 @router.get("/coaches", response_model=Page[CoachOut], summary="List coaches")
 async def list_coaches(
     db: Db,
-    _: RequireStaff,
+    principal: RequireStaff,
     params: Params,
     coach_status: Annotated[CoachStatus | None, Query(alias="status")] = None,
     coach_type: Annotated[CoachType | None, Query(alias="type")] = None,
@@ -115,8 +147,12 @@ async def list_coaches(
     workload = await service.coach_workload(db)
     total = int(total or 0)
 
+    items = [await _coach_out(db, coach, sports, workload) for coach in rows]
+    if not _can_see_pay(principal):
+        items = [payroll.redact_pay(item) for item in items]
+
     return Page[CoachOut](
-        items=[await _coach_out(db, coach, sports, workload) for coach in rows],
+        items=items,
         total=total,
         page=params.page,
         size=params.size,
@@ -181,6 +217,348 @@ async def update_coach(
     sports = await service.coach_sport_map(db)
     workload = await service.coach_workload(db)
     return await _coach_out(db, coach, sports, workload)
+
+
+@router.get(
+    "/coaches/{coach_id}/profile",
+    response_model=CoachProfile,
+    summary="A coach's page: classes, students, ratings, reviews, attendance and pay",
+    description=(
+        "Everything is derived when asked. The `pay` block — salary, this month's "
+        "earnings and payout history — is only present for a manager or admin; for "
+        "anyone below, the coach's pay fields are zeroed as well."
+    ),
+)
+async def coach_profile(coach_id: uuid.UUID, db: Db, principal: RequireStaff) -> CoachProfile:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    tz, now, today = await _local_clock(db)
+    sports = await service.coach_sport_map(db)
+    workload = await service.coach_workload(db)
+    out = await _coach_out(db, coach, sports, workload)
+    return await payroll.build_profile(
+        db, coach, out, tz=tz, now=now, today=today, with_pay=_can_see_pay(principal)
+    )
+
+
+@router.post(
+    "/coaches/{coach_id}/assign",
+    response_model=CoachOut,
+    summary="Put batches under this coach",
+    description=(
+        "Takes the batches from whoever had them. Their active students and their "
+        "upcoming sessions move too; past sessions and finished enrolments stay with "
+        "the coach who actually taught them."
+    ),
+)
+async def assign_batches(
+    coach_id: uuid.UUID, payload: BatchAssign, db: Db, _: RequireManager
+) -> CoachOut:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    if coach.status is not CoachStatus.ACTIVE:
+        raise InvalidInputError(f"{coach.name} is {coach.status.value}; make them active first.")
+
+    ids = set(payload.batch_ids)
+    batches = (await db.execute(select(Batch).where(Batch.id.in_(ids)))).scalars().all()
+    if len(batches) != len(ids):
+        raise InvalidInputError("One or more of those batches no longer exists.")
+    for batch in batches:
+        await service.set_batch_coach(db, batch, coach.id)
+    await db.flush()
+    return await _coach_out(
+        db, coach, await service.coach_sport_map(db), await service.coach_workload(db)
+    )
+
+
+@router.post(
+    "/coaches/{coach_id}/unassign",
+    response_model=CoachOut,
+    summary="Take batches off this coach",
+    description="Leaves them with no coach until another is assigned.",
+)
+async def unassign_batches(
+    coach_id: uuid.UUID, payload: BatchAssign, db: Db, _: RequireManager
+) -> CoachOut:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    batches = (
+        (
+            await db.execute(
+                select(Batch).where(Batch.id.in_(set(payload.batch_ids)), Batch.coach_id == coach.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for batch in batches:
+        await service.set_batch_coach(db, batch, None)
+    await db.flush()
+    return await _coach_out(
+        db, coach, await service.coach_sport_map(db), await service.coach_workload(db)
+    )
+
+
+async def _has_history(db, coach: Coach) -> bool:
+    """Whether anything on record points at this coach — which decides delete vs archive."""
+    for model in (CoachingSession, CoachPayout, CoachReview, StudentEnrollment, Batch):
+        found = await db.scalar(select(model.id).where(model.coach_id == coach.id).limit(1))
+        if found is not None:
+            return True
+    return False
+
+
+@router.delete(
+    "/coaches/{coach_id}",
+    response_model=CoachRemoval,
+    summary="Remove a coach",
+    description=(
+        "Hands their open batches and programmes to `reassign_to` (or to nobody), then "
+        "deletes the coach — **unless** they have history: sessions taught, students "
+        "enrolled, reviews or pay on record. Those are kept, so the coach is made "
+        "inactive instead and `outcome` says `archived`."
+    ),
+)
+async def remove_coach(
+    coach_id: uuid.UUID, db: Db, _: RequireManager, reassign_to: uuid.UUID | None = None
+) -> CoachRemoval:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+
+    target: Coach | None = None
+    if reassign_to is not None:
+        if reassign_to == coach.id:
+            raise InvalidInputError("Pick a different coach to take over.")
+        target = await get_or_404(db, Coach, reassign_to, label="Coach")
+        if target.status is not CoachStatus.ACTIVE:
+            raise InvalidInputError(f"{target.name} is {target.status.value}, so cannot take over.")
+    new_id = target.id if target else None
+
+    open_batches = (
+        (
+            await db.execute(
+                select(Batch).where(Batch.coach_id == coach.id, Batch.status != BatchStatus.COMPLETED)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for batch in open_batches:
+        await service.set_batch_coach(db, batch, new_id)
+
+    programs = (await db.execute(select(Program).where(Program.coach_id == coach.id))).scalars().all()
+    for program in programs:
+        program.coach_id = new_id
+    await db.flush()
+
+    if await _has_history(db, coach):
+        coach.status = CoachStatus.INACTIVE
+        outcome = "archived"
+    else:
+        await db.delete(coach)
+        outcome = "deleted"
+    await db.flush()
+    return CoachRemoval(
+        outcome=outcome, reassigned_batches=len(open_batches), reassigned_programs=len(programs)
+    )
+
+
+@router.post(
+    "/coaches/{coach_id}/reviews",
+    response_model=CoachReviewOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record feedback on a coach",
+    description="Updates the coach's rating to the average of all their reviews.",
+)
+async def add_coach_review(
+    coach_id: uuid.UUID, payload: CoachReviewCreate, db: Db, principal: RequireStaff
+) -> CoachReviewOut:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    _tz, _now, today = await _local_clock(db)
+    reviewed_on = payload.reviewed_on or today
+    if reviewed_on > today:
+        raise InvalidInputError("A review cannot be dated in the future.")
+
+    reviewer = payload.reviewer_name
+    if payload.student_id is not None:
+        student = await get_or_404(db, Student, payload.student_id, label="Student")
+        reviewer = reviewer or student.parent_name or student.name
+
+    row = CoachReview(
+        coach_id=coach.id,
+        student_id=payload.student_id,
+        reviewer_name=reviewer,
+        rating=payload.rating,
+        comment=payload.comment,
+        reviewed_on=reviewed_on,
+        recorded_by=principal.actor_label,
+    )
+    db.add(row)
+    await db.flush()
+    await service.refresh_coach_rating(db, coach)
+    await db.flush()
+    return CoachReviewOut.model_validate(row)
+
+
+@router.delete(
+    "/coach-reviews/{review_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a coach review",
+)
+async def delete_coach_review(review_id: uuid.UUID, db: Db, _: RequireManager) -> None:
+    review = await get_or_404(db, CoachReview, review_id, label="Review")
+    coach = await db.get(Coach, review.coach_id)
+    await db.delete(review)
+    await db.flush()
+    if coach is not None:
+        await service.refresh_coach_rating(db, coach)
+        await db.flush()
+
+
+# ── Payroll ─────────────────────────────────────────────────────────────────
+
+MonthQuery = Annotated[
+    str | None, Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="YYYY-MM")
+]
+
+
+@router.get(
+    "/coaches/{coach_id}/earnings",
+    response_model=CoachEarnings,
+    summary="What a coach has earned in a month, and how it adds up",
+)
+async def coach_earnings(
+    coach_id: uuid.UUID, db: Db, _: RequireManager, month: MonthQuery = None
+) -> CoachEarnings:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    tz, _now, today = await _local_clock(db)
+    period = payroll.parse_month(month) if month else payroll.month_start(today)
+    return (await payroll.earnings_for(db, [coach], period, tz))[coach.id]
+
+
+@router.get(
+    "/payroll",
+    response_model=Payroll,
+    summary="Every coach's earnings for a month, and who has been paid",
+)
+async def coach_payroll(db: Db, _: RequireManager, month: MonthQuery = None) -> Payroll:
+    tz, _now, today = await _local_clock(db)
+    period = payroll.parse_month(month) if month else payroll.month_start(today)
+
+    coaches = (await db.execute(select(Coach).order_by(Coach.name))).scalars().all()
+    earned = await payroll.earnings_for(db, coaches, period, tz)
+
+    rows: list[PayrollRow] = []
+    for coach in coaches:
+        e = earned[coach.id]
+        # An inactive coach is only listed if the month actually has something on it.
+        if coach.status is CoachStatus.INACTIVE and e.status == "nothing":
+            continue
+        rows.append(
+            PayrollRow(
+                coach_id=coach.id,
+                coach_no=coach.coach_no,
+                name=coach.name,
+                avatar_initials=coach.avatar_initials,
+                coach_status=coach.status,
+                pay_model=e.pay_model,
+                sessions=e.sessions,
+                hours=e.hours,
+                fees_collected=e.fees_collected,
+                base_amount=e.base_amount,
+                commission_amount=e.commission_amount,
+                gross=e.gross,
+                status=e.status,
+                paid_total=e.payout.total if e.payout else None,
+                payout_id=e.payout.id if e.payout else None,
+            )
+        )
+
+    zero = Decimal("0")
+    return Payroll(
+        period=period,
+        current_period=payroll.month_start(today),
+        rows=rows,
+        # What the month comes to: the amount paid where it has been, else what is owed.
+        total_gross=sum((r.paid_total if r.paid_total is not None else r.gross for r in rows), zero),
+        total_paid=sum((r.paid_total for r in rows if r.paid_total is not None), zero),
+        total_due=sum((r.gross for r in rows if r.status == "due"), zero),
+    )
+
+
+@router.post(
+    "/coaches/{coach_id}/payouts",
+    response_model=CoachPayoutOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record a payout for a month",
+    description=(
+        "The amounts are worked out here from the month's sessions and collected fees "
+        "— the client sends only an optional bonus or deduction. What is recorded is a "
+        "snapshot: later refunds or rate changes do not rewrite it. A month can be "
+        "paid once; to correct one, an admin deletes it and records it again."
+    ),
+)
+async def record_payout(
+    coach_id: uuid.UUID, payload: PayoutCreate, db: Db, principal: RequireManager
+) -> CoachPayoutOut:
+    coach = await get_or_404(db, Coach, coach_id, label="Coach")
+    tz, _now, today = await _local_clock(db)
+    period = payroll.parse_month(payload.month)
+
+    if period > payroll.month_start(today):
+        raise InvalidInputError("That month has not started yet.")
+    already = await db.scalar(
+        select(CoachPayout.id).where(CoachPayout.coach_id == coach.id, CoachPayout.period == period)
+    )
+    if already is not None:
+        raise ConflictError(
+            f"{coach.name} has already been paid for {payload.month}.",
+            details={"payout_id": str(already)},
+        )
+
+    earned = (await payroll.earnings_for(db, [coach], period, tz))[coach.id]
+    adjustment = money(payload.adjustment)
+    if adjustment != 0 and not (payload.adjustment_note or "").strip():
+        raise InvalidInputError("Say what the bonus or deduction is for.")
+    total = earned.gross + adjustment
+    if total < 0:
+        raise InvalidInputError("The deduction is larger than what was earned.")
+    if total == 0:
+        raise InvalidInputError("There is nothing to pay for this month.")
+
+    row = CoachPayout(
+        coach_id=coach.id,
+        coach_name=coach.name,
+        period=period,
+        pay_model=earned.pay_model,
+        sessions=earned.sessions,
+        hours=earned.hours,
+        fees_collected=earned.fees_collected,
+        commission_pct=earned.commission_pct,
+        base_amount=earned.base_amount,
+        commission_amount=earned.commission_amount,
+        adjustment=adjustment,
+        adjustment_note=(payload.adjustment_note or "").strip() or None,
+        total=total,
+        method=payload.method,
+        reference=payload.reference,
+        paid_on=payload.paid_on or today,
+        note=payload.note,
+        paid_by=principal.actor_label,
+    )
+    db.add(row)
+    await db.flush()
+    return CoachPayoutOut.model_validate(row)
+
+
+@router.delete(
+    "/payouts/{payout_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a payout recorded in error",
+    description=(
+        "Admin only — it removes a financial record, after which the month can be paid again."
+    ),
+)
+async def delete_payout(payout_id: uuid.UUID, db: Db, _: RequireAdmin) -> None:
+    payout = await get_or_404(db, CoachPayout, payout_id, label="Payout")
+    await db.delete(payout)
+    await db.flush()
 
 
 # ── Programmes ──────────────────────────────────────────────────────────────
@@ -262,7 +640,11 @@ async def update_batch(
     batch_id: uuid.UUID, payload: BatchUpdate, db: Db, _: RequireManager
 ) -> BatchOut:
     batch = await get_or_404(db, Batch, batch_id, label="Batch")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if "coach_id" in updates and updates["coach_id"] != batch.coach_id:
+        # Not a plain setattr: the batch's students and upcoming sessions follow it.
+        await service.set_batch_coach(db, batch, updates.pop("coach_id"))
+    for field, value in updates.items():
         setattr(batch, field, value)
     await db.flush()
     counts = await service.batch_enrolment_counts(db, [batch.id])
@@ -401,6 +783,167 @@ async def update_student(
         **StudentOut.model_validate(student).model_dump(exclude={"age"}),
         age=student.age_on(date.today()),
     )
+
+
+# ── Roster, profile and attention ───────────────────────────────────────────
+
+
+async def _local_clock(db) -> tuple[ZoneInfo, datetime, date]:
+    """The academy's timezone, and "now" and "today" in it.
+
+    `date.today()` is the *server's* date, which is not the academy's between 18:30
+    and midnight UTC — exactly the evening window in which sessions are marked and
+    renewals tick over.
+    """
+    tz = ZoneInfo((await _settings(db)).timezone)
+    now = datetime.now(tz)
+    return tz, now, now.date()
+
+
+@router.get(
+    "/roster",
+    response_model=Page[StudentRow],
+    summary="The students table: who, where they train, and how it is going",
+    description=(
+        "Every figure after `status` — attendance, fee state, renewal and the "
+        "`flags` — is derived at request time from registers, enrolments and "
+        "payments, never stored.\n\n"
+        "`attendance_pct` covers the last 30 days and is null when nothing was marked "
+        "in that window. Rows with no value for the sort key always come last, so "
+        "sorting attendance ascending leads with the students who are actually "
+        "missing classes rather than the ones with no data.\n\n"
+        "`attention` keeps only students carrying that flag."
+    ),
+)
+async def student_roster(
+    db: Db,
+    _: RequireStaff,
+    params: Params,
+    search: str | None = None,
+    student_status: Annotated[StudentStatus | None, Query(alias="status")] = None,
+    sport_id: uuid.UUID | None = None,
+    batch_id: uuid.UUID | None = None,
+    coach_id: uuid.UUID | None = None,
+    level: SkillLevel | None = None,
+    fee_status: Annotated[str | None, Query(pattern="^(paid|due|none)$")] = None,
+    attention: Annotated[
+        str | None,
+        Query(pattern="^(repeat_absentee|low_attendance|renewal_due|promotion_ready)$"),
+    ] = None,
+    sort: Annotated[str, Query(pattern="^(name|attendance|rating|renewal)$")] = "name",
+    desc: bool = False,
+) -> Page[StudentRow]:
+    _tz, now, today = await _local_clock(db)
+    rows = await insights.roster(
+        db,
+        insights.RosterFilters(
+            search=search,
+            status=student_status,
+            sport_id=sport_id,
+            batch_id=batch_id,
+            coach_id=coach_id,
+            level=level,
+            fee_status=fee_status,
+            attention=attention,
+            sort=sort,
+            descending=desc,
+        ),
+        today=today,
+        now=now,
+    )
+    total = len(rows)
+    return Page[StudentRow](
+        items=rows[params.offset : params.offset + params.size],
+        total=total,
+        page=params.page,
+        size=params.size,
+        pages=max(1, (total + params.size - 1) // params.size),
+    )
+
+
+@router.get(
+    "/attention",
+    response_model=AttentionOut,
+    summary="Students who need a call, a renewal or a promotion look",
+    description=(
+        "Four lists over active students: repeat absentees (3+ absences in 14 days), "
+        "low attendance (under 60% over 30 days, with at least 4 marked sessions), "
+        "terms ending within 7 days or already lapsed, and promotion candidates "
+        "(rated 8+, 80%+ attendance, at least 45 days at the current level).\n\n"
+        "A promotion candidate is a suggestion for a coach to look at, not a "
+        "decision — promoting stays a manager's call."
+    ),
+)
+async def students_needing_attention(db: Db, _: RequireStaff) -> AttentionOut:
+    _tz, now, today = await _local_clock(db)
+    return await insights.attention(db, today=today, now=now)
+
+
+@router.get(
+    "/students/{student_id}/profile",
+    response_model=StudentProfile,
+    summary="Everything about one student: performance, attendance, standing, fees",
+)
+async def student_profile(student_id: uuid.UUID, db: Db, _: RequireStaff) -> StudentProfile:
+    student = await get_or_404(db, Student, student_id, label="Student")
+    tz, now, today = await _local_clock(db)
+    return await insights.build_profile(db, student, today=today, now=now, tz=tz)
+
+
+@router.post(
+    "/students/{student_id}/assessments",
+    response_model=AssessmentOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Review a student",
+    description=(
+        "Records a dated review — an overall score, the skill scores behind it, and "
+        "a comment. Reviews are kept as history so progress can be plotted.\n\n"
+        "The newest review is mirrored onto the student (`performance_rating`, and "
+        "`skills` when supplied), so screens that read the student stay current. "
+        "Back-dating a review never overwrites a newer one.\n\n"
+        "Manager and above. A review is distinct from a promotion: it scores how "
+        "well someone is playing, whereas a promotion moves them up the ladder."
+    ),
+)
+async def add_assessment(
+    student_id: uuid.UUID, payload: AssessmentCreate, db: Db, principal: RequireManager
+) -> AssessmentOut:
+    student = await get_or_404(db, Student, student_id, label="Student")
+    if payload.sport_id is not None:
+        await get_or_404(db, Sport, payload.sport_id, label="Sport")
+
+    _tz, _now, today = await _local_clock(db)
+    on = payload.assessed_on or today
+    if on > today:
+        raise InvalidInputError(
+            "A review cannot be dated in the future.", details={"field": "assessed_on"}
+        )
+
+    assessment = StudentAssessment(
+        student_id=student.id,
+        sport_id=payload.sport_id,
+        assessed_on=on,
+        rating=payload.rating,
+        skills=[skill.model_dump() for skill in payload.skills],
+        comment=(payload.comment or "").strip() or None,
+        assessed_by=payload.assessed_by or principal.email,
+    )
+    db.add(assessment)
+    await db.flush()
+
+    newer = await db.scalar(
+        select(func.count(StudentAssessment.id)).where(
+            StudentAssessment.student_id == student.id,
+            StudentAssessment.assessed_on > on,
+            StudentAssessment.id != assessment.id,
+        )
+    )
+    if not newer:
+        student.performance_rating = payload.rating
+        if payload.skills:
+            student.skills = [skill.model_dump() for skill in payload.skills]
+        await db.flush()
+    return AssessmentOut.model_validate(assessment)
 
 
 # ── Progression ─────────────────────────────────────────────────────────────

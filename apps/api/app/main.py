@@ -24,6 +24,7 @@ from app.modules.admin import router as admin_router
 from app.modules.advertising import router as advertising_router
 from app.modules.billing import router as billing_router
 from app.modules.booking import router as booking_router
+from app.modules.branches import router as branches_router
 from app.modules.finance import router as finance_router
 from app.modules.gateway import admin_router as gateway_admin_router
 from app.modules.gateway import sandbox as gateway_sandbox
@@ -201,6 +202,7 @@ def create_app() -> FastAPI:
     api.include_router(platform_router.router)
     api.include_router(billing_router.router)
     api.include_router(onboarding_router.router)
+    api.include_router(branches_router.router)
     api.include_router(booking_router.router)
     api.include_router(academy_router.router)
     api.include_router(advertising_router.router)

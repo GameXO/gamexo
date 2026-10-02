@@ -161,7 +161,7 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
   const totalShown = sortedRows.reduce((sum, row) => sum + row.total, 0)
 
   return (
-    <div className="flex w-full shrink-0 flex-col items-start gap-5 overflow-hidden rounded-xl border border-border-card bg-surface p-5">
+    <div className="flex w-full shrink-0 flex-col items-start gap-5 overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
       <div className="flex w-full items-center gap-2.5">
         <img src={calendar05} alt="" className="size-5" />
         <p className="flex-1 text-sm font-medium text-ink">Latest Bookings</p>
@@ -211,7 +211,7 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
                 <tr key={row.id} className="border-b border-border-card/80 transition-colors duration-100 last:border-none hover:bg-surface-muted/70">
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2.5">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-ink text-[12px] font-semibold text-lime">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-ink text-[11px] font-semibold text-lime">
                         {initialOf(row.customer)}
                       </span>
                       <div className="flex min-w-0 flex-col">

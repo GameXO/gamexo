@@ -2,7 +2,7 @@
  * Sell a membership, against the API.
  *
  * Plans and prices are not chosen here in any meaningful sense — they are read
- * from what Settings → Membership Plans defines. Only terms the plan actually
+ * from what the Plans tab on the Members page defines. Only terms the plan actually
  * prices are offered, because the server refuses a duration priced at zero, and
  * a picker that can produce a rejected request is a picker that will.
  *
@@ -131,7 +131,7 @@ export default function NewMembershipWizard({
         ) : (
           <div className="flex flex-col gap-5 px-5 py-5">
             <section className="flex flex-col gap-3">
-              <p className="text-[13px] font-medium text-ink">Member</p>
+              <p className="text-[12px] font-medium text-ink">Member</p>
               <input
                 className={inputClass}
                 placeholder="Phone (10 digits)"
@@ -149,11 +149,11 @@ export default function NewMembershipWizard({
             </section>
 
             <section className="flex flex-col gap-3">
-              <p className="text-[13px] font-medium text-ink">Plan</p>
+              <p className="text-[12px] font-medium text-ink">Plan</p>
               {isLoading && <p className="text-sm text-muted">Loading plans…</p>}
               {!isLoading && offered.length === 0 && (
                 <p className="text-sm text-muted">
-                  No sellable plans. Define one in Settings → Membership Plans and price
+                  No sellable plans. Define one on the Plans tab and price
                   at least one term.
                 </p>
               )}

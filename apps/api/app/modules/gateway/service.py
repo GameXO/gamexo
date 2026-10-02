@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import ConflictError
 from app.modules.booking import service as booking_service
 from app.modules.booking.models import (
+    BookingSource,
     Booking,
     BookingEventKind,
     BookingStatus,
@@ -387,6 +388,8 @@ async def _claim_one(
         customer_phone=phone,
         sport_id=court.sport_id,
         court_id=court.id,
+        branch_id=court.branch_id,
+        booked_via=BookingSource.PARTNER,
         starts_at=slot.starts_at,
         ends_at=slot.ends_at,
         duration_min=slot.duration_min,

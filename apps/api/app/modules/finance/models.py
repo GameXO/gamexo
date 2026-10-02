@@ -165,6 +165,13 @@ class Invoice(TenantScoped):
         PgUUID(as_uuid=True), ForeignKey("student_enrollment.id", ondelete="RESTRICT")
     )
 
+    #: The branch that issued this bill — whose address and GSTIN print on it. NULL
+    #: for invoices with no site behind them (an ad contract, say) and for those raised
+    #: before branches existed; the document then falls back to the academy's details.
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("branch.id", ondelete="RESTRICT")
+    )
+
     customer_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("customer.id", ondelete="RESTRICT")
     )

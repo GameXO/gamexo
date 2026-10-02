@@ -1,5 +1,5 @@
 /**
- * Manage → Integrations.
+ * Settings → Integrations.
  *
  * Two halves that look similar and are not. Payment gateways hold credentials the
  * academy owns at Razorpay or Cashfree, which we store encrypted and replay on
@@ -37,7 +37,7 @@ export default function Integrations() {
   const pos = collecting('pos')
 
   return (
-    <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-4 py-5 sm:px-6">
+    <div className="flex flex-col gap-8">
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -62,7 +62,7 @@ export default function Integrations() {
           ).map(([label, using]) => (
             <div
               key={label}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-border-card bg-white px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border-card bg-white px-4 py-3"
             >
               <span className="text-sm text-slate">{label} collects via</span>
               <span

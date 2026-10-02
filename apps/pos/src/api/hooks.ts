@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 import type { components } from './schema'
 import { asset } from '../lib/asset'
+import { useBranch } from '../branch/useBranch'
 
 type SportOut = components['schemas']['SportOut']
 type CourtWithStatus = components['schemas']['CourtWithStatus']
@@ -124,7 +125,7 @@ export function toEquipmentItem(e: EquipmentOut): EquipmentItem {
 
 export const queryKeys = {
   sports: ['sports'] as const,
-  courts: (sportId?: string) => ['courts', sportId ?? 'all'] as const,
+  courts: (sportId?: string, branchId?: string) => ['courts', sportId ?? 'all', branchId ?? 'any'] as const,
   availability: (courtId: string, date: string, durationMin: number) =>
     ['availability', courtId, date, durationMin] as const,
   equipment: ['equipment'] as const,
@@ -162,26 +163,54 @@ export function usePosServices() {
   }
 }
 
-/** Sports, with each one's court count folded in for the "N Courts" label. */
+/** The business's name, for the header of anything printed. */
+export function usePosBusinessName() {
+  const query = useQuery({
+    queryKey: queryKeys.publicSettings,
+    queryFn: () => api.publicSettings(),
+    staleTime: 60_000,
+  })
+  return query.data?.business_name ?? ''
+}
+
+/**
+ * Sports, with each one's court count folded in for the "N Courts" label.
+ *
+ * Counted over *this branch's* courts, and — when the academy has several branches —
+ * a sport with none here is left off, since tapping it would lead to an empty court
+ * list. A single-site academy keeps showing every sport, as before.
+ */
 export function useSports() {
-  const courts = useQuery({ queryKey: queryKeys.courts(), queryFn: () => api.listCourts() })
+  const { branch, multi } = useBranch()
+  const branchId = branch?.id
+  const courts = useQuery({
+    queryKey: queryKeys.courts(undefined, branchId),
+    queryFn: () => api.listCourts(branchId ? { branch_id: branchId } : undefined),
+  })
 
   return useQuery({
-    queryKey: [...queryKeys.sports, courts.data?.length ?? 0],
+    queryKey: [...queryKeys.sports, branchId ?? 'any', courts.data?.length ?? 0],
     queryFn: async () => {
       const sports = await api.listSports()
       const counts = new Map<string, number>()
       for (const c of courts.data ?? []) counts.set(c.sport_id, (counts.get(c.sport_id) ?? 0) + 1)
-      return sports.map((s) => toSport(s, counts.get(s.id) ?? 0))
+      return sports
+        .filter((s) => !multi || (counts.get(s.id) ?? 0) > 0)
+        .map((s) => toSport(s, counts.get(s.id) ?? 0))
     },
     enabled: !courts.isLoading,
   })
 }
 
+/** Courts at the branch this tablet is set to. */
 export function useCourts(sportId?: string) {
+  const branchId = useBranch().branch?.id
   return useQuery({
-    queryKey: queryKeys.courts(sportId),
-    queryFn: async () => (await api.listCourts(sportId ? { sport_id: sportId } : undefined)).map(toCourt),
+    queryKey: queryKeys.courts(sportId, branchId),
+    queryFn: async () => {
+      const query = { ...(sportId ? { sport_id: sportId } : {}), ...(branchId ? { branch_id: branchId } : {}) }
+      return (await api.listCourts(Object.keys(query).length ? query : undefined)).map(toCourt)
+    },
   })
 }
 

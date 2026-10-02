@@ -9,7 +9,7 @@
 import type { Me } from '../api/auth'
 
 /** Tenant-scoped roles, most privileged first. Mirrors `app/core/security.py::Role`. */
-export type Role = 'admin' | 'manager' | 'reception' | 'kiosk'
+export type Role = 'admin' | 'manager' | 'reception' | 'accountant' | 'coach' | 'kiosk'
 
 /**
  * What each role is called on screen.
@@ -22,6 +22,8 @@ const ROLE_LABELS: Record<Role, string> = {
   admin: 'Owner · Admin',
   manager: 'Staff · Manager',
   reception: 'Staff · Front Desk',
+  accountant: 'Staff · Accountant',
+  coach: 'Staff · Coach',
   kiosk: 'Counter',
 }
 
@@ -99,5 +101,5 @@ export function canManageAcademy(role: Role | null, isOps: boolean): boolean {
 
 /** Inventory, courts, membership, academy — the staff level and above. */
 export function canManageOperations(role: Role | null, isOps: boolean): boolean {
-  return isOps || role === 'admin' || role === 'manager' || role === 'reception'
+  return isOps || role === 'admin' || role === 'manager' || role === 'reception' || role === 'accountant'
 }

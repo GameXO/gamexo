@@ -17,10 +17,20 @@ export function downloadInvoicePdf(inv: InvoiceData) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(100)
-  doc.text(`${inv.facility.addressLine}, ${inv.facility.pincode}`, LEFT, y)
-  y += 14
-  doc.text(`GSTIN ${inv.facility.gstin}`, LEFT, y)
-  y += 26
+  // Only the lines that exist — a branch with no phone or GSTIN yet should leave
+  // them off the bill, not print "GSTIN null".
+  const header = [
+    inv.facility.branchName,
+    inv.facility.addressLine,
+    inv.facility.phone,
+    inv.facility.gstin ? `GSTIN ${inv.facility.gstin}` : null,
+    inv.source ? `Source: ${inv.source}` : null,
+  ].filter((line): line is string => Boolean(line))
+  for (const line of header) {
+    doc.text(line, LEFT, y, { maxWidth: RIGHT - LEFT })
+    y += 14
+  }
+  y += 12
 
   doc.setTextColor(0)
   doc.setFont('helvetica', 'bold')

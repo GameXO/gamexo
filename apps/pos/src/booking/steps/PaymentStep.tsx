@@ -4,6 +4,7 @@ import { money, startsAtISO } from '../../lib/format'
 import { downloadInvoicePdf } from '../../lib/invoicePdf'
 import type { PaymentMethodId } from '../../lib/paymentMethods'
 import { buildProvisionalInvoice } from '../invoice'
+import { useCurrentIssuer } from '../../branch/useCurrentIssuer'
 import { traySelections } from '../offers'
 import type { Draft } from '../types'
 import { asset } from '../../lib/asset'
@@ -40,6 +41,7 @@ export default function PaymentStep({
 }) {
   const sportsQuery = useSports()
   const courtsQuery = useCourts(draft.sportId || undefined)
+  const issuer = useCurrentIssuer()
   const sport = sportsQuery.data?.find((s) => s.id === draft.sportId)
   const court = courtsQuery.data?.find((c) => c.id === draft.courtId)
 
@@ -49,7 +51,7 @@ export default function PaymentStep({
     court && startsAt ? { courtId: court.id, startsAt, durationMin: draft.hours * 60, equipment } : null,
   )
 
-  const invoice = buildProvisionalInvoice(draft, sport, court, quoteQuery.data)
+  const invoice = buildProvisionalInvoice(draft, sport, court, quoteQuery.data, issuer)
   const pricingReady = !quoteQuery.isPending && !quoteQuery.error
 
   // No upsell rail here by design: kit is chosen in the Add-Ons step, and repeating the

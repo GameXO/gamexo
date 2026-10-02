@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.modules.branches.schemas import BranchInfo
 from app.modules.finance.models import (
     InvoiceStatus,
     PaymentMethod,
@@ -60,6 +61,8 @@ class InvoiceOut(BaseModel):
     booking_id: uuid.UUID | None
     member_subscription_id: uuid.UUID | None
     student_enrollment_id: uuid.UUID | None
+    #: The branch that issued it; NULL for invoices with no site behind them.
+    branch_id: uuid.UUID | None = None
     customer_id: uuid.UUID | None
     customer_name: str
     billing_address: str | None
@@ -80,6 +83,8 @@ class InvoiceOut(BaseModel):
 
 class InvoiceDetail(InvoiceOut):
     payments: list[PaymentOut] = Field(default_factory=list)
+    #: The issuing branch as it prints on the bill, GSTIN resolved.
+    branch: BranchInfo | None = None
     # "Split" when more than one payment was taken, matching the Payments page's
     # method breakdown. Derived from the rows, never stored.
     payment_method: str | None = None

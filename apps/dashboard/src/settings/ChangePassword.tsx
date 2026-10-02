@@ -13,7 +13,7 @@
  *     running a counter tablet on the same admin login deserves to know.
  */
 import { useState, type FormEvent } from 'react'
-import { Lock } from 'lucide-react'
+import { SettingsPanel, SettingsRow } from './SettingsPanel'
 import { ApiError, api } from '../api/client'
 import { setTokens } from '../api/auth'
 
@@ -63,48 +63,29 @@ export function ChangePassword() {
   }
 
   return (
-    <section className="rounded-2xl border border-border-card bg-surface p-6">
-      <div className="flex items-start gap-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-lime/20 text-lime-ink">
-          <Lock size={20} />
-        </div>
-        <div>
-          <h2 className="font-display text-lg font-semibold text-ink">Password</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate">
-            If you're still using the password from your welcome email, change it here.
-            Everyone signed in to this account on other devices will be signed out.
-          </p>
-        </div>
-      </div>
-
+    <SettingsPanel flush>
       {done && (
-        <p
-          role="status"
-          className="mt-4 rounded-lg bg-positive/10 px-4 py-3 text-sm text-positive"
-        >
+        <p role="status" className="mb-4 rounded-lg bg-positive/10 px-4 py-3 text-sm text-positive">
           Password changed. Other devices signed in as you have been signed out.
         </p>
       )}
 
-      <form onSubmit={submit} className="mt-5 space-y-4">
-        <Field label="Current password">
+      <form onSubmit={submit}>
+        <SettingsRow label="Current password" description="To confirm it is really you." htmlFor="pw-current">
           <input
+            id="pw-current"
             type="password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded-lg border border-border-input bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-lime-ink"
+            className={INPUT}
           />
-        </Field>
+        </SettingsRow>
 
-        <Field
-          label="New password"
-          hint={tooShort ? 'At least 8 characters.' : undefined}
-          invalid={tooShort || unchanged}
-          error={unchanged ? 'This is the password you already have.' : undefined}
-        >
+        <SettingsRow label="New password" description="At least 8 characters." htmlFor="pw-new">
           <input
+            id="pw-new"
             type="password"
             value={next}
             onChange={(e) => setNext(e.target.value)}
@@ -112,75 +93,56 @@ export function ChangePassword() {
             minLength={8}
             maxLength={128}
             required
-            className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-lime-ink ${
-              tooShort || unchanged ? 'border-negative' : 'border-border-input'
-            }`}
+            className={`${INPUT} ${tooShort || unchanged ? 'border-negative' : ''}`}
           />
-        </Field>
+          <Message
+            error={unchanged ? 'This is the password you already have.' : undefined}
+            hint={tooShort ? 'At least 8 characters.' : undefined}
+          />
+        </SettingsRow>
 
-        <Field
-          label="Confirm new password"
-          invalid={mismatch}
-          error={mismatch ? "These don't match." : undefined}
-        >
+        <SettingsRow label="Confirm new password" htmlFor="pw-confirm">
           <input
+            id="pw-confirm"
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             autoComplete="new-password"
             required
-            className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-lime-ink ${
-              mismatch ? 'border-negative' : 'border-border-input'
-            }`}
+            className={`${INPUT} ${mismatch ? 'border-negative' : ''}`}
           />
-        </Field>
+          <Message error={mismatch ? "These don't match." : undefined} />
+        </SettingsRow>
 
-        {error && (
-          <p role="alert" className="text-sm text-negative">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {busy ? 'Changing…' : 'Change password'}
-        </button>
+        <div className="flex items-center justify-end gap-4 border-t border-dashed border-border-soft py-4">
+          {error && (
+            <p role="alert" className="mr-auto text-sm text-negative">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-control disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Changing…' : 'Change password'}
+          </button>
+        </div>
       </form>
-    </section>
+    </SettingsPanel>
   )
 }
 
-function Field({
-  label,
-  hint,
-  error,
-  invalid,
-  children,
-}: {
-  label: string
-  hint?: string
-  error?: string
-  invalid?: boolean
-  children: React.ReactNode
-}) {
+const INPUT =
+  'w-full rounded-lg border border-border-card bg-white px-3.5 py-2.5 text-sm text-ink shadow-control outline-none transition-colors focus:border-lime-ink'
+
+/* aria-live so a message that appears as you type is announced, not just drawn --
+   the same rule as the website's Field primitive. */
+function Message({ error, hint }: { error?: string; hint?: string }) {
+  const text = error ?? hint
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
-      {children}
-      {/* aria-live so a message that appears as you type is announced, not just
-          drawn — the same rule as the website's Field primitive. */}
-      <span aria-live="polite">
-        {error ? (
-          <span className="mt-1.5 block text-[13px] text-negative">{error}</span>
-        ) : hint ? (
-          <span className={`mt-1.5 block text-[13px] ${invalid ? 'text-negative' : 'text-muted'}`}>
-            {hint}
-          </span>
-        ) : null}
-      </span>
-    </label>
+    <span aria-live="polite">
+      {text ? <span className="mt-1.5 block text-[12px] text-negative">{text}</span> : null}
+    </span>
   )
 }

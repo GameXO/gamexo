@@ -1,5 +1,6 @@
 import * as db from '../lib/db'
 import type { NotifChannel } from '../lib/db'
+import { SettingsPanel } from '../settings/SettingsPanel'
 import Toggle from './Toggle'
 
 const ROWS: { id: string; title: string; desc: string }[] = [
@@ -22,42 +23,33 @@ export default function NotificationSettings() {
   const prefs = db.getNotifPrefs()
 
   return (
-    <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <p className="text-lg text-ink">Notification Settings</p>
-
-      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-[0px_5px_13px_0px_rgba(0,0,0,0.05)]">
-        <p className="border-b border-border-card px-5 py-4 text-sm font-semibold text-ink">
-          Customer Notifications
-        </p>
-
-        {ROWS.map((row, i) => {
-          const pref = prefs[row.id] || { email: false, whatsapp: false, sms: false }
-          return (
-            <div
-              key={row.id}
-              className={`flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
-                i < ROWS.length - 1 ? 'border-b border-border-card' : ''
-              }`}
-            >
-              <div>
-                <p className="text-sm font-semibold text-ink">{row.title}</p>
-                <p className="text-xs text-muted">{row.desc}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-5 sm:gap-6">
-                {CHANNELS.map((channel) => (
-                  <label key={channel.id} className="flex items-center gap-2">
-                    <Toggle
-                      checked={pref[channel.id]}
-                      onChange={() => db.toggleNotifPref(row.id, channel.id)}
-                    />
-                    <span className="text-sm text-slate">{channel.label}</span>
-                  </label>
-                ))}
-              </div>
+    <SettingsPanel
+      title="Customer notifications"
+      description="Pick the channels each message goes out on."
+      flush
+    >
+      {ROWS.map((row) => {
+        const pref = prefs[row.id] || { email: false, whatsapp: false, sms: false }
+        return (
+          <div
+            key={row.id}
+            className="flex flex-col gap-4 border-b border-dashed border-border-soft py-5 last:border-b-0 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div>
+              <p className="text-sm font-medium text-ink">{row.title}</p>
+              <p className="mt-0.5 text-[12px] text-muted">{row.desc}</p>
             </div>
-          )
-        })}
-      </div>
-    </div>
+            <div className="flex flex-wrap items-center gap-6">
+              {CHANNELS.map((channel) => (
+                <label key={channel.id} className="flex items-center gap-2.5">
+                  <Toggle checked={pref[channel.id]} onChange={() => db.toggleNotifPref(row.id, channel.id)} />
+                  <span className="text-sm text-slate">{channel.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </SettingsPanel>
   )
 }

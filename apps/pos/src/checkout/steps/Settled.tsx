@@ -8,7 +8,7 @@ import { money } from '../../lib/format'
 import SuccessGraphic from '../../checkin/SuccessGraphic'
 import HomeCountdownButton from '../../ui/HomeCountdown'
 import type { CheckoutBooking } from '../useCheckout'
-import type { InvoiceOut } from '../../api/hooks'
+import { usePosBusinessName, type InvoiceOut } from '../../api/hooks'
 
 export default function Settled({
   booking,
@@ -23,7 +23,7 @@ export default function Settled({
   method: 'upi' | 'cash'
   onHome: () => void
 }) {
-  const invoiceData = buildConfirmedInvoice(booking, emptyDraft(), invoice)
+  const invoiceData = buildConfirmedInvoice(booking, emptyDraft(), invoice, usePosBusinessName())
   const summary = invoiceSummaryText(invoiceData)
 
   return (

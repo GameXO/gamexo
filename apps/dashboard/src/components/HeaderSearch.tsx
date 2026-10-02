@@ -2,8 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { SEARCHABLE_PAGES } from '../data/navigation'
 import type { View } from '../App'
+import type { SettingsSectionId } from '../settings/settingsNav'
 
-export default function HeaderSearch({ onNavigate }: { onNavigate: (view: View) => void }) {
+export default function HeaderSearch({
+  onNavigate,
+}: {
+  onNavigate: (view: View, section?: SettingsSectionId) => void
+}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -16,6 +21,24 @@ export default function HeaderSearch({ onNavigate }: { onNavigate: (view: View) 
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
+
+  // The sidebar's "Quick search" box and Ctrl/Cmd+K both open this, so search is one
+  // gesture from anywhere rather than a hunt for the small icon in the header.
+  useEffect(() => {
+    const openIt = () => setOpen(true)
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setOpen(true)
+      }
+    }
+    window.addEventListener('gamexo:open-search', openIt)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('gamexo:open-search', openIt)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
 
   useEffect(() => setActiveIndex(0), [query, open])
 
@@ -33,8 +56,8 @@ export default function HeaderSearch({ onNavigate }: { onNavigate: (view: View) 
     setQuery('')
   }
 
-  function select(view: View) {
-    onNavigate(view)
+  function select(page: (typeof results)[number]) {
+    onNavigate(page.view, page.section)
     close()
   }
 
@@ -51,14 +74,14 @@ export default function HeaderSearch({ onNavigate }: { onNavigate: (view: View) 
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const picked = results[activeIndex]
-      if (picked) select(picked.view)
+      if (picked) select(picked)
     }
   }
 
   return (
     <div ref={wrapperRef} className="relative h-9 w-9 shrink-0">
       <div
-        className={`absolute right-0 top-0 flex h-9 items-center overflow-hidden rounded-lg border border-border-input bg-white shadow-[0px_1px_2px_0px_rgba(82,88,102,0.09)] transition-[width] duration-200 ease-out ${
+        className={`absolute right-0 top-0 flex h-9 items-center overflow-hidden rounded-lg border border-border-input bg-white transition-[width] duration-200 ease-out ${
           open ? 'w-[260px] md:w-[380px]' : 'w-9 cursor-pointer'
         }`}
         onClick={() => !open && setOpen(true)}
@@ -74,24 +97,24 @@ export default function HeaderSearch({ onNavigate }: { onNavigate: (view: View) 
           onKeyDown={onKeyDown}
           placeholder="Search Anything..."
           tabIndex={open ? 0 : -1}
-          className="h-9 min-w-0 flex-1 bg-transparent pr-3 text-sm text-ink placeholder:text-muted focus:outline-none"
+          className="no-ring h-9 min-w-0 flex-1 bg-transparent pr-3 text-sm text-ink placeholder:text-muted focus:outline-none"
         />
       </div>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-[260px] overflow-hidden rounded-lg border border-border-card bg-white py-1.5 shadow-[0px_10px_30px_-5px_rgba(15,73,106,0.25)] md:w-[380px]">
+        <div className="absolute right-0 top-11 z-50 w-[260px] overflow-hidden rounded-lg border border-border-card bg-white py-1.5 md:w-[380px]">
           {results.length === 0 ? (
             <p className="px-3.5 py-2.5 text-sm text-muted">No pages match “{query}”.</p>
           ) : (
             results.map((page, i) => (
               <button
-                key={page.view}
+                key={`${page.view}:${page.section ?? ''}`}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActiveIndex(i)}
-                onClick={() => select(page.view)}
+                onClick={() => select(page)}
                 className={`flex w-full cursor-pointer items-center justify-between px-3.5 py-2 text-left text-sm transition-colors ${
-                  i === activeIndex ? 'bg-surface-muted text-ink' : 'text-slate'
+                  i === activeIndex ? 'bg-hover text-ink' : 'text-slate'
                 }`}
               >
                 <span>{page.label}</span>

@@ -12,7 +12,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError
+from app.core.security import Role
 from app.modules.booking.models import (
+    BookingSource,
     LIVE_STATUSES,
     Booking,
     BookingEvent,
@@ -65,6 +67,18 @@ async def load_settings(session: AsyncSession) -> TenantSettings:
 #: so "XCB42", "B-42" and "42" can only mean one booking, and refusing the short
 #: forms would make someone key a prefix they can see printed above the screen.
 _REFERENCE_INPUT = re.compile(r"^[A-Z]*B?[^0-9]*([0-9]+)$")
+
+
+def booking_source_for(principal) -> BookingSource:
+    """Which desk a booking came from, decided by who is logged in.
+
+    The shared counter tablet signs in as the kiosk role; everyone else reaching this
+    endpoint is staff at a dashboard — the office desk. Platform operators acting on a
+    tenant's behalf are staff too, so they land in the same bucket.
+    """
+    if principal.role is Role.KIOSK:
+        return BookingSource.COUNTER
+    return BookingSource.OFFICE_DESK
 
 
 async def next_booking_reference(session: AsyncSession) -> str:

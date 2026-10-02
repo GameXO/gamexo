@@ -21,6 +21,7 @@ import {
   type AddOnUnit,
 } from '../booking/offers'
 import { buildQuickSaleReceipt } from './receipt'
+import { useCurrentIssuer } from '../branch/useCurrentIssuer'
 import BookingTicket from '../booking/BookingTicket'
 
 const inputClass =
@@ -94,6 +95,7 @@ export default function CheckoutSheet({
 
   const searchQuery = useBookingSearch(query)
   const courtsQuery = useCourts()
+  const issuer = useCurrentIssuer()
   const addEquipment = useAddEquipmentToBooking()
   const recordPayment = useRecordPayment()
 
@@ -128,7 +130,7 @@ export default function CheckoutSheet({
 
   const openSale = () => {
     if (!phoneOk || !name.trim()) return
-    const r = buildQuickSaleReceipt(tray, items, { name: name.trim(), phone, email, customerId }, payNow)
+    const r = buildQuickSaleReceipt(tray, items, { name: name.trim(), phone, email, customerId }, payNow, issuer)
     setReceipt(r)
     setSuccess({
       headline: 'Counter receipt ready',

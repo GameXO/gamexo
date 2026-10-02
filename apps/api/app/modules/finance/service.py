@@ -15,6 +15,8 @@ from app.core.errors import ConflictError, NotFoundError
 from app.models.tenant import TenantSettings
 from app.modules.booking.models import Booking, Customer, PaymentStatus as BookingPaymentStatus
 from app.modules.booking.pricing import money
+from app.modules.branches.models import Branch
+from app.modules.branches.service import format_address
 from app.modules.finance.models import (
     DURATION_MONTHS,
     CounterKind,
@@ -92,6 +94,7 @@ async def create_invoice(
     due_date: date | None = None,
     notes: str | None = None,
     gst_override: Decimal | None = None,
+    branch: Branch | None = None,
 ) -> Invoice:
     """Raise an invoice, taking the next number in this academy's series."""
     settings = await _settings(session)
@@ -117,8 +120,11 @@ async def create_invoice(
         student_enrollment_id=student_enrollment_id,
         customer_id=customer_id,
         customer_name=customer_name,
-        billing_address=settings.address,
-        gst_number=settings.gst_number,
+        branch_id=branch.id if branch else None,
+        # The issuer's details, snapshotted: a bill raised at a branch carries that
+        # branch's address and GSTIN, falling back to the academy's own.
+        billing_address=format_address(branch) if branch and format_address(branch) else settings.address,
+        gst_number=(branch.gstin if branch else None) or settings.gst_number,
         due_date=due_date,
         items=jsonable_items(items),
         subtotal=subtotal,
@@ -172,6 +178,7 @@ async def invoice_for_booking(session: AsyncSession, booking: Booking) -> Invoic
         items=items,
         discount=booking.discount,
         booking_id=booking.id,
+        branch=await session.get(Branch, booking.branch_id),
         due_date=booking.starts_at.date(),
         # Reuse the tax already computed on the booking, so the invoice total matches
         # the amount the customer was quoted at the desk, to the paisa.

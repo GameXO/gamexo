@@ -220,7 +220,7 @@ export default function AllTenants() {
         <div className="overflow-x-auto rounded-xl border border-border-card bg-surface">
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-border-card text-left text-[12px] uppercase tracking-wide text-muted">
+              <tr className="border-b border-border-card text-left text-[11px] uppercase tracking-wide text-muted">
                 <th className="px-4 py-3 font-medium">Academy</th>
                 <th className="px-4 py-3 font-medium">Address</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
@@ -239,7 +239,7 @@ export default function AllTenants() {
                     className={`border-b border-border-card last:border-0 ${busy ? 'opacity-50' : ''}`}
                   >
                     <td className="px-4 py-3 font-medium text-ink">{tenant.name}</td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-slate">{tenant.slug}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-slate">{tenant.slug}</td>
                     <td className="px-4 py-3">
                       <select
                         value={tenant.plan_tier}
@@ -247,7 +247,7 @@ export default function AllTenants() {
                         onChange={(e) =>
                           changePlan(tenant, e.target.value as (typeof PLANS)[number])
                         }
-                        className="rounded-lg border border-border-input bg-white px-2 py-1 text-[13px] capitalize text-ink outline-none focus:border-lime-ink disabled:opacity-50"
+                        className="rounded-lg border border-border-input bg-white px-2 py-1 text-[12px] capitalize text-ink outline-none focus:border-lime-ink disabled:opacity-50"
                       >
                         {/* A tier the API does not know about would 422, so the
                             options are the enum rather than whatever is stored. A
@@ -266,7 +266,7 @@ export default function AllTenants() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[12px] font-medium capitalize ${
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize ${
                           STATUS_STYLES[tenant.status] ?? 'bg-surface-muted text-slate'
                         }`}
                       >
@@ -304,7 +304,7 @@ export default function AllTenants() {
                           type="button"
                           disabled={busy}
                           onClick={() => setImpersonatedTenant(tenant.slug)}
-                          className="rounded-lg border border-border-soft bg-white px-3 py-1.5 text-[13px] font-medium text-ink hover:border-ink disabled:opacity-50"
+                          className="rounded-lg border border-border-soft bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50"
                         >
                           Open
                         </button>
@@ -344,7 +344,7 @@ function RowAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg px-2.5 py-1.5 text-[13px] font-medium disabled:opacity-50 ${
+      className={`rounded-lg px-2.5 py-1.5 text-[12px] font-medium disabled:opacity-50 ${
         danger ? 'text-negative hover:bg-negative/10' : 'text-slate hover:bg-surface-muted'
       }`}
     >
@@ -371,19 +371,19 @@ function CredentialPanel({
     <div className="mb-4 rounded-xl border border-lime-ink/20 bg-lime/15 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-display text-[15px] font-semibold text-lime-ink">
+          <p className="font-display text-[14px] font-semibold text-lime-ink">
             {credential.title}
           </p>
-          <p className="mt-0.5 text-[13px] text-lime-ink/80">
+          <p className="mt-0.5 text-[12px] text-lime-ink/80">
             Shown once. Copy it now — it cannot be retrieved again.
           </p>
           <dl className="mt-3 space-y-1.5">
             {credential.lines.map((line) => (
               <div key={line.label} className="flex flex-wrap items-baseline gap-2">
-                <dt className="w-28 shrink-0 text-[12px] uppercase tracking-wide text-lime-ink/70">
+                <dt className="w-28 shrink-0 text-[11px] uppercase tracking-wide text-lime-ink/70">
                   {line.label}
                 </dt>
-                <dd className="select-all break-all font-mono text-[13px] text-lime-ink">
+                <dd className="select-all break-all font-mono text-[12px] text-lime-ink">
                   {line.value}
                 </dd>
               </div>
@@ -393,7 +393,7 @@ function CredentialPanel({
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 rounded-lg bg-lime-ink px-3 py-1.5 text-[13px] font-medium text-lime"
+          className="shrink-0 rounded-lg bg-lime-ink px-3 py-1.5 text-[12px] font-medium text-lime"
         >
           Done
         </button>
@@ -463,8 +463,8 @@ function NewAcademyForm({
       onSubmit={submit}
       className="mb-4 rounded-xl border border-border-card bg-surface p-4"
     >
-      <p className="font-display text-[15px] font-semibold text-ink">New academy</p>
-      <p className="mt-0.5 text-[13px] text-slate">
+      <p className="font-display text-[14px] font-semibold text-ink">New academy</p>
+      <p className="mt-0.5 text-[12px] text-slate">
         Creates the venue, its owner login and its counter login. Passwords are
         generated and shown once.
       </p>
@@ -491,7 +491,7 @@ function NewAcademyForm({
             minLength={2}
             maxLength={63}
             placeholder="kondapur-turf-arena"
-            className="w-full rounded-lg border border-border-input bg-white px-3 py-2 font-mono text-[13px] text-ink outline-none focus:border-lime-ink"
+            className="w-full rounded-lg border border-border-input bg-white px-3 py-2 font-mono text-[12px] text-ink outline-none focus:border-lime-ink"
           />
         </Labelled>
         <Labelled label="Owner name">
@@ -518,7 +518,7 @@ function NewAcademyForm({
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-[13px] text-negative">
+        <p role="alert" className="mt-3 text-[12px] text-negative">
           {error}
         </p>
       )}
@@ -601,7 +601,7 @@ function DeleteDialog({
           customers, staff, invoices and payments. It cannot be undone.
         </p>
 
-        <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-[13px] leading-relaxed text-slate">
+        <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-[12px] leading-relaxed text-slate">
           Only stopping them for now?{' '}
           <button
             type="button"
@@ -633,7 +633,7 @@ function DeleteDialog({
         </label>
 
         {error && (
-          <p role="alert" className="mt-3 text-[13px] text-negative">
+          <p role="alert" className="mt-3 text-[12px] text-negative">
             {error}
           </p>
         )}
@@ -664,7 +664,7 @@ function DeleteDialog({
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-medium text-ink">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-medium text-ink">{label}</span>
       {children}
     </label>
   )

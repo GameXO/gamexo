@@ -40,6 +40,8 @@ export const SPORTS: Sport[] = [
 export type Court = {
   id: string
   sportId: string
+  /** Which site it is at. Absent only on the offline sample courts. */
+  branchId?: string
   name: string
   price: number
   surface: string
@@ -444,6 +446,11 @@ export type Booking = {
   payment: { method: string; status: string } | null
   status: 'checked-in' | 'confirmed' | 'completed'
   source: 'app' | 'counter'
+  /** The site it was played at. */
+  branchId?: string
+  /** Which desk took it, as the server stamped it: the POS tablet, the office desk
+   *  (the dashboard), or a partner. Null on bookings that predate the column. */
+  bookedVia?: 'counter' | 'office_desk' | 'partner' | null
   /** Set when a third-party platform (Playo, Hudle, District) sold this booking —
    *  not the venue's own website. Such a booking was paid for on the platform, so
    *  only the platform can cancel and refund it; staff request that instead. */
@@ -473,6 +480,18 @@ export type Sale = {
 /** "playo" → "Playo". The slug is all a booking carries once the integration is
  *  gone, and every platform we integrate is named as a single word. */
 export const platformName = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
+
+/** How a booking's source reads on screen and on the receipt. A partner booking is
+ *  named for the platform when we know it ("Playo"), not the umbrella word. */
+export function sourceLabel(
+  via: 'counter' | 'office_desk' | 'partner' | null | undefined,
+  platformSlug?: string | null,
+): string | null {
+  if (via === 'office_desk') return 'Office Desk'
+  if (via === 'counter') return 'POS'
+  if (via === 'partner') return platformSlug ? platformName(platformSlug) : 'Partner'
+  return null
+}
 
 // toPaise, not Math.round: a ₹2,194.80 booking with nothing paid owes ₹2,194.80,
 // not ₹2,195. The rounding here was silently altering what the counter collects.

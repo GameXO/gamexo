@@ -79,7 +79,7 @@ export default function AddOns({ draft, setDraft }: { draft: Draft; setDraft: (p
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-semibold text-ink">{item.name}</p>
                     <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                         offer.mode === 'rent' ? 'bg-surface-muted text-slate' : 'bg-lime/30 text-lime-ink'
                       }`}
                     >

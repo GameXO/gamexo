@@ -31,6 +31,9 @@ from app.modules.booking.models import (
 )
 from app.modules.admin.notify import EMAIL_BOOKING_CONFIRMATION, enqueue_email
 from app.modules.booking.pricing import money, tenant_zone
+from app.modules.branches.models import Branch
+from app.modules.branches.service import branch_info, resolve_branch
+from app.models.tenant import TenantSettings
 from app.modules.finance.service import refresh_booking_payment_status
 from app.modules.booking.schemas import (
     BookingCancel,
@@ -157,6 +160,7 @@ async def list_courts(
     db: Db,
     _: RequireKiosk,
     sport_id: uuid.UUID | None = None,
+    branch_id: uuid.UUID | None = None,
     at: datetime | None = Query(default=None, description="Defaults to now"),
 ) -> list[CourtWithStatus]:
     moment = at or datetime.now(UTC)
@@ -164,6 +168,8 @@ async def list_courts(
     stmt = select(Court, Sport.name).join(Sport, Court.sport_id == Sport.id)
     if sport_id is not None:
         stmt = stmt.where(Court.sport_id == sport_id)
+    if branch_id is not None:
+        stmt = stmt.where(Court.branch_id == branch_id)
     rows = (await db.execute(stmt.order_by(Court.name))).all()
 
     # Statuses are derived from the courts already fetched above, so this costs one
@@ -187,8 +193,10 @@ async def list_courts(
 @router.post("/courts", response_model=CourtOut, status_code=status.HTTP_201_CREATED, summary="Add a court")
 async def create_court(payload: CourtCreate, db: Db, _: RequireManager) -> CourtOut:
     await get_or_404(db, Sport, payload.sport_id, label="Sport")
+    branch = await resolve_branch(db, payload.branch_id)
     data = payload.model_dump()
     data["operating_hours"] = payload.operating_hours.model_dump()
+    data["branch_id"] = branch.id
     court = Court(**data)
     db.add(court)
     await db.flush()
@@ -203,6 +211,14 @@ async def update_court(
     updates = payload.model_dump(exclude_unset=True)
     if "operating_hours" in updates and payload.operating_hours is not None:
         updates["operating_hours"] = payload.operating_hours.model_dump()
+    # A null branch means "leave it", not "no branch" — the column is NOT NULL, and a
+    # form that sends the field blank should not be able to detach a court from its site.
+    if updates.get("branch_id") is None:
+        updates.pop("branch_id", None)
+    elif updates["branch_id"] != court.branch_id:
+        # Bookings already taken keep the branch they were taken at (see
+        # Booking.branch_id); only new ones follow the court to its new site.
+        await resolve_branch(db, updates["branch_id"])
     for field, value in updates.items():
         setattr(court, field, value)
     await db.flush()
@@ -728,6 +744,8 @@ async def create_booking(payload: BookingCreate, db: Db, principal: RequireKiosk
         customer_phone=phone,
         sport_id=court.sport_id,
         court_id=court.id,
+        branch_id=court.branch_id,
+        booked_via=service.booking_source_for(principal),
         starts_at=payload.starts_at,
         ends_at=ends_at,
         duration_min=payload.duration_min,
@@ -1299,9 +1317,12 @@ async def booking_timeline(booking_id: uuid.UUID, db: Db, _: RequireStaff) -> li
 async def _detail(db, booking: Booking) -> BookingDetail:
     sport = await db.get(Sport, booking.sport_id)
     court = await db.get(Court, booking.court_id)
+    branch = await db.get(Branch, booking.branch_id)
+    settings = (await db.execute(select(TenantSettings))).scalar_one()
     return BookingDetail(
         **BookingOut.model_validate(booking).model_dump(exclude={"sold_on_platform"}),
         sport_name=sport.name if sport else None,
         court_name=court.name if court else None,
+        branch=branch_info(branch, settings),
         sold_on_platform=await selling_platform(db, booking) is not None,
     )

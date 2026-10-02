@@ -1,4 +1,4 @@
-import { FACILITY_PROFILE } from '../facility/facilityData'
+import { issuerFrom, sourceLabel, type Issuer } from '../branch/issuer'
 import { dayLabel, formalDate, hour12, money, toISO, toPaise } from '../lib/format'
 import type { BookingDetail, Court, InvoiceOut, QuoteOut, Sport } from '../api/hooks'
 import type { Draft } from './types'
@@ -6,7 +6,10 @@ import type { Draft } from './types'
 export type InvoiceLine = { label: string; detail: string; amount: number }
 
 export type InvoiceData = {
-  facility: typeof FACILITY_PROFILE
+  /** Who the bill is from — the business and the branch it was raised at. */
+  facility: Issuer
+  /** Which desk took it, e.g. "POS" or "Office Desk". Null if it was not recorded. */
+  source: string | null
   invoiceNo: string | null
   bookingId: string | null
   /** `XCB0042` — what the customer is asked for at the counter. Null until the
@@ -49,6 +52,7 @@ export function buildProvisionalInvoice(
   sport: Sport | undefined,
   court: Court | undefined,
   quote: QuoteOut | undefined,
+  issuer: Issuer,
 ): InvoiceData {
   const date = draft.date || toISO(new Date())
   const timeRange = draft.startHour != null ? `${hour12(draft.startHour)} – ${hour12(draft.startHour + draft.hours)}` : null
@@ -68,7 +72,9 @@ export function buildProvisionalInvoice(
   ]
 
   return {
-    facility: FACILITY_PROFILE,
+    facility: issuer,
+    // Anything built on this tablet is a counter booking; the server stamps the same.
+    source: sourceLabel('counter'),
     invoiceNo: null,
     bookingId: null,
     bookingRef: null,
@@ -96,7 +102,12 @@ export function buildProvisionalInvoice(
 
 /** Final invoice, built from the server's own booking + (optional) formal invoice record —
  *  every number on it is what actually landed in the database. */
-export function buildConfirmedInvoice(booking: BookingDetail, draft: Draft, invoice?: InvoiceOut): InvoiceData {
+export function buildConfirmedInvoice(
+  booking: BookingDetail,
+  draft: Draft,
+  invoice: InvoiceOut | undefined,
+  businessName: string,
+): InvoiceData {
   const starts = new Date(booking.starts_at)
   const date = toISO(starts)
   const startHour = starts.getHours()
@@ -114,7 +125,10 @@ export function buildConfirmedInvoice(booking: BookingDetail, draft: Draft, invo
   ]
 
   return {
-    facility: FACILITY_PROFILE,
+    // The booking's own branch, as the server recorded it — not whichever branch the
+    // tablet happens to be set to when someone reopens the receipt later.
+    facility: issuerFrom(businessName, booking.branch),
+    source: sourceLabel(booking.booked_via, booking.source_platform),
     invoiceNo: invoice?.invoice_no ?? null,
     bookingId: booking.id,
     bookingRef: booking.reference,
@@ -149,6 +163,10 @@ export function buildConfirmedInvoice(booking: BookingDetail, draft: Draft, invo
 export function invoiceSummaryText(inv: InvoiceData) {
   const lines = [
     inv.facility.name,
+    inv.facility.branchName ?? '',
+    inv.facility.addressLine,
+    inv.facility.gstin ? `GSTIN ${inv.facility.gstin}` : '',
+    inv.source ? `Source: ${inv.source}` : '',
     inv.bookingRef ? `Booking ${inv.bookingRef}${inv.invoiceNo ? ` · Invoice ${inv.invoiceNo}` : ''}` : 'Provisional invoice',
     `${inv.sportName} · ${inv.courtName}`,
     `${inv.dateLabel}${inv.timeRange ? `, ${inv.timeRange}` : ''}`,

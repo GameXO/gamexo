@@ -20,9 +20,9 @@ export default function Drawer({
         type="button"
         aria-label="Close panel"
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/30"
+        className="fixed inset-0 z-40 animate-fade-in bg-black/30"
       />
-      <div className="fixed inset-y-0 right-0 z-50 flex h-screen w-full max-w-[440px] flex-col overflow-y-auto bg-page shadow-2xl">
+      <div className="fixed inset-y-0 right-0 z-50 flex h-screen w-full max-w-[440px] animate-slide-in flex-col overflow-y-auto border-l border-border-soft bg-page shadow-pop">
         <div className="flex shrink-0 items-center gap-3 border-b border-border-soft px-5 py-4">
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-ink">{title}</p>
@@ -31,7 +31,7 @@ export default function Drawer({
           <button
             type="button"
             onClick={onClose}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white hover:bg-hover"
           >
             <X size={16} className="text-ink" />
           </button>

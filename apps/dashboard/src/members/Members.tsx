@@ -2,7 +2,7 @@
  * Members — every membership this academy has sold, and what to do with each.
  *
  * Reads the API, not localStorage. Pricing is not editable here: plans are
- * defined once in Settings → Membership Plans and only *applied* on this screen.
+ * defined once on this page's Plans tab and only *applied* in the Members tab.
  * That split is deliberate — a price field beside a customer's name is how one
  * receptionist ends up repricing the whole academy while signing somebody up.
  *
@@ -17,7 +17,9 @@
  *   is shown so staff can explain that without having to work it out.
  */
 import { useState } from 'react'
-import { Loader2, Pause, Play, RotateCw, Search, X } from 'lucide-react'
+import { Loader2, Pause, Play, Plus, RotateCw, Search, X } from 'lucide-react'
+import RowActionsMenu, { type RowAction } from '../ui/RowActionsMenu'
+import StatusPill, { type StatusTone } from '../ui/StatusPill'
 import {
   DURATION_LABEL,
   sellableDurations,
@@ -28,16 +30,17 @@ import {
   type PlanDuration,
   type SubscriptionOut,
 } from '../api/hooks'
+import Membership from '../manage/Membership'
 import NewMembershipWizard from './NewMembershipWizard'
 
 const rupees = (n: number) =>
   n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
 
-const STATUS_COLOR: Record<string, string> = {
-  active: 'bg-positive/15 text-positive',
-  paused: 'bg-surface-muted text-muted',
-  expired: 'bg-negative/15 text-negative',
-  cancelled: 'bg-surface-muted text-muted',
+const STATUS_TONE: Record<string, StatusTone> = {
+  active: 'positive',
+  paused: 'neutral',
+  expired: 'negative',
+  cancelled: 'neutral',
 }
 
 const FILTERS = ['all', 'active', 'paused', 'expired', 'cancelled'] as const
@@ -51,7 +54,42 @@ function whenLabel(row: SubscriptionOut): string {
   return `${days}d left`
 }
 
+const TABS = [
+  { id: 'members', label: 'Members' },
+  { id: 'plans', label: 'Plans' },
+] as const
+
 export default function Members() {
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('members')
+
+  return (
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div role="tablist" className="flex shrink-0 gap-6 border-b border-border-soft">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 pb-2.5 text-sm font-medium transition-colors ${
+              tab === t.id ? 'border-ink text-ink' : 'border-transparent text-slate hover:text-ink'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* `key` restarts the entrance animation, so switching tabs eases in. */}
+      <div key={tab} className="flex flex-col animate-section-in motion-reduce:animate-none">
+        {tab === 'members' ? <MembersList /> : <Membership />}
+      </div>
+    </div>
+  )
+}
+
+function MembersList() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -92,41 +130,45 @@ export default function Members() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-lg bg-surface-muted p-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`rounded-md px-3.5 py-2 text-sm capitalize transition-colors ${
-                filter === f ? 'bg-white text-ink shadow-sm' : 'text-slate'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full sm:w-72">
+            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              className="w-full rounded-lg border border-border-card bg-white py-2.5 pl-9 pr-3.5 text-sm text-ink shadow-control outline-none placeholder:text-muted focus:border-lime-ink"
+              placeholder="Search member or number"
+              aria-label="Search members"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg bg-surface-muted p-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                aria-pressed={filter === f}
+                className={`rounded-md px-3 py-1.5 text-sm capitalize transition-colors ${
+                  filter === f ? 'bg-white font-medium text-ink shadow-control' : 'text-slate hover:text-ink'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => setWizardOpen(true)}
-          className="flex h-10 items-center justify-center rounded-full px-5 text-sm text-[#fefefe]"
-          style={{ backgroundImage: 'linear-gradient(105deg, rgb(41,41,41) 2%, rgb(26,26,26) 100%)' }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-control"
         >
+          <Plus size={15} />
           New membership
         </button>
-      </div>
-
-      <div className="relative max-w-sm">
-        <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          className="w-full rounded-lg border border-border-input bg-white py-2.5 pl-9 pr-3.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-          placeholder="Search member or number"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
       </div>
 
       {error && (
@@ -135,158 +177,129 @@ export default function Members() {
         </div>
       )}
 
-      <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-              <th className="px-4 py-3 font-medium">Member</th>
-              <th className="px-4 py-3 font-medium">Plan</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Expires</th>
-              <th className="px-4 py-3 font-medium">Paid</th>
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const plan = (plans ?? []).find((p) => p.id === row.plan_id)
-              const busy = busyId === row.id
-              return (
-                <tr key={row.id} className="border-b border-border-card last:border-0">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{row.member_no}</p>
-                    {(row.paused_days_total ?? 0) > 0 && (
-                      <p className="text-xs text-muted">
-                        {row.paused_days_total} paused day
-                        {row.paused_days_total === 1 ? '' : 's'} added
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate">
-                    {row.plan_name}
-                    <span className="ml-1.5 text-xs text-muted">
-                      {DURATION_LABEL[row.duration as PlanDuration]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
-                        STATUS_COLOR[row.status ?? 'active']
-                      }`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-slate">{row.expiry_date}</p>
-                    <p className="text-xs text-muted">{whenLabel(row)}</p>
-                  </td>
-                  <td className="px-4 py-3 text-slate">{rupees(Number(row.total_paid ?? 0))}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {busy && <Loader2 size={15} className="animate-spin text-muted" />}
-
-                      {row.status !== 'cancelled' && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setRenewing(row)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
-                        >
-                          <RotateCw size={13} />
-                          Renew
-                        </button>
+      <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white shadow-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
+                <th className="px-5 py-3 font-medium">Member</th>
+                <th className="px-3 py-3 font-medium">Plan</th>
+                <th className="px-3 py-3 font-medium">Status</th>
+                <th className="px-3 py-3 font-medium">Expires</th>
+                <th className="px-3 py-3 font-medium">Paid</th>
+                <th className="px-5 py-3 text-right font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const plan = (plans ?? []).find((p) => p.id === row.plan_id)
+                const busy = busyId === row.id
+                const actions: RowAction[] = [
+                  ...(row.status === 'active'
+                    ? [{ label: 'Pause', icon: Pause, onClick: () => void act(row, 'pause') }]
+                    : []),
+                  ...(row.status === 'paused'
+                    ? [{ label: 'Resume', icon: Play, onClick: () => void act(row, 'resume') }]
+                    : []),
+                  ...(row.status !== 'cancelled'
+                    ? [{ label: 'Cancel membership', icon: X, danger: true, onClick: () => void act(row, 'cancel') }]
+                    : []),
+                ]
+                return (
+                  <tr key={row.id} className="border-b border-border-card/70 last:border-0">
+                    <td className="px-5 py-3.5">
+                      <p className="font-semibold text-ink">{row.member_no}</p>
+                      {(row.paused_days_total ?? 0) > 0 && (
+                        <p className="text-xs text-muted">
+                          {row.paused_days_total} paused day
+                          {row.paused_days_total === 1 ? '' : 's'} added
+                        </p>
                       )}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <p className="font-medium text-ink">{row.plan_name}</p>
+                      <p className="text-xs text-muted">{DURATION_LABEL[row.duration as PlanDuration]}</p>
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <StatusPill label={row.status ?? 'active'} tone={STATUS_TONE[row.status ?? 'active'] ?? 'neutral'} />
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <p className="text-ink">{row.expiry_date}</p>
+                      <p className="text-xs text-muted">{whenLabel(row)}</p>
+                    </td>
+                    <td className="px-3 py-3.5 font-medium text-ink">{rupees(Number(row.total_paid ?? 0))}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-end gap-2">
+                        {busy && <Loader2 size={15} className="animate-spin text-muted" />}
 
-                      {row.status === 'active' && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => act(row, 'pause')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
-                        >
-                          <Pause size={13} />
-                          Pause
-                        </button>
-                      )}
-
-                      {row.status === 'paused' && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => act(row, 'resume')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate disabled:opacity-40"
-                        >
-                          <Play size={13} />
-                          Resume
-                        </button>
-                      )}
-
-                      {row.status !== 'cancelled' && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => act(row, 'cancel')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-negative disabled:opacity-40"
-                        >
-                          <X size={13} />
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-
-                    {renewing?.id === row.id && (
-                      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-                        <span className="text-xs text-muted">Renew for</span>
-                        {(plan ? sellableDurations(plan) : []).map((d) => (
+                        {row.status !== 'cancelled' && (
                           <button
-                            key={d}
                             type="button"
                             disabled={busy}
-                            onClick={() => doRenew(row, d)}
-                            className="rounded-lg bg-ink px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
+                            onClick={() => setRenewing(row)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border-card bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-control hover:bg-surface-muted disabled:opacity-40"
                           >
-                            {DURATION_LABEL[d]}
+                            <RotateCw size={13} />
+                            Renew
                           </button>
-                        ))}
-                        {plan && sellableDurations(plan).length === 0 && (
-                          <span className="text-xs text-amber-700">
-                            This plan no longer prices any term.
-                          </span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setRenewing(null)}
-                          className="text-xs text-muted underline"
-                        >
-                          cancel
-                        </button>
+
+                        {actions.length > 0 && <RowActionsMenu actions={actions} />}
                       </div>
-                    )}
+
+                      {renewing?.id === row.id && (
+                        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                          <span className="text-xs text-muted">Renew for</span>
+                          {(plan ? sellableDurations(plan) : []).map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              disabled={busy}
+                              onClick={() => doRenew(row, d)}
+                              className="rounded-lg bg-ink px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
+                            >
+                              {DURATION_LABEL[d]}
+                            </button>
+                          ))}
+                          {plan && sellableDurations(plan).length === 0 && (
+                            <span className="text-xs text-amber-700">This plan no longer prices any term.</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setRenewing(null)}
+                            className="text-xs text-muted underline"
+                          >
+                            cancel
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted">
+                    Loading memberships…
                   </td>
                 </tr>
-              )
-            })}
+              )}
 
-            {isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
-                  Loading memberships…
-                </td>
-              </tr>
-            )}
-
-            {!isLoading && rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
-                  {query || filter !== 'all'
-                    ? 'No memberships match.'
-                    : 'No memberships sold yet. Define a plan in Settings → Membership Plans, then sell one here.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              {!isLoading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted">
+                    {query || filter !== 'all'
+                      ? 'No memberships match.'
+                      : 'No memberships sold yet. Create a plan on the Plans tab, then sell one here.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {wizardOpen && (

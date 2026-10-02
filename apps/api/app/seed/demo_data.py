@@ -31,6 +31,7 @@ from app.modules.booking.models import (
     Sport,
 )
 from app.modules.booking.service import initials
+from app.modules.branches.models import Branch
 from app.modules.finance.models import CounterKind, MembershipPlan
 from app.modules.finance.numbering import next_number
 
@@ -249,13 +250,31 @@ async def seed_domain_data(session: AsyncSession, prefix: str) -> dict[str, int]
         for slug, sid in (await session.execute(select(Sport.slug, Sport.id))).all()
     }
 
+    # Courts belong to a branch. Reuse the academy's default if provisioning already
+    # made one; otherwise this is a bare database being seeded and it needs one.
+    branch = (
+        await session.execute(select(Branch).where(Branch.is_default.is_(True)))
+    ).scalar_one_or_none()
+    if branch is None:
+        branch = Branch(
+            name="Navigo Sports Arena",
+            address="Survey 42, Kondapur",
+            city="Hyderabad",
+            state="Telangana",
+            pincode="500084",
+            is_default=True,
+            is_active=True,
+        )
+        session.add(branch)
+        await session.flush()
+
     known_courts = await _existing(session, Court, Court.code)
     for code, name, slug, hourly, peak, opens, closes, amenities in COURTS:
         if code in known_courts or slug not in sport_ids:
             continue
         session.add(
             Court(
-                code=code, name=name, sport_id=sport_ids[slug],
+                code=code, name=name, sport_id=sport_ids[slug], branch_id=branch.id,
                 hourly_rate=Decimal(hourly), peak_rate=Decimal(peak),
                 operating_hours={"open": opens, "close": closes},
                 amenities=amenities,

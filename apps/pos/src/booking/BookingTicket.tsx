@@ -18,7 +18,10 @@ export default function BookingTicket({ invoice, className = '' }: { invoice: In
     <div className={`flex w-full flex-col gap-5 rounded-2xl bg-white p-6 font-mono ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-muted">{invoice.facility.name}</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted">
+            {invoice.facility.name}
+            {invoice.facility.branchName ? ` · ${invoice.facility.branchName}` : ''}
+          </p>
           <p className="font-sans text-xl font-semibold text-ink">
             {invoice.sportName} · {invoice.courtName}
           </p>

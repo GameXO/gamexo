@@ -9,6 +9,7 @@ import MembershipCounter from './academy/MembershipCounter'
 import { useAuth } from './auth/AuthProvider'
 import LoginPage from './auth/LoginPage'
 import { useViewportHeight } from './ui/useViewportHeight'
+import { BranchProvider } from './branch/BranchProvider'
 
 export type View = 'home' | 'booking' | 'store' | 'checkin' | 'academy' | 'membership' | 'checkout'
 
@@ -23,7 +24,13 @@ function App() {
   }
   if (status === 'anonymous') return <LoginPage />
 
-  return <Shell />
+  // The branch is chosen after sign-in and before any screen that sells a court, so
+  // it wraps the whole shell rather than any one flow.
+  return (
+    <BranchProvider>
+      <Shell />
+    </BranchProvider>
+  )
 }
 
 function Shell() {

@@ -291,6 +291,30 @@ RequireStaff = Annotated[Principal, Depends(require_roles(Role.RECEPTION))]
 #: endpoint, default to RequireStaff and move it down only if the POS breaks.
 RequireKiosk = Annotated[Principal, Depends(require_roles(Role.KIOSK))]
 
+#: Taking a register: the counter tablet, a coach's own login, and all staff. The
+#: only guard a coach passes besides their own `/academy/me` workspace.
+RequireRegister = Annotated[Principal, Depends(require_roles(Role.COACH))]
+
+
+def _payroll(principal: CurrentPrincipal) -> Principal:
+    """Manager and above, or the accountant — by name, not by rank.
+
+    The accountant sits at the front-desk rung for everything else, so a plain
+    `require_roles` cannot express "accountant, but not reception".
+    """
+    if principal.is_platform_admin or principal.role is Role.ACCOUNTANT:
+        return principal
+    if principal.role is not None and ROLE_HIERARCHY[principal.role] >= ROLE_HIERARCHY[Role.MANAGER]:
+        return principal
+    raise PermissionDeniedError(
+        "Pay and payroll are for managers, admins and the accountant.",
+        details={"actual": principal.role.value if principal.role else None},
+    )
+
+
+#: Coach pay, payroll and payouts.
+RequirePayroll = Annotated[Principal, Depends(_payroll)]
+
 
 async def get_current_platform_admin(
     db: UntenantedDb, credentials: BearerToken = None

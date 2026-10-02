@@ -8,14 +8,18 @@ export default function Tabs<T extends string>({
   onChange: (tab: T) => void
 }) {
   return (
-    <div className="flex w-full gap-1 overflow-x-auto rounded-lg border border-border-input bg-surface p-1">
+    <div role="tablist" className="inline-flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl bg-hover p-1">
       {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
           onClick={() => onChange(tab)}
-          className={`shrink-0 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
-            active === tab ? 'bg-ink text-white' : 'text-slate hover:bg-white/60'
+          role="tab"
+          aria-selected={active === tab}
+          className={`shrink-0 rounded-lg border px-4 py-1.5 text-[14px] font-medium ${
+            active === tab
+              ? 'border-border-input bg-white text-ink'
+              : 'border-transparent text-slate hover:text-ink'
           }`}
         >
           {tab}

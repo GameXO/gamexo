@@ -28,7 +28,7 @@ export default function RevenueByChannelCard({ range }: { range: DashboardRange 
   const max = Math.max(1, ...rows.map((r) => r.revenue))
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5">
+    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
       <div className="flex w-full items-center gap-6">
         <div className="flex flex-1 items-center gap-2.5">
           <img src={storeManagement} alt="" className="size-5" />

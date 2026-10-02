@@ -214,7 +214,7 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
       )}
 
       {adding && (
-        <div className="mt-4 rounded-2xl border border-border-card bg-white p-4">
+        <div className="mt-4 rounded-xl border border-border-card bg-white p-4">
           <label htmlFor="platform-name" className="text-sm font-medium text-ink">
             Platform name
           </label>
@@ -294,7 +294,7 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {cardLabel(d)}
                   {!d.is_ready && (
-                    <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold text-slate uppercase">
+                    <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[11px] font-semibold text-slate uppercase">
                       Soon
                     </span>
                   )}
@@ -398,7 +398,7 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
 
       <div className="mt-4 space-y-3">
         {rows.length === 0 && !adding && (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-border-soft bg-white/60 px-6 py-10 text-center">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-border-soft bg-white/60 px-6 py-10 text-center">
             <Plug size={20} className="text-muted" />
             <p className="mt-3 text-sm font-semibold text-ink">No platforms connected</p>
             <p className="mt-1 max-w-sm text-xs text-slate">
@@ -411,7 +411,7 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
         {rows.map((partner) => (
           <div
             key={partner.id}
-            className="grid grid-cols-1 items-center gap-3 rounded-2xl border border-border-card bg-white p-4 sm:grid-cols-[1fr_auto_1fr]"
+            className="grid grid-cols-1 items-center gap-3 rounded-xl border border-border-card bg-white p-4 sm:grid-cols-[1fr_auto_1fr]"
           >
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-muted">
@@ -420,7 +420,7 @@ export default function BookingPlatforms({ onNotify }: { onNotify: (message: str
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold text-ink">{partner.name}</p>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${
                     partner.is_active ? 'bg-positive/15 text-positive' : 'bg-surface-muted text-slate'
                   }`}
                 >
@@ -580,7 +580,7 @@ function useCopy(value: string) {
 //   const { copied, copy } = useCopy(url)
 
 //   return (
-//     <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border-card bg-surface-muted/50 px-4 py-3">
+//     <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border-card bg-surface-muted/50 px-4 py-3">
 //       <div className="min-w-0 flex-1">
 //         <p className="text-[11px] font-semibold tracking-wide text-slate uppercase">
 //           Base URL — give this to every platform
@@ -617,7 +617,7 @@ function FreshKeyPanel({
   const { copied, copy } = useCopy(partner.api_key)
 
   return (
-    <div className="mt-4 rounded-2xl border border-lime bg-lime/10 p-4">
+    <div className="mt-4 rounded-xl border border-lime bg-lime/10 p-4">
       <p className="text-sm font-semibold text-lime-ink">
         {partner.name}'s API key — copy it now
       </p>

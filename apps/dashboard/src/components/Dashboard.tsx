@@ -27,18 +27,18 @@ export default function Dashboard({
   const statCards = useDashboardStatCards(range)
 
   return (
-    <div className="flex flex-1 flex-col items-start gap-5 overflow-y-auto px-4 py-5 sm:px-6">
-      <p className="w-full text-lg text-ink">
+    <div className="flex flex-1 flex-col items-start gap-6 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <p className="w-full text-base font-medium text-ink">
         {range.preset === 'custom' ? `Overview · ${range.label}` : `${range.label}’s Overview`}
       </p>
 
-      <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {(statCards ?? LOADING_CARDS).map((card) => (
           <StatCard key={card.label} {...card} />
         ))}
       </div>
 
-      <div className="flex w-full flex-col items-stretch gap-5 lg:flex-row">
+      <div className="flex w-full flex-col items-stretch gap-6 lg:flex-row">
         <MonthlyRevenueCard range={range} />
         <SportPopularityCard range={range} />
         <QuickStatsCard range={range} />
@@ -46,7 +46,7 @@ export default function Dashboard({
 
       <RevenueTrendChart />
 
-      <div className="flex w-full flex-col items-stretch gap-5 lg:flex-row">
+      <div className="flex w-full flex-col items-stretch gap-6 lg:flex-row">
         <RevenueByChannelCard range={range} />
         <PrimeHoursCard range={range} />
       </div>

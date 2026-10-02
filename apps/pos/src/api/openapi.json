@@ -1354,6 +1354,167 @@
         "title": "AgeBand",
         "type": "string"
       },
+      "AssessmentCreate": {
+        "properties": {
+          "assessed_by": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed By"
+          },
+          "assessed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed On"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rating"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillScore"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "AssessmentCreate",
+        "type": "object"
+      },
+      "AssessmentOut": {
+        "properties": {
+          "assessed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed By"
+          },
+          "assessed_on": {
+            "format": "date",
+            "title": "Assessed On",
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rating": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rating",
+            "type": "string"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillScore"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "sport_id",
+          "assessed_on",
+          "rating",
+          "skills",
+          "comment",
+          "assessed_by",
+          "created_at"
+        ],
+        "title": "AssessmentOut",
+        "type": "object"
+      },
       "AttendanceBulkMark": {
         "description": "Reception marks a whole batch at once, not one student at a time.",
         "properties": {
@@ -1399,6 +1560,36 @@
           "status"
         ],
         "title": "AttendanceMark",
+        "type": "object"
+      },
+      "AttendanceMonth": {
+        "properties": {
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct"
+          }
+        },
+        "required": [
+          "month",
+          "pct",
+          "marked"
+        ],
+        "title": "AttendanceMonth",
         "type": "object"
       },
       "AttendanceOut": {
@@ -1466,6 +1657,229 @@
         "title": "AttendanceStatus",
         "type": "string"
       },
+      "AttendanceSummary": {
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "integer"
+          },
+          "last_30_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last 30 Pct"
+          },
+          "late": {
+            "title": "Late",
+            "type": "integer"
+          },
+          "monthly": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceMonth"
+            },
+            "title": "Monthly",
+            "type": "array"
+          },
+          "overall_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Pct"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/RecentSession"
+            },
+            "title": "Recent",
+            "type": "array"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "overall_pct",
+          "last_30_pct",
+          "present",
+          "late",
+          "absent",
+          "total",
+          "streak",
+          "monthly",
+          "recent"
+        ],
+        "title": "AttendanceSummary",
+        "type": "object"
+      },
+      "AttentionCounts": {
+        "properties": {
+          "low_attendance": {
+            "title": "Low Attendance",
+            "type": "integer"
+          },
+          "promotion_candidates": {
+            "title": "Promotion Candidates",
+            "type": "integer"
+          },
+          "renewals_due": {
+            "title": "Renewals Due",
+            "type": "integer"
+          },
+          "repeat_absentees": {
+            "title": "Repeat Absentees",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "repeat_absentees",
+          "low_attendance",
+          "renewals_due",
+          "promotion_candidates"
+        ],
+        "title": "AttentionCounts",
+        "type": "object"
+      },
+      "AttentionItem": {
+        "properties": {
+          "avatar_initials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Initials"
+          },
+          "batch_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Name"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_no": {
+            "title": "Student No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_no",
+          "name",
+          "photo_url",
+          "avatar_initials",
+          "batch_name",
+          "sport_id",
+          "detail"
+        ],
+        "title": "AttentionItem",
+        "type": "object"
+      },
+      "AttentionOut": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/AttentionCounts"
+          },
+          "low_attendance": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItem"
+            },
+            "title": "Low Attendance",
+            "type": "array"
+          },
+          "promotion_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItem"
+            },
+            "title": "Promotion Candidates",
+            "type": "array"
+          },
+          "renewals_due": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItem"
+            },
+            "title": "Renewals Due",
+            "type": "array"
+          },
+          "repeat_absentees": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItem"
+            },
+            "title": "Repeat Absentees",
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "repeat_absentees",
+          "low_attendance",
+          "renewals_due",
+          "promotion_candidates"
+        ],
+        "title": "AttentionOut",
+        "type": "object"
+      },
       "AvailabilityResponse": {
         "properties": {
           "courts": {
@@ -1489,6 +1903,25 @@
           "message"
         ],
         "title": "AvailabilityResponse",
+        "type": "object"
+      },
+      "BatchAssign": {
+        "properties": {
+          "batch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Batch Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_ids"
+        ],
+        "title": "BatchAssign",
         "type": "object"
       },
       "BatchCreate": {
@@ -2216,8 +2649,33 @@
             "title": "Balance Due",
             "type": "string"
           },
+          "booked_via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "booking_type": {
             "$ref": "#/components/schemas/BookingType"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BranchInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string"
           },
           "court_charge": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -2425,6 +2883,7 @@
           "customer_phone",
           "sport_id",
           "court_id",
+          "branch_id",
           "starts_at",
           "ends_at",
           "duration_min",
@@ -2597,8 +3056,23 @@
             "title": "Balance Due",
             "type": "string"
           },
+          "booked_via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "booking_type": {
             "$ref": "#/components/schemas/BookingType"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string"
           },
           "court_charge": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -2784,6 +3258,7 @@
           "customer_phone",
           "sport_id",
           "court_id",
+          "branch_id",
           "starts_at",
           "ends_at",
           "duration_min",
@@ -2804,6 +3279,16 @@
         ],
         "title": "BookingOut",
         "type": "object"
+      },
+      "BookingSource": {
+        "description": "Which desk a booking was taken at. Stamped by the server from who was logged in.\n\nNever read from the request body: the whole point of the field is that the\nreceipt and the reports can be trusted about it, and a client-supplied value\nwould let a mis-built (or hostile) frontend claim whatever it liked.\n\nDistinct from `Booking.booking_type` (walk-in / advance / ...), which says what\n*kind* of booking it is, and from `Booking.source_platform`, which names the\nthird-party marketplace \u2014 `PARTNER` is only the umbrella for that.",
+        "enum": [
+          "counter",
+          "office_desk",
+          "partner"
+        ],
+        "title": "BookingSource",
+        "type": "string"
       },
       "BookingStatus": {
         "enum": [
@@ -2943,6 +3428,443 @@
           }
         },
         "title": "BookingUpdate",
+        "type": "object"
+      },
+      "BranchCreate": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "gstin": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Leave empty to print the academy's own GSTIN from Settings.",
+            "title": "Gstin"
+          },
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pincode"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BranchCreate",
+        "type": "object"
+      },
+      "BranchInfo": {
+        "description": "A branch as it prints on a bill.\n\nCarried inside booking and invoice responses so the POS and the dashboard render\nthe issuing site from the server's own record instead of a constant baked into the\nbundle. `gstin` is already resolved: the branch's own when it has one, otherwise\nthe academy's \u2014 a client never has to know there was a fallback.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "gstin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gstin"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pincode"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "BranchInfo",
+        "type": "object"
+      },
+      "BranchOut": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "effective_gstin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Gstin"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "gstin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gstin"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pincode"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "is_default",
+          "is_active"
+        ],
+        "title": "BranchOut",
+        "type": "object"
+      },
+      "BranchUpdate": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "gstin": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gstin"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "pincode": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pincode"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "title": "BranchUpdate",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -3091,6 +4013,112 @@
         "title": "ChannelSpend",
         "type": "object"
       },
+      "CoachBatchRow": {
+        "properties": {
+          "attendance_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Pct"
+          },
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "enrolled": {
+            "title": "Enrolled",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "program_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program Name"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "time_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Label"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sport_id",
+          "program_name",
+          "schedule",
+          "time_label",
+          "location",
+          "status",
+          "capacity",
+          "enrolled",
+          "attendance_pct"
+        ],
+        "title": "CoachBatchRow",
+        "type": "object"
+      },
       "CoachCreate": {
         "properties": {
           "bio": {
@@ -3110,6 +4138,21 @@
             },
             "title": "Certifications",
             "type": "array"
+          },
+          "commission_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Commission Pct"
           },
           "email": {
             "anyOf": [
@@ -3190,6 +4233,10 @@
             "title": "Name",
             "type": "string"
           },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel",
+            "default": "fixed"
+          },
           "phone": {
             "anyOf": [
               {
@@ -3250,6 +4297,100 @@
         "title": "CoachCreate",
         "type": "object"
       },
+      "CoachEarnings": {
+        "description": "What a coach has earned for one month, recomputed from sessions and payments.\n\n`payout` is what was actually paid, if anything \u2014 and when present it is the\nrecord of truth, not these figures, which move with later refunds or rate changes.",
+        "properties": {
+          "base_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Base Amount",
+            "type": "string"
+          },
+          "coach_id": {
+            "format": "uuid",
+            "title": "Coach Id",
+            "type": "string"
+          },
+          "commission_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Amount",
+            "type": "string"
+          },
+          "commission_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Pct",
+            "type": "string"
+          },
+          "fees_collected": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fees Collected",
+            "type": "string"
+          },
+          "gross": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Gross",
+            "type": "string"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/EarningLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel"
+          },
+          "payout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachPayoutOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "due",
+              "nothing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coach_id",
+          "period",
+          "pay_model",
+          "sessions",
+          "hours",
+          "fees_collected",
+          "commission_pct",
+          "base_amount",
+          "commission_amount",
+          "gross",
+          "lines",
+          "status"
+        ],
+        "title": "CoachEarnings",
+        "type": "object"
+      },
       "CoachOut": {
         "properties": {
           "active_batches": {
@@ -3288,6 +4429,12 @@
           },
           "coach_no": {
             "title": "Coach No",
+            "type": "string"
+          },
+          "commission_pct": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Pct",
             "type": "string"
           },
           "email": {
@@ -3366,6 +4513,10 @@
             "title": "Name",
             "type": "string"
           },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel",
+            "default": "fixed"
+          },
           "phone": {
             "anyOf": [
               {
@@ -3431,6 +4582,522 @@
         "title": "CoachOut",
         "type": "object"
       },
+      "CoachPay": {
+        "description": "Everything about money, and only ever sent to a manager or admin.",
+        "properties": {
+          "commission_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Pct",
+            "type": "string"
+          },
+          "current": {
+            "$ref": "#/components/schemas/CoachEarnings"
+          },
+          "hourly_rate": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hourly Rate",
+            "type": "string"
+          },
+          "paid_to_date": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid To Date",
+            "type": "string"
+          },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel"
+          },
+          "payouts": {
+            "items": {
+              "$ref": "#/components/schemas/CoachPayoutOut"
+            },
+            "title": "Payouts",
+            "type": "array"
+          },
+          "salary": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Salary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pay_model",
+          "salary",
+          "hourly_rate",
+          "commission_pct",
+          "current",
+          "payouts",
+          "paid_to_date"
+        ],
+        "title": "CoachPay",
+        "type": "object"
+      },
+      "CoachPayoutOut": {
+        "properties": {
+          "adjustment": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Adjustment",
+            "type": "string"
+          },
+          "adjustment_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjustment Note"
+          },
+          "base_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Base Amount",
+            "type": "string"
+          },
+          "coach_id": {
+            "format": "uuid",
+            "title": "Coach Id",
+            "type": "string"
+          },
+          "coach_name": {
+            "title": "Coach Name",
+            "type": "string"
+          },
+          "commission_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Amount",
+            "type": "string"
+          },
+          "commission_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Pct",
+            "type": "string"
+          },
+          "fees_collected": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fees Collected",
+            "type": "string"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "paid_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid By"
+          },
+          "paid_on": {
+            "format": "date",
+            "title": "Paid On",
+            "type": "string"
+          },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel"
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "coach_id",
+          "coach_name",
+          "period",
+          "pay_model",
+          "sessions",
+          "hours",
+          "fees_collected",
+          "commission_pct",
+          "base_amount",
+          "commission_amount",
+          "adjustment",
+          "adjustment_note",
+          "total",
+          "method",
+          "reference",
+          "paid_on",
+          "note",
+          "paid_by"
+        ],
+        "title": "CoachPayoutOut",
+        "type": "object"
+      },
+      "CoachProfile": {
+        "properties": {
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/CoachBatchRow"
+            },
+            "title": "Batches",
+            "type": "array"
+          },
+          "coach": {
+            "$ref": "#/components/schemas/CoachOut"
+          },
+          "monthly": {
+            "items": {
+              "$ref": "#/components/schemas/MonthPoint"
+            },
+            "title": "Monthly",
+            "type": "array"
+          },
+          "pay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachPay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rating_breakdown": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Rating Breakdown",
+            "type": "array"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/SessionBrief"
+            },
+            "title": "Recent",
+            "type": "array"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/CoachReviewOut"
+            },
+            "title": "Reviews",
+            "type": "array"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CoachStats"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/StudentRow"
+            },
+            "title": "Students",
+            "type": "array"
+          },
+          "students_total": {
+            "title": "Students Total",
+            "type": "integer"
+          },
+          "upcoming": {
+            "items": {
+              "$ref": "#/components/schemas/SessionBrief"
+            },
+            "title": "Upcoming",
+            "type": "array"
+          }
+        },
+        "required": [
+          "coach",
+          "stats",
+          "batches",
+          "students",
+          "students_total",
+          "upcoming",
+          "recent",
+          "reviews",
+          "rating_breakdown",
+          "monthly"
+        ],
+        "title": "CoachProfile",
+        "type": "object"
+      },
+      "CoachRemoval": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "deleted",
+              "archived"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reassigned_batches": {
+            "title": "Reassigned Batches",
+            "type": "integer"
+          },
+          "reassigned_programs": {
+            "title": "Reassigned Programs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outcome",
+          "reassigned_batches",
+          "reassigned_programs"
+        ],
+        "title": "CoachRemoval",
+        "type": "object"
+      },
+      "CoachReviewCreate": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "rating": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating",
+            "type": "integer"
+          },
+          "reviewed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed On"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "CoachReviewCreate",
+        "type": "object"
+      },
+      "CoachReviewOut": {
+        "properties": {
+          "coach_id": {
+            "format": "uuid",
+            "title": "Coach Id",
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "integer"
+          },
+          "recorded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
+          },
+          "reviewed_on": {
+            "format": "date",
+            "title": "Reviewed On",
+            "type": "string"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "id",
+          "coach_id",
+          "student_id",
+          "reviewer_name",
+          "rating",
+          "comment",
+          "reviewed_on",
+          "recorded_by"
+        ],
+        "title": "CoachReviewOut",
+        "type": "object"
+      },
+      "CoachStats": {
+        "properties": {
+          "avg_student_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Student Rating"
+          },
+          "batches": {
+            "title": "Batches",
+            "type": "integer"
+          },
+          "hours_30d": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours 30D",
+            "type": "string"
+          },
+          "rating": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rating",
+            "type": "string"
+          },
+          "review_count": {
+            "title": "Review Count",
+            "type": "integer"
+          },
+          "sessions_cancelled_30d": {
+            "title": "Sessions Cancelled 30D",
+            "type": "integer"
+          },
+          "sessions_completed_30d": {
+            "title": "Sessions Completed 30D",
+            "type": "integer"
+          },
+          "student_attendance_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Attendance Pct"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "batches",
+          "sessions_completed_30d",
+          "sessions_cancelled_30d",
+          "hours_30d",
+          "avg_student_rating",
+          "student_attendance_pct",
+          "review_count",
+          "rating"
+        ],
+        "title": "CoachStats",
+        "type": "object"
+      },
       "CoachStatus": {
         "enum": [
           "active",
@@ -3476,6 +5143,23 @@
               }
             ],
             "title": "Certifications"
+          },
+          "commission_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commission Pct"
           },
           "email": {
             "anyOf": [
@@ -3589,6 +5273,16 @@
               }
             ],
             "title": "Name"
+          },
+          "pay_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "phone": {
             "anyOf": [
@@ -3819,6 +5513,18 @@
             "title": "Amenities",
             "type": "array"
           },
+          "branch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
+          },
           "code": {
             "maxLength": 50,
             "minLength": 1,
@@ -3949,6 +5655,11 @@
             "title": "Amenities",
             "type": "array"
           },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -4048,7 +5759,8 @@
           "hourly_rate",
           "peak_rate",
           "id",
-          "code"
+          "code",
+          "branch_id"
         ],
         "title": "CourtOut",
         "type": "object"
@@ -4068,6 +5780,18 @@
               }
             ],
             "title": "Amenities"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
           },
           "display_order": {
             "anyOf": [
@@ -4266,6 +5990,11 @@
             "title": "Amenities",
             "type": "array"
           },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -4394,6 +6123,7 @@
           "peak_rate",
           "id",
           "code",
+          "branch_id",
           "status"
         ],
         "title": "CourtWithStatus",
@@ -5213,6 +6943,31 @@
         "title": "DialectOut",
         "type": "object"
       },
+      "EarningLine": {
+        "description": "One line of how a month's pay was worked out, so nobody has to take it on trust.",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "detail",
+          "amount"
+        ],
+        "title": "EarningLine",
+        "type": "object"
+      },
       "EnrollmentCreate": {
         "properties": {
           "batch_id": {
@@ -6007,6 +7762,100 @@
         "title": "FeeCollection",
         "type": "object"
       },
+      "FeeHistoryRow": {
+        "properties": {
+          "enrollment_id": {
+            "format": "uuid",
+            "title": "Enrollment Id",
+            "type": "string"
+          },
+          "paid": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid",
+            "type": "string"
+          },
+          "pending": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending",
+            "type": "string"
+          },
+          "program_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program Name"
+          },
+          "renewal_date": {
+            "format": "date",
+            "title": "Renewal Date",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus"
+          },
+          "total_fee": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Fee",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enrollment_id",
+          "program_name",
+          "start_date",
+          "renewal_date",
+          "total_fee",
+          "paid",
+          "pending",
+          "status"
+        ],
+        "title": "FeeHistoryRow",
+        "type": "object"
+      },
+      "FeeSummary": {
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/FeeHistoryRow"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "paid": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid",
+            "type": "string"
+          },
+          "pending": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending",
+            "type": "string"
+          },
+          "total_fee": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Fee",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total_fee",
+          "paid",
+          "pending",
+          "history"
+        ],
+        "title": "FeeSummary",
+        "type": "object"
+      },
       "Gender": {
         "enum": [
           "male",
@@ -6173,6 +8022,28 @@
               }
             ],
             "title": "Booking Id"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BranchInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
           },
           "created_at": {
             "format": "date-time",
@@ -6458,6 +8329,18 @@
               }
             ],
             "title": "Booking Id"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
           },
           "created_at": {
             "format": "date-time",
@@ -6767,6 +8650,30 @@
           "outstanding_dues"
         ],
         "title": "Kpis",
+        "type": "object"
+      },
+      "LevelEntry": {
+        "properties": {
+          "assessed_on": {
+            "format": "date",
+            "title": "Assessed On",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/SkillLevel"
+          },
+          "sport_id": {
+            "format": "uuid",
+            "title": "Sport Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sport_id",
+          "level",
+          "assessed_on"
+        ],
+        "title": "LevelEntry",
         "type": "object"
       },
       "LoginRequest": {
@@ -7391,6 +9298,66 @@
         ],
         "title": "MembershipTier",
         "type": "string"
+      },
+      "MonthPoint": {
+        "properties": {
+          "earned": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earned"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "paid": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "sessions",
+          "hours",
+          "rating"
+        ],
+        "title": "MonthPoint",
+        "type": "object"
       },
       "MovementCreate": {
         "properties": {
@@ -8455,6 +10422,42 @@
         "title": "Page[StudentOut]",
         "type": "object"
       },
+      "Page_StudentRow_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages"
+        ],
+        "title": "Page[StudentRow]",
+        "type": "object"
+      },
       "Page_SubscriptionOut_": {
         "properties": {
           "items": {
@@ -9047,6 +11050,17 @@
         "title": "PartnerWithKey",
         "type": "object"
       },
+      "PayModel": {
+        "description": "How a coach is paid. Which of `salary`, `hourly_rate` and `commission_pct`\ncount is decided by this, so a coach can carry all three numbers without anyone\nhaving to blank the unused ones.",
+        "enum": [
+          "fixed",
+          "hourly",
+          "commission",
+          "hybrid"
+        ],
+        "title": "PayModel",
+        "type": "string"
+      },
       "PaymentCreate": {
         "properties": {
           "amount": {
@@ -9333,6 +11347,252 @@
           "by_method"
         ],
         "title": "PaymentsOverview",
+        "type": "object"
+      },
+      "PayoutCreate": {
+        "properties": {
+          "adjustment": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": -1000000.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Adjustment"
+          },
+          "adjustment_note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjustment Note"
+          },
+          "method": {
+            "default": "bank",
+            "enum": [
+              "cash",
+              "upi",
+              "bank",
+              "cheque"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "month": {
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "paid_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid On"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          }
+        },
+        "required": [
+          "month"
+        ],
+        "title": "PayoutCreate",
+        "type": "object"
+      },
+      "Payroll": {
+        "properties": {
+          "current_period": {
+            "format": "date",
+            "title": "Current Period",
+            "type": "string"
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PayrollRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Due",
+            "type": "string"
+          },
+          "total_gross": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Gross",
+            "type": "string"
+          },
+          "total_paid": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Paid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period",
+          "current_period",
+          "rows",
+          "total_gross",
+          "total_paid",
+          "total_due"
+        ],
+        "title": "Payroll",
+        "type": "object"
+      },
+      "PayrollRow": {
+        "properties": {
+          "avatar_initials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Initials"
+          },
+          "base_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Base Amount",
+            "type": "string"
+          },
+          "coach_id": {
+            "format": "uuid",
+            "title": "Coach Id",
+            "type": "string"
+          },
+          "coach_no": {
+            "title": "Coach No",
+            "type": "string"
+          },
+          "coach_status": {
+            "$ref": "#/components/schemas/CoachStatus"
+          },
+          "commission_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Commission Amount",
+            "type": "string"
+          },
+          "fees_collected": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fees Collected",
+            "type": "string"
+          },
+          "gross": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Gross",
+            "type": "string"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "paid_total": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid Total"
+          },
+          "pay_model": {
+            "$ref": "#/components/schemas/PayModel"
+          },
+          "payout_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payout Id"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "due",
+              "nothing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coach_id",
+          "coach_no",
+          "name",
+          "avatar_initials",
+          "coach_status",
+          "pay_model",
+          "sessions",
+          "hours",
+          "fees_collected",
+          "base_amount",
+          "commission_amount",
+          "gross",
+          "status"
+        ],
+        "title": "PayrollRow",
         "type": "object"
       },
       "PeakHour": {
@@ -10906,6 +13166,35 @@
         "title": "QuoteRequest",
         "type": "object"
       },
+      "RecentSession": {
+        "properties": {
+          "batch_name": {
+            "title": "Batch Name",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttendanceStatus"
+          }
+        },
+        "required": [
+          "session_id",
+          "starts_at",
+          "batch_name",
+          "status"
+        ],
+        "title": "RecentSession",
+        "type": "object"
+      },
       "RefreshRequest": {
         "properties": {
           "refresh_token": {
@@ -11151,6 +13440,57 @@
           "steps"
         ],
         "title": "ScenarioResult",
+        "type": "object"
+      },
+      "SessionBrief": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "batch_name": {
+            "title": "Batch Name",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "batch_name",
+          "starts_at",
+          "ends_at",
+          "status",
+          "marked",
+          "present"
+        ],
+        "title": "SessionBrief",
         "type": "object"
       },
       "SessionCreate": {
@@ -12675,6 +15015,56 @@
         "title": "StaffUpdate",
         "type": "object"
       },
+      "Standing": {
+        "description": "Where the student ranks among their current batch.\n\nScore is 60% overall rating (0-10 scaled to 100) plus 40% attendance. A weighting\nchosen so that turning up counts for nearly as much as talent \u2014 the figure is for\na coach's conversation with a parent, not a league table.",
+        "properties": {
+          "batch_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Name"
+          },
+          "batch_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Rank"
+          },
+          "batch_size": {
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "batch_name",
+          "batch_rank",
+          "batch_size",
+          "score"
+        ],
+        "title": "Standing",
+        "type": "object"
+      },
       "StartSignup": {
         "properties": {
           "email": {
@@ -12883,6 +15273,17 @@
             ],
             "title": "Phone"
           },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
           "skills": {
             "items": {
               "$ref": "#/components/schemas/SkillScore"
@@ -13089,6 +15490,17 @@
               }
             ],
             "title": "Phone"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
           },
           "program_id": {
             "anyOf": [
@@ -13299,6 +15711,17 @@
             ],
             "title": "Phone"
           },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
           "skills": {
             "items": {
               "$ref": "#/components/schemas/SkillScore"
@@ -13321,6 +15744,442 @@
           "student_no"
         ],
         "title": "StudentOut",
+        "type": "object"
+      },
+      "StudentPersonal": {
+        "properties": {
+          "achievements": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Achievements",
+            "type": "array"
+          },
+          "blood_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Group"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "joined_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined On"
+          }
+        },
+        "required": [
+          "email",
+          "gender",
+          "date_of_birth",
+          "blood_group",
+          "achievements",
+          "joined_on"
+        ],
+        "title": "StudentPersonal",
+        "type": "object"
+      },
+      "StudentProfile": {
+        "properties": {
+          "assessments": {
+            "items": {
+              "$ref": "#/components/schemas/AssessmentOut"
+            },
+            "title": "Assessments",
+            "type": "array"
+          },
+          "attendance": {
+            "$ref": "#/components/schemas/AttendanceSummary"
+          },
+          "fees": {
+            "$ref": "#/components/schemas/FeeSummary"
+          },
+          "personal": {
+            "$ref": "#/components/schemas/StudentPersonal"
+          },
+          "previous_skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillScore"
+            },
+            "title": "Previous Skills",
+            "type": "array"
+          },
+          "promotions": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionOut"
+            },
+            "title": "Promotions",
+            "type": "array"
+          },
+          "row": {
+            "$ref": "#/components/schemas/StudentRow"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillScore"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/Standing"
+          }
+        },
+        "required": [
+          "row",
+          "personal",
+          "promotions",
+          "attendance",
+          "assessments",
+          "skills",
+          "previous_skills",
+          "fees",
+          "standing"
+        ],
+        "title": "StudentProfile",
+        "type": "object"
+      },
+      "StudentRow": {
+        "description": "One line of the students table: who, where they train, and how it is going.\n\nEverything after `status` is derived at request time \u2014 attendance, fee state and\nthe attention flags are never stored, so they cannot go stale between a register\nbeing marked and somebody opening this screen.",
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "attendance_overall_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Overall Pct"
+          },
+          "attendance_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Pct"
+          },
+          "avatar_initials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Initials"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "batch_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Name"
+          },
+          "coach_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coach Id"
+          },
+          "coach_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coach Name"
+          },
+          "days_to_renewal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days To Renewal"
+          },
+          "fee_status": {
+            "enum": [
+              "paid",
+              "due",
+              "none"
+            ],
+            "title": "Fee Status",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "enum": [
+                "repeat_absentee",
+                "low_attendance",
+                "renewal_due",
+                "promotion_ready"
+              ],
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/LevelEntry"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Name"
+          },
+          "pending_fee": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Fee",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "program_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program Id"
+          },
+          "program_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program Name"
+          },
+          "rating": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rating",
+            "type": "string"
+          },
+          "renewal_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Date"
+          },
+          "renewal_state": {
+            "enum": [
+              "ok",
+              "due_soon",
+              "lapsed",
+              "none"
+            ],
+            "title": "Renewal State",
+            "type": "string"
+          },
+          "sessions_marked_30d": {
+            "title": "Sessions Marked 30D",
+            "type": "integer"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StudentStatus"
+          },
+          "student_no": {
+            "title": "Student No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_no",
+          "name",
+          "photo_url",
+          "avatar_initials",
+          "age",
+          "gender",
+          "parent_name",
+          "phone",
+          "status",
+          "program_id",
+          "program_name",
+          "sport_id",
+          "batch_id",
+          "batch_name",
+          "coach_id",
+          "coach_name",
+          "levels",
+          "attendance_pct",
+          "attendance_overall_pct",
+          "sessions_marked_30d",
+          "rating",
+          "fee_status",
+          "pending_fee",
+          "renewal_date",
+          "renewal_state",
+          "days_to_renewal",
+          "flags"
+        ],
+        "title": "StudentRow",
         "type": "object"
       },
       "StudentStatus": {
@@ -13458,6 +16317,17 @@
               }
             ],
             "title": "Phone"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
           },
           "skills": {
             "anyOf": [
@@ -14316,6 +17186,33 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/academy/attention": {
+      "get": {
+        "description": "Four lists over active students: repeat absentees (3+ absences in 14 days), low attendance (under 60% over 30 days, with at least 4 marked sessions), terms ending within 7 days or already lapsed, and promotion candidates (rated 8+, 80%+ attendance, at least 45 days at the current level).\n\nA promotion candidate is a suggestion for a coach to look at, not a decision \u2014 promoting stays a manager's call.",
+        "operationId": "academy_studentsNeedingAttention",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Students who need a call, a renewal or a promotion look",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
     "/api/v1/academy/batches": {
       "get": {
         "operationId": "academy_listBatches",
@@ -14489,6 +17386,47 @@
           }
         ],
         "summary": "Update a batch",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coach-reviews/{review_id}": {
+      "delete": {
+        "operationId": "academy_deleteCoachReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete a coach review",
         "tags": [
           "academy"
         ]
@@ -14670,6 +17608,70 @@
       }
     },
     "/api/v1/academy/coaches/{coach_id}": {
+      "delete": {
+        "description": "Hands their open batches and programmes to `reassign_to` (or to nobody), then deletes the coach \u2014 **unless** they have history: sessions taught, students enrolled, reviews or pay on record. Those are kept, so the coach is made inactive instead and `outcome` says `archived`.",
+        "operationId": "academy_removeCoach",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reassign_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reassign To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachRemoval"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove a coach",
+        "tags": [
+          "academy"
+        ]
+      },
       "patch": {
         "operationId": "academy_updateCoach",
         "parameters": [
@@ -14722,6 +17724,358 @@
           }
         ],
         "summary": "Update a coach",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/assign": {
+      "post": {
+        "description": "Takes the batches from whoever had them. Their active students and their upcoming sessions move too; past sessions and finished enrolments stay with the coach who actually taught them.",
+        "operationId": "academy_assignBatches",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAssign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Put batches under this coach",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/earnings": {
+      "get": {
+        "operationId": "academy_coachEarnings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachEarnings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "What a coach has earned in a month, and how it adds up",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/payouts": {
+      "post": {
+        "description": "The amounts are worked out here from the month's sessions and collected fees \u2014 the client sends only an optional bonus or deduction. What is recorded is a snapshot: later refunds or rate changes do not rewrite it. A month can be paid once; to correct one, an admin deletes it and records it again.",
+        "operationId": "academy_recordPayout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachPayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Record a payout for a month",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/profile": {
+      "get": {
+        "description": "Everything is derived when asked. The `pay` block \u2014 salary, this month's earnings and payout history \u2014 is only present for a manager or admin; for anyone below, the coach's pay fields are zeroed as well.",
+        "operationId": "academy_coachProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "A coach's page: classes, students, ratings, reviews, attendance and pay",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/reviews": {
+      "post": {
+        "description": "Updates the coach's rating to the average of all their reviews.",
+        "operationId": "academy_addCoachReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachReviewCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Record feedback on a coach",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/coaches/{coach_id}/unassign": {
+      "post": {
+        "description": "Leaves them with no coach until another is assigned.",
+        "operationId": "academy_unassignBatches",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "coach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Coach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAssign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Take batches off this coach",
         "tags": [
           "academy"
         ]
@@ -14796,6 +18150,105 @@
           }
         ],
         "summary": "Coaching dashboard summary",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/payouts/{payout_id}": {
+      "delete": {
+        "description": "Admin only \u2014 it removes a financial record, after which the month can be paid again.",
+        "operationId": "academy_deletePayout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "payout_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Payout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete a payout recorded in error",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/payroll": {
+      "get": {
+        "operationId": "academy_coachPayroll",
+        "parameters": [
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payroll"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Every coach's earnings for a month, and who has been paid",
         "tags": [
           "academy"
         ]
@@ -14950,6 +18403,226 @@
           }
         ],
         "summary": "Update a programme",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/roster": {
+      "get": {
+        "description": "Every figure after `status` \u2014 attendance, fee state, renewal and the `flags` \u2014 is derived at request time from registers, enrolments and payments, never stored.\n\n`attendance_pct` covers the last 30 days and is null when nothing was marked in that window. Rows with no value for the sort key always come last, so sorting attendance ascending leads with the students who are actually missing classes rather than the ones with no data.\n\n`attention` keeps only students carrying that flag.",
+        "operationId": "academy_studentRoster",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StudentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sport_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sport Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "batch_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "coach_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Coach Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SkillLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fee_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(paid|due|none)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fee Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attention",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(repeat_absentee|low_attendance|renewal_due|promotion_ready)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attention"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "pattern": "^(name|attendance|rating|renewal)$",
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desc",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Desc",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "1-indexed page number",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "1-indexed page number",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StudentRow_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "The students table: who, where they train, and how it is going",
         "tags": [
           "academy"
         ]
@@ -15613,6 +19286,65 @@
         ]
       }
     },
+    "/api/v1/academy/students/{student_id}/assessments": {
+      "post": {
+        "description": "Records a dated review \u2014 an overall score, the skill scores behind it, and a comment. Reviews are kept as history so progress can be plotted.\n\nThe newest review is mirrored onto the student (`performance_rating`, and `skills` when supplied), so screens that read the student stay current. Back-dating a review never overwrites a newer one.\n\nManager and above. A review is distinct from a promotion: it scores how well someone is playing, whereas a promotion moves them up the ladder.",
+        "operationId": "academy_addAssessment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssessmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Review a student",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
     "/api/v1/academy/students/{student_id}/enrollments": {
       "get": {
         "description": "The history the frontend's flat Student interface would have destroyed on renewal.",
@@ -15714,6 +19446,54 @@
           }
         ],
         "summary": "Where a student stands, per sport",
+        "tags": [
+          "academy"
+        ]
+      }
+    },
+    "/api/v1/academy/students/{student_id}/profile": {
+      "get": {
+        "operationId": "academy_studentProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Everything about one student: performance, attendance, standing, fees",
         "tags": [
           "academy"
         ]
@@ -17601,6 +21381,161 @@
         ]
       }
     },
+    "/api/v1/branches": {
+      "get": {
+        "description": "Active branches, default first. The counter tablet reads this to let staff pick which site it is sitting in. Reception and above may also pass `include_inactive` to see closed ones; for the tablet it is ignored.",
+        "operationId": "branches_listBranches",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BranchOut"
+                  },
+                  "title": "Response Branches Listbranches",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List branches",
+        "tags": [
+          "branches"
+        ]
+      },
+      "post": {
+        "operationId": "branches_createBranch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Add a branch",
+        "tags": [
+          "branches"
+        ]
+      }
+    },
+    "/api/v1/branches/{branch_id}": {
+      "patch": {
+        "operationId": "branches_updateBranch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update a branch",
+        "tags": [
+          "branches"
+        ]
+      }
+    },
     "/api/v1/courts": {
       "get": {
         "description": "`status` is derived at request time from bookings and the maintenance flag, not stored \u2014 a stored status goes stale the moment a session ends.",
@@ -17621,6 +21556,23 @@
                 }
               ],
               "title": "Sport Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
             }
           },
           {

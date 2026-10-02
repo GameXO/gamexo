@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Check, Download, Mail, MessageCircle, Printer, RotateCcw, Send } from 'lucide-react'
-import type { Draft } from '../../data/booking'
+import { sourceLabel, type Draft } from '../../data/booking'
 import type { BookingQuote } from '../../api/hooks'
 import { buildInvoice, invoiceSummaryText } from '../invoice'
 import { downloadInvoicePdf } from '../../lib/invoicePdf'
 import { shareOnWhatsApp } from '../../lib/share'
 import BookingTicket from '../BookingTicket'
+import { useIssuer } from '../useIssuer'
 
 function ActionButton({
   icon: Icon,
@@ -41,7 +42,8 @@ export default function Confirmation({
   onDone: () => void
   onBookAnother: () => void
 }) {
-  const invoice = buildInvoice(draft, { bookingId, quote })
+  const issuer = useIssuer(draft.courtId)
+  const invoice = buildInvoice(draft, { bookingId, quote, issuer, source: sourceLabel('office_desk') })
   const [email, setEmail] = useState(draft.customer.email || '')
   const [queued, setQueued] = useState(false)
 

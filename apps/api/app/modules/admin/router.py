@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -85,6 +86,9 @@ class SettingsOut(BaseModel):
     notification_sender_email: str | None
 
 
+_HEX_COLOUR = re.compile(r"#[0-9A-Fa-f]{6}")
+
+
 class SettingsUpdate(BaseModel):
     business_name: str | None = Field(default=None, min_length=1, max_length=200)
     phone: str | None = None
@@ -106,6 +110,17 @@ class SettingsUpdate(BaseModel):
     enabled_services: dict[str, bool] | None = None
     notification_sender_name: str | None = None
     notification_sender_email: EmailStr | None = None
+
+    @field_validator("brand_primary", "brand_accent", "brand_background")
+    @classmethod
+    def _hex_colour(cls, v: str | None) -> str | None:
+        # These land unescaped inside inline CSS in every email we send, so anything
+        # that is not a plain hex colour is rejected rather than stored.
+        if v is None:
+            return None
+        if not _HEX_COLOUR.fullmatch(v):
+            raise ValueError("Use a hex colour such as #B5E770")
+        return v.upper()
 
     @field_validator("enabled_services")
     @classmethod

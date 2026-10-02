@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail import Message, send_email
 from app.core.mail_templates import booking_confirmation, invoice_raised, payment_receipt
+from app.modules.branches.models import Branch
 from app.db.session import dispose_engine, tenant_session, untenanted_session
 from app.models.tenant import Tenant, TenantSettings, TenantStatus
 from app.modules.admin.models import Job, JobState, Notification, NotificationKind
@@ -332,12 +333,14 @@ async def _job_invoice_email(session: AsyncSession, payload: dict[str, Any]) -> 
         return "invoice no longer exists; skipped"
 
     tenant_settings = await _tenant_settings(session)
+    branch = await session.get(Branch, invoice.branch_id) if invoice.branch_id else None
     return await _deliver(
         session,
         tenant_settings,
         payload,
         invoice_raised(
             tenant_settings,
+            branch=branch,
             invoice_no=invoice.invoice_no,
             customer_name=invoice.customer_name,
             items=list(invoice.items or []),

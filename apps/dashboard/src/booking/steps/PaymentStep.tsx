@@ -1,10 +1,11 @@
-import { money, type Draft } from '../../data/booking'
+import { money, sourceLabel, type Draft } from '../../data/booking'
 import type { BookingQuote } from '../../api/hooks'
 import { buildInvoice } from '../invoice'
 import { downloadInvoicePdf } from '../../lib/invoicePdf'
 import InvoiceDocument from '../InvoiceDocument'
 import BookingTicket from '../BookingTicket'
 import { STEPS } from '../Stepper'
+import { useIssuer } from '../useIssuer'
 
 export default function PaymentStep({
   draft,
@@ -23,7 +24,10 @@ export default function PaymentStep({
   onPay: () => void
   onEditStep: (step: number) => void
 }) {
-  const invoice = buildInvoice(draft, { quote })
+  const issuer = useIssuer(draft.courtId)
+  // Everything booked from this app is taken at the office desk; the server stamps
+  // the same value when the booking is created.
+  const invoice = buildInvoice(draft, { quote, issuer, source: sourceLabel('office_desk') })
 
   return (
     <div className="flex w-full flex-col gap-5 lg:flex-row lg:items-start">

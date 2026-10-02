@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import { asset } from '../lib/asset'
+import { useBranch } from '../branch/useBranch'
 import { getStoredLanguage, LANGUAGES, loadGoogleTranslate, setLanguage, type LangCode } from '../lib/googleTranslate'
 
 const logoMark = asset('brand/logo-mark.svg')
@@ -97,19 +99,36 @@ export function TopBar({
   onLogoDoubleClick?: () => void
   logoMenu?: ReactNode
 }) {
+  const { branch, multi, switchBranch } = useBranch()
   return (
     <header className="relative flex w-full shrink-0 items-center justify-between gap-4 px-[clamp(1.25rem,3vw,3.25rem)] py-[clamp(0.625rem,1.8dvh,1.75rem)]">
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={onLogoClick}
-          onDoubleClick={onLogoDoubleClick}
-          className="flex items-center gap-2.5"
-        >
-          <img src={logoMark} alt="" className="h-[clamp(1.75rem,2.3vw,2.2rem)] w-auto" />
-          <span className="notranslate font-display text-[clamp(1rem,1.05vw,1.1rem)] font-bold text-ink">XCSports</span>
-        </button>
-        {logoMenu}
+      <div className="flex min-w-0 items-center gap-[clamp(0.625rem,1.2vw,1rem)]">
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={onLogoClick}
+            onDoubleClick={onLogoDoubleClick}
+            className="flex items-center gap-2.5"
+          >
+            <img src={logoMark} alt="" className="h-[clamp(1.75rem,2.3vw,2.2rem)] w-auto" />
+            <span className="notranslate font-display text-[clamp(1rem,1.05vw,1.1rem)] font-bold text-ink">XCSports</span>
+          </button>
+          {logoMenu}
+        </div>
+
+        {branch && (
+          // Which site this counter is at. Tappable only when there is another to move
+          // to; a single-site academy just sees where it is.
+          <button
+            type="button"
+            onClick={multi ? switchBranch : undefined}
+            disabled={!multi}
+            className="notranslate flex min-w-0 shrink items-center gap-1.5 rounded-xl bg-surface px-3 py-2 text-[clamp(0.8125rem,1vw,0.9375rem)] font-medium text-ink disabled:cursor-default"
+          >
+            <MapPin size={14} strokeWidth={2} className="shrink-0" />
+            <span className="truncate">{branch.name}</span>
+          </button>
+        )}
       </div>
 
       {centerTitle && (

@@ -6,16 +6,13 @@ import BookingsPage from './components/BookingsPage'
 import BookingFlow from './booking/BookingFlow'
 import AddOns from './addons/AddOns'
 import ActiveGames from './pos/ActiveGames'
-import CourtsOverview from './facility/CourtsOverview'
+import SportsManagement from './facility/SportsManagement'
 import SettingsPage from './settings/SettingsPage'
-import NotificationSettings from './manage/NotificationSettings'
-import PaymentModes from './manage/PaymentModes'
-import Integrations from './manage/Integrations'
-import StaffManagement from './manage/StaffManagement'
+import BrandTheme from './theme/BrandTheme'
+import { ActiveBranchProvider } from './branch/ActiveBranchProvider'
+import { SETTINGS_NAV, type SettingsSectionId } from './settings/settingsNav'
 import AllTenants from './manage/AllTenants'
-import Coaches from './manage/Coaches'
 import Users from './manage/Users'
-import Membership from './manage/Membership'
 import Invoices from './manage/Invoices'
 import Coupons from './manage/Coupons'
 import Members from './members/Members'
@@ -57,15 +54,9 @@ export type View =
   | 'settings'
   | 'helpCenter'
   | 'manageCourts'
-  | 'manageCoaches'
   | 'manageUsers'
-  | 'manageMembership'
   | 'manageInvoices'
   | 'manageCoupons'
-  | 'managePaymentModes'
-  | 'manageIntegrations'
-  | 'manageNotifications'
-  | 'manageStaff'
   | 'opsTenants'
 
 function App() {
@@ -85,7 +76,11 @@ function App() {
   // The academy list *is* their home screen until they pick one.
   if (needsTenantChoice) return <OperatorHome />
 
-  return <Shell />
+  return (
+    <ActiveBranchProvider>
+      <Shell />
+    </ActiveBranchProvider>
+  )
 }
 
 /** `ops@gamexo` before choosing an academy: the list, and a way out. */
@@ -95,8 +90,8 @@ function OperatorHome() {
     <div className="flex h-screen w-full flex-col bg-page">
       <header className="flex items-center justify-between border-b border-border-soft px-6 py-4">
         <div>
-          <p className="font-display text-[17px] font-semibold text-ink">gamexo Operations</p>
-          <p className="text-[13px] text-slate">
+          <p className="font-display text-[16px] font-semibold text-ink">gamexo Operations</p>
+          <p className="text-[12px] text-slate">
             Signed in as {operator?.username ?? 'ops@gamexo'} · pick an academy to open it
           </p>
         </div>
@@ -116,6 +111,10 @@ function OperatorHome() {
 function Shell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [view, setView] = useState<View>('dashboard')
+  // Held here so header search can open Settings straight on a section.
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>('counterServices')
+  const settingsLabel =
+    SETTINGS_NAV.flatMap((g) => g.items).find((i) => i.id === settingsSection)?.label ?? 'Settings'
   const [prefillCourtId, setPrefillCourtId] = useState<string | null>(null)
   // Lives here rather than in Dashboard because the control that changes it is
   // in the header, which is Dashboard's sibling.
@@ -125,7 +124,8 @@ function Shell() {
   // the API instead and ignore this entirely.
   useEffect(() => db.seedBookingsIfEmpty(demoBookings), [])
 
-  const navigate = (next: View) => {
+  const navigate = (next: View, section?: SettingsSectionId) => {
+    if (section) setSettingsSection(section)
     setView(next)
     setSidebarOpen(false)
   }
@@ -137,9 +137,16 @@ function Shell() {
 
   return (
     <div className="flex h-screen w-full items-stretch overflow-hidden bg-page">
+      <BrandTheme />
       <PublishedEquipmentBridge />
       <SportCourtBridge />
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} view={view} onNavigate={navigate} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        view={view}
+        section={settingsSection}
+        onNavigate={navigate}
+      />
 
       {/* `[&>*]:min-h-0` is load-bearing, not tidying.
        *
@@ -155,7 +162,14 @@ function Shell() {
        * `overflow-hidden` — lives here, and a per-page fix is one every new page
        * has to remember. The Header is `h-[72px] shrink-0`, so this is inert on it.
        */}
-      <div className="flex h-screen flex-1 flex-col overflow-hidden border-l border-[#ebf0f4] [&>*]:min-h-0">
+      {/* `key={view}` remounts the column on every navigation so each screen eases in
+          instead of snapping. Only opacity and a few pixels of rise are animated, and
+          only for 260ms — a drawer cannot be opened in that time, and a transform that
+          has finished leaves nothing behind to trap `position: fixed` children. */}
+      <div
+        key={view}
+        className="flex h-screen min-w-0 flex-1 animate-section-in flex-col overflow-hidden bg-page motion-reduce:animate-none [&>*]:min-h-0"
+      >
         {view === 'dashboard' && (
           <>
             <Header
@@ -219,56 +233,26 @@ function Shell() {
         )}
         {view === 'manageCourts' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Courts Overview" icon={storeManagement} />
-            <CourtsOverview onStartBooking={() => navigate('booking')} />
-          </>
-        )}
-        {view === 'manageCoaches' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Coaches" icon={storeManagement} />
-            <Coaches />
+            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Sports & Courts" crumbs={['Manage', 'Sports & Courts']} icon={storeManagement} />
+            <SportsManagement />
           </>
         )}
         {view === 'manageUsers' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Users" icon={storeManagement} />
+            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Users" crumbs={['Manage', 'Users']} icon={storeManagement} />
             <Users />
-          </>
-        )}
-        {view === 'manageMembership' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Membership" icon={storeManagement} />
-            <Membership />
           </>
         )}
         {view === 'manageInvoices' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Invoices" icon={storeManagement} />
+            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Invoices" crumbs={['Manage', 'Invoices']} icon={storeManagement} />
             <Invoices />
           </>
         )}
         {view === 'manageCoupons' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Discount Coupons" icon={storeManagement} />
+            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Discount Coupons" crumbs={['Manage', 'Discount Coupons']} icon={storeManagement} />
             <Coupons />
-          </>
-        )}
-        {view === 'managePaymentModes' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Payment Modes" icon={storeManagement} />
-            <PaymentModes />
-          </>
-        )}
-        {view === 'manageIntegrations' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Integrations" icon={storeManagement} />
-            <Integrations />
-          </>
-        )}
-        {view === 'manageNotifications' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Notification Settings" icon={storeManagement} />
-            <NotificationSettings />
           </>
         )}
         {view === 'sales' && (
@@ -285,20 +269,14 @@ function Shell() {
         )}
         {view === 'settings' && (
           <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Settings" icon={settings} />
-            <SettingsPage />
+            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Settings" crumbs={['Settings', settingsLabel]} icon={settings} />
+            <SettingsPage section={settingsSection} onSectionChange={setSettingsSection} />
           </>
         )}
         {view === 'helpCenter' && (
           <>
             <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Help Center" icon={helpSquareRounded} />
             <ComingSoon label="Help Center" />
-          </>
-        )}
-        {view === 'manageStaff' && (
-          <>
-            <Header onMenuClick={() => setSidebarOpen(true)} onNavigate={navigate} title="Manage Staff" icon={storeManagement} />
-            <StaffManagement />
           </>
         )}
         {view === 'opsTenants' && (

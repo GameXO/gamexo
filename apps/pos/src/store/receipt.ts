@@ -1,4 +1,4 @@
-import { FACILITY_PROFILE } from '../facility/facilityData'
+import { sourceLabel, type Issuer } from '../branch/issuer'
 import { formalDate, toISO, toPaise } from '../lib/format'
 import type { EquipmentItem } from '../api/hooks'
 import type { InvoiceData } from '../booking/invoice'
@@ -13,6 +13,7 @@ export function buildQuickSaleReceipt(
   items: EquipmentItem[],
   customer: { name: string; phone: string; email: string; customerId: string },
   paidNow: boolean,
+  issuer: Issuer,
 ): InvoiceData {
   // Priced through the shared offer helper so the receipt cannot disagree with the
   // price the shop card showed — a pack of three is one line at the pack price,
@@ -32,7 +33,8 @@ export function buildQuickSaleReceipt(
   const today = toISO(new Date())
 
   return {
-    facility: FACILITY_PROFILE,
+    facility: issuer,
+    source: sourceLabel('counter'),
     invoiceNo: null,
     bookingId: null,
     // A shop sale with no court behind it, so there is no booking to reference.

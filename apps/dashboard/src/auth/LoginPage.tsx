@@ -111,7 +111,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={goToOps}
-            className="mt-5 text-[12px] font-medium text-muted underline underline-offset-4 hover:text-slate"
+            className="mt-5 text-[11px] font-medium text-muted underline underline-offset-4 hover:text-slate"
           >
             Platform operator sign-in
           </button>

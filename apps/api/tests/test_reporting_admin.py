@@ -191,6 +191,27 @@ async def test_settings_are_the_white_label_surface(
     assert updated.json()["tax_config"]["gst_rate"] == 12
 
 
+async def test_brand_colours_must_be_plain_hex(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    """Brand colours are interpolated into inline CSS in outgoing email, so a value
+    that is not a hex colour must never be stored."""
+    ctx = await setup_academy(client, tenant_a)
+
+    bad = await client.patch(
+        "/api/v1/settings",
+        json={"brand_accent": 'red;" onmouseover="x'},
+        headers=ctx["headers"],
+    )
+    assert bad.status_code == 422
+
+    ok = await client.patch(
+        "/api/v1/settings", json={"brand_accent": "#7cc6fe"}, headers=ctx["headers"]
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["brand_accent"] == "#7CC6FE"
+
+
 async def test_changing_the_gst_rate_changes_pricing(
     client: AsyncClient, tenant_a: TenantFixture
 ) -> None:

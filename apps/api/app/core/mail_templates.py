@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 from app.models.tenant import TenantSettings
 from app.modules.booking.models import Booking
+from app.modules.branches.models import Branch
 
 CURRENCY = {"INR": "₹", "USD": "$", "GBP": "£", "EUR": "€"}
 
@@ -333,9 +334,29 @@ def welcome_credentials(
 # ── Invoice ─────────────────────────────────────────────────────────────────
 
 
+def _branch_lines(branch: Branch | None) -> list[str]:
+    """The branch's name and address as separate printable lines."""
+    if branch is None:
+        return []
+    tail = " ".join(part for part in (branch.state, branch.pincode) if part)
+    address = ", ".join(part for part in (branch.address, branch.city, tail) if part)
+    return [line for line in (branch.name, address, branch.phone) if line]
+
+
+def _issuer_block(lines: list[str]) -> str:
+    if not lines:
+        return ""
+    body = "".join(
+        f'<p style="margin:0;font-size:13px;color:#555555;line-height:1.5;">{escape(line)}</p>'
+        for line in lines
+    )
+    return f'<div style="margin:0 0 18px;">{body}</div>'
+
+
 def invoice_raised(
     settings: TenantSettings,
     *,
+    branch: Branch | None = None,
     invoice_no: str,
     customer_name: str,
     items: list[dict],
@@ -364,9 +385,15 @@ def invoice_raised(
         else "Paid in full — thank you."
     )
 
+    # Whose bill this is: the branch it was raised at, with the academy's GSTIN behind
+    # it when the branch has none of its own.
+    issuer = _branch_lines(branch)
+    gstin = (branch.gstin if branch else None) or settings.gst_number
+
     text = "\n".join(
         [
             f"{settings.business_name} — invoice {invoice_no}",
+            *issuer,
             "",
             *(f"{label}: {value}" for label, value in line_rows),
             "",
@@ -379,11 +406,11 @@ def invoice_raised(
         settings,
         f"Invoice {invoice_no}",
         f"Hi {customer_name or 'there'}, here is your invoice.",
-        _rows(line_rows)
+        _issuer_block(issuer)
+        + _rows(line_rows)
         + '<div style="height:18px"></div>'
         + _rows(totals, emphasise_last=True)
         + f'<p style="margin:18px 0 0;font-size:14px;color:#111111;">{escape(closing)}</p>',
-        f"Invoice {invoice_no}"
-        + (f" · GST {settings.gst_number}" if settings.gst_number else ""),
+        f"Invoice {invoice_no}" + (f" · GST {gstin}" if gstin else ""),
     )
     return subject, text, html

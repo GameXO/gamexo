@@ -200,8 +200,12 @@ export const api = {
     request<Ok<'/api/v1/sports', 'get'>>('/api/v1/sports', { query }),
 
   /** Plain array too. `at` asks for occupancy as of an instant. */
-  listCourts: (query?: { sport_id?: string; at?: string }) =>
+  listCourts: (query?: { sport_id?: string; branch_id?: string; at?: string }) =>
     request<Ok<'/api/v1/courts', 'get'>>('/api/v1/courts', { query }),
+
+  /** Open branches, default first. The tablet is allowed to read these — it needs the
+   *  name and address to show which site it is at, and the GSTIN its receipts print. */
+  listBranches: () => request<Ok<'/api/v1/branches', 'get'>>('/api/v1/branches'),
 
   /** Real per-slot availability for a day — powers the walk-in wizard's time grid. */
   courtAvailability: (query: {

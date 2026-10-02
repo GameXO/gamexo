@@ -26,6 +26,7 @@ const TITLE: Record<SkillLevel, string> = {
   beginner: 'Beginner',
   intermediate: 'Intermediate',
   advanced: 'Advanced',
+  competitive: 'Competitive',
 }
 
 export default function StudentLevelPanel({
@@ -83,7 +84,7 @@ export default function StudentLevelPanel({
 
         <div className="flex flex-col gap-5 px-5 py-5">
           <section>
-            <p className="text-[13px] font-medium text-ink">Standing</p>
+            <p className="text-[12px] font-medium text-ink">Standing</p>
             {isLoading && <p className="mt-2 text-sm text-muted">Loading…</p>}
             {!isLoading && (levels ?? []).length === 0 && (
               <p className="mt-2 text-sm text-muted">
@@ -108,7 +109,7 @@ export default function StudentLevelPanel({
           </section>
 
           <section className="rounded-xl border border-border-soft bg-surface-muted/40 p-4">
-            <p className="text-[13px] font-medium text-ink">Record an assessment</p>
+            <p className="text-[12px] font-medium text-ink">Record an assessment</p>
             <div className="mt-3 flex flex-col gap-3">
               <select
                 value={sportId}
@@ -161,7 +162,7 @@ export default function StudentLevelPanel({
           </section>
 
           <section>
-            <p className="text-[13px] font-medium text-ink">History</p>
+            <p className="text-[12px] font-medium text-ink">History</p>
             {(promotions ?? []).length === 0 && (
               <p className="mt-2 text-sm text-muted">Nothing recorded yet.</p>
             )}

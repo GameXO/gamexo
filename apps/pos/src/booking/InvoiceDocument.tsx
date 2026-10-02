@@ -37,15 +37,21 @@ export default function InvoiceDocument({
         <div className="flex w-full items-start justify-between gap-4">
           <div>
             <p className="font-sans text-lg font-semibold text-ink">{invoice.facility.name}</p>
-            <p className="mt-1 text-xs text-slate">{invoice.facility.addressLine}</p>
-            <p className="text-xs text-slate">{invoice.facility.pincode}</p>
-            <p className="text-xs text-slate">GSTIN {invoice.facility.gstin}</p>
+            {invoice.facility.branchName && (
+              <p className="mt-0.5 text-xs font-medium text-ink">{invoice.facility.branchName}</p>
+            )}
+            {invoice.facility.addressLine && (
+              <p className="mt-1 text-xs text-slate">{invoice.facility.addressLine}</p>
+            )}
+            {invoice.facility.phone && <p className="text-xs text-slate">{invoice.facility.phone}</p>}
+            {invoice.facility.gstin && <p className="text-xs text-slate">GSTIN {invoice.facility.gstin}</p>}
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-flame">
               {invoice.confirmed ? (invoice.balanceDue > 0 ? 'Due' : 'Paid') : 'Provisional'}
             </p>
             <p className="mt-1 text-xs text-slate">{invoice.formalDate}</p>
+            {invoice.source && <p className="text-xs text-slate">Source: {invoice.source}</p>}
             {invoice.bookingId && (
               <p className="text-xs text-slate">
                 {invoice.invoiceNo ?? invoice.bookingRef}

@@ -84,7 +84,7 @@ export default function PaymentGatewayCard({
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border-card bg-white p-5">
+    <div className="flex flex-col rounded-xl border border-border-card bg-white p-5">
       <div className="flex items-start gap-3">
         <div
           className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${
@@ -98,7 +98,7 @@ export default function PaymentGatewayCard({
             <p className="text-sm font-semibold text-ink">{provider.label}</p>
             {config && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${
                   config.mode === 'live'
                     ? 'bg-positive/15 text-positive'
                     : 'bg-surface-muted text-slate'

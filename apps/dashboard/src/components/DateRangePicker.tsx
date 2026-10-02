@@ -79,7 +79,7 @@ export default function DateRangePicker({
         onClick={() => (open ? close() : setOpen(true))}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={`hidden h-9 shrink-0 items-center gap-2.5 rounded-lg border bg-white px-3.5 py-2.5 drop-shadow-[0px_1px_1px_rgba(82,88,102,0.09)] transition-colors duration-100 md:flex ${
+        className={`hidden h-9 shrink-0 items-center gap-2.5 rounded-lg border bg-white px-3.5 py-2.5 shadow-control transition-colors duration-100 md:flex ${
           open ? 'border-ink' : 'border-border-input hover:border-slate'
         }`}
       >

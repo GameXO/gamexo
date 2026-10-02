@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, InvalidInputError, NotFoundError
 from app.modules.academy.models import (
     LEVEL_ORDER,
+    ATTENDED,
+    COUNTED,
+    SEAT_STATUSES,
     Attendance,
     AttendanceStatus,
     Batch,
     Coach,
     CoachingSession,
+    CoachReview,
     CoachStatus,
+    SessionStatus,
     EnrollmentStatus,
     Program,
     SkillLevel,
@@ -26,6 +31,7 @@ from app.modules.academy.models import (
     StudentEnrollment,
     StudentPromotion,
     StudentSportLevel,
+    StudentStatus,
 )
 from app.modules.booking.pricing import money, percent
 from app.modules.finance.models import CounterKind, Invoice, Payment
@@ -41,11 +47,17 @@ async def batch_enrolment_counts(
 
     A query rather than a stored counter: the two can disagree, and the version that
     disagrees is the one the capacity check reads — which then admits a student into
-    a batch that is already full.
+    a batch that is already full. Paused, completed and alumni students are not
+    counted: they have given the seat back.
     """
     stmt = (
         select(StudentEnrollment.batch_id, func.count(StudentEnrollment.id))
-        .where(StudentEnrollment.status == EnrollmentStatus.ACTIVE)
+        .join(Student, Student.id == StudentEnrollment.student_id)
+        .where(
+            StudentEnrollment.status == EnrollmentStatus.ACTIVE,
+            # A paused student does not hold a seat.
+            Student.status.in_(SEAT_STATUSES),
+        )
         .group_by(StudentEnrollment.batch_id)
     )
     if batch_ids is not None:
@@ -113,6 +125,12 @@ async def enrol_student(
     this check — the partial unique index prevents the duplicate *enrolment*, and at
     academy scale one over-subscribed batch is a conversation, not a corruption.
     """
+    if student.status is StudentStatus.RESTRICTED:
+        raise ConflictError(
+            f"{student.name} is restricted and cannot be enrolled. Lift the restriction first.",
+            details={"student_id": str(student.id), "status": student.status.value},
+        )
+
     counts = await batch_enrolment_counts(session, [batch.id])
     if counts.get(batch.id, 0) >= batch.capacity:
         raise ConflictError(
@@ -280,12 +298,11 @@ async def attendance_pct(session: AsyncSession, student_id: uuid.UUID) -> float:
         await session.execute(
             select(
                 func.count(Attendance.id),
-                func.count(Attendance.id).filter(
-                    Attendance.status.in_([AttendanceStatus.PRESENT, AttendanceStatus.LATE])
-                ),
+                func.count(Attendance.id).filter(Attendance.status.in_(ATTENDED)),
             ).where(
                 Attendance.student_id == student_id,
-                Attendance.status != AttendanceStatus.NOT_STARTED,
+                # An excused absence is not counted either way.
+                Attendance.status.in_(COUNTED),
             )
         )
     ).one()
@@ -304,9 +321,7 @@ async def session_attendance_counts(
             select(
                 Attendance.session_id,
                 func.count(Attendance.id),
-                func.count(Attendance.id).filter(
-                    Attendance.status.in_([AttendanceStatus.PRESENT, AttendanceStatus.LATE])
-                ),
+                func.count(Attendance.id).filter(Attendance.status.in_(ATTENDED)),
                 func.count(Attendance.id).filter(Attendance.status == AttendanceStatus.ABSENT),
             )
             .where(Attendance.session_id.in_(list(session_ids)))
@@ -352,3 +367,89 @@ async def coach_sport_map(session: AsyncSession) -> dict[uuid.UUID, list[uuid.UU
     for coach_id, sport_id in rows:
         mapping.setdefault(coach_id, []).append(sport_id)
     return mapping
+
+
+async def set_batch_coach(
+    session: AsyncSession, batch: Batch, coach_id: uuid.UUID | None
+) -> None:
+    """Hand a batch to a coach (or to nobody), and bring its people with it.
+
+    A batch's coach is stamped onto each active enrolment and each upcoming session
+    when those are created, so changing only `batch.coach_id` would leave the
+    students listed under the old coach and tomorrow's class on the old coach's
+    schedule. Past sessions and finished enrolments are history and stay as they
+    were — they are who actually taught and who actually earned.
+    """
+    batch.coach_id = coach_id
+    await session.execute(
+        update(StudentEnrollment)
+        .where(
+            StudentEnrollment.batch_id == batch.id,
+            StudentEnrollment.status == EnrollmentStatus.ACTIVE,
+        )
+        .values(coach_id=coach_id)
+    )
+    await session.execute(
+        update(CoachingSession)
+        .where(
+            CoachingSession.batch_id == batch.id,
+            CoachingSession.status == SessionStatus.SCHEDULED,
+            CoachingSession.starts_at >= datetime.now(UTC),
+        )
+        .values(coach_id=coach_id)
+    )
+
+
+async def refresh_coach_rating(session: AsyncSession, coach: Coach) -> None:
+    """Set `coach.rating` to the mean of their reviews.
+
+    A coach with no reviews keeps whatever figure they already had, rather than
+    dropping to zero when their only review is deleted.
+    """
+    mean = await session.scalar(
+        select(func.avg(CoachReview.rating)).where(CoachReview.coach_id == coach.id)
+    )
+    if mean is not None:
+        coach.rating = Decimal(mean).quantize(Decimal("0.01"))
+
+
+async def private_batch(
+    session: AsyncSession, *, program: Program, student: Student, coach_id: uuid.UUID | None
+) -> Batch:
+    """The one-student batch behind a private-coaching enrolment.
+
+    Private coaching reuses everything a group batch gives — sessions, a register,
+    fees, a coach's hours — by being a batch of one, rather than growing a second
+    code path. Created on first use and reused on renewal.
+    """
+    name = f"{program.name} · {student.name}"
+    existing = (
+        await session.execute(select(Batch).where(Batch.name == name))
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    batch = Batch(
+        name=name[:150],
+        program_id=program.id,
+        sport_id=program.sport_id,
+        coach_id=coach_id or program.coach_id,
+        capacity=1,
+        target_size=1,
+        location=program.location,
+    )
+    session.add(batch)
+    await session.flush()
+    return batch
+
+
+def capacity_state(enrolled: int, capacity: int, target: int | None) -> str:
+    """"ok", "near_full" or "full" — what the enrol screen warns about.
+
+    Near-full is one seat before the hard stop, or reaching the target size if the
+    academy set one lower: the point of a target is to be told before it is passed.
+    """
+    if enrolled >= capacity:
+        return "full"
+    if enrolled >= capacity - 1 or (target is not None and enrolled >= target):
+        return "near_full"
+    return "ok"

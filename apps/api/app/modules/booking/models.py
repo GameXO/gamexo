@@ -77,6 +77,23 @@ class BookingType(StrEnum):
     ONLINE = "online"
 
 
+class BookingSource(StrEnum):
+    """Which desk a booking was taken at. Stamped by the server from who was logged in.
+
+    Never read from the request body: the whole point of the field is that the
+    receipt and the reports can be trusted about it, and a client-supplied value
+    would let a mis-built (or hostile) frontend claim whatever it liked.
+
+    Distinct from `Booking.booking_type` (walk-in / advance / ...), which says what
+    *kind* of booking it is, and from `Booking.source_platform`, which names the
+    third-party marketplace — `PARTNER` is only the umbrella for that.
+    """
+
+    COUNTER = "counter"  #: the shared POS tablet at the front desk (kiosk login)
+    OFFICE_DESK = "office_desk"  #: a staff member booking from the dashboard
+    PARTNER = "partner"  #: arrived through the partner gateway (Playo, Hudle, ...)
+
+
 class MemberType(StrEnum):
     MEMBER = "member"
     NON_MEMBER = "non-member"
@@ -168,6 +185,17 @@ class Sport(TenantScoped):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    #: The card/cover photo. Takes precedence over the CDN's `sports/<slug>.jpg` that
+    #: the stock sports use, which is how a sport the venue invented itself gets a
+    #: picture at all.
+    image_url: Mapped[str | None] = mapped_column(Text)
+    #: The facility, in the venue's own words: surface, lighting, what to bring.
+    description: Mapped[str | None] = mapped_column(Text)
+    #: Gallery for the sport page. Capped in the schema, not here.
+    images: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb"), nullable=False
+    )
+
     courts: Mapped[list[Court]] = relationship(back_populates="sport")
 
     def __repr__(self) -> str:
@@ -189,6 +217,7 @@ class Court(TenantScoped):
     __table_args__ = (
         Index("uq_court_tenant_code", "tenant_id", "code", unique=True),
         Index("ix_court_tenant_sport", "tenant_id", "sport_id"),
+        Index("ix_court_tenant_branch", "tenant_id", "branch_id"),
         CheckConstraint(
             "rating IS NULL OR (rating >= 0 AND rating <= 5)", name="rating_within_range"
         ),
@@ -203,6 +232,12 @@ class Court(TenantScoped):
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     sport_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("sport.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The site this court is physically at. A court belongs to exactly one branch;
+    #: bookings inherit it, which is how the counter shows only its own site's courts
+    #: and how an invoice knows whose address to print.
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("branch.id", ondelete="RESTRICT"), nullable=False
     )
     hourly_rate: Mapped[Decimal] = mapped_column(money(), nullable=False)
     peak_rate: Mapped[Decimal] = mapped_column(money(), nullable=False)
@@ -461,6 +496,7 @@ class Booking(TenantScoped):
             postgresql_where=text("external_ref IS NOT NULL"),
         ),
         Index("ix_booking_tenant_court_start", "tenant_id", "court_id", "starts_at"),
+        Index("ix_booking_tenant_branch_start", "tenant_id", "branch_id", "starts_at"),
         Index("ix_booking_tenant_start", "tenant_id", "starts_at"),
         Index("ix_booking_tenant_customer", "tenant_id", "customer_id"),
         Index("ix_booking_tenant_status", "tenant_id", "status"),
@@ -493,6 +529,13 @@ class Booking(TenantScoped):
     )
     court_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("court.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Snapshot of `court.branch_id` at booking time. Denormalised for the same reason
+    #: as `open_slot`: moving a court to another branch next year must not quietly
+    #: re-home last year's bookings, and so reports and the invoice can name the site
+    #: without joining through a court that may since have moved.
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("branch.id", ondelete="RESTRICT"), nullable=False
     )
 
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -552,6 +595,14 @@ class Booking(TenantScoped):
         PgUUID(as_uuid=True), ForeignKey("integration_partner.id", ondelete="RESTRICT")
     )
     source_platform: Mapped[str | None] = mapped_column(String(50))
+
+    #: Which desk took it — the POS counter, the office desk (dashboard), or a
+    #: partner. NULL only on bookings that predate the column and could not be
+    #: attributed (seeded rows, or ones made by a platform operator). Printed on the
+    #: receipt as "Source".
+    booked_via: Mapped[BookingSource | None] = mapped_column(
+        enum_type(BookingSource, name="booking_source")
+    )
 
     #: The partner's own identifier for this booking. Carried so a reconciliation
     #: run can line our rows up against theirs, and so a retried create is

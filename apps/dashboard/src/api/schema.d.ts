@@ -4,6 +4,28 @@
  */
 
 export interface paths {
+    "/api/v1/academy/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Students who need a call, a renewal or a promotion look
+         * @description Four lists over active students: repeat absentees (3+ absences in 14 days), low attendance (under 60% over 30 days, with at least 4 marked sessions), terms ending within 7 days or already lapsed, and promotion candidates (rated 8+, 80%+ attendance, at least 45 days at the current level).
+         *
+         *     A promotion candidate is a suggestion for a coach to look at, not a decision — promoting stays a manager's call.
+         */
+        get: operations["academy_studentsNeedingAttention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/academy/batches": {
         parameters: {
             query?: never;
@@ -39,6 +61,23 @@ export interface paths {
         patch: operations["academy_updateBatch"];
         trace?: never;
     };
+    "/api/v1/academy/coach-reviews/{review_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a coach review */
+        delete: operations["academy_deleteCoachReview"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/academy/coaches": {
         parameters: {
             query?: never;
@@ -70,11 +109,132 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove a coach
+         * @description Hands their open batches and programmes to `reassign_to` (or to nobody), then deletes the coach — **unless** they have history: sessions taught, students enrolled, reviews or pay on record. Those are kept, so the coach is made inactive instead and `outcome` says `archived`.
+         */
+        delete: operations["academy_removeCoach"];
         options?: never;
         head?: never;
         /** Update a coach */
         patch: operations["academy_updateCoach"];
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put batches under this coach
+         * @description Takes the batches from whoever had them. Their active students and their upcoming sessions move too; past sessions and finished enrolments stay with the coach who actually taught them.
+         */
+        post: operations["academy_assignBatches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a coach has earned in a month, and how it adds up */
+        get: operations["academy_coachEarnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a payout for a month
+         * @description The amounts are worked out here from the month's sessions and collected fees — the client sends only an optional bonus or deduction. What is recorded is a snapshot: later refunds or rate changes do not rewrite it. A month can be paid once; to correct one, an admin deletes it and records it again.
+         */
+        post: operations["academy_recordPayout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A coach's page: classes, students, ratings, reviews, attendance and pay
+         * @description Everything is derived when asked. The `pay` block — salary, this month's earnings and payout history — is only present for a manager or admin; for anyone below, the coach's pay fields are zeroed as well.
+         */
+        get: operations["academy_coachProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record feedback on a coach
+         * @description Updates the coach's rating to the average of all their reviews.
+         */
+        post: operations["academy_addCoachReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/coaches/{coach_id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take batches off this coach
+         * @description Leaves them with no coach until another is assigned.
+         */
+        post: operations["academy_unassignBatches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/academy/enrollments": {
@@ -121,6 +281,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/academy/payouts/{payout_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a payout recorded in error
+         * @description Admin only — it removes a financial record, after which the month can be paid again.
+         */
+        delete: operations["academy_deletePayout"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/payroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every coach's earnings for a month, and who has been paid */
+        get: operations["academy_coachPayroll"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/academy/programs": {
         parameters: {
             query?: never;
@@ -154,6 +351,30 @@ export interface paths {
         head?: never;
         /** Update a programme */
         patch: operations["academy_updateProgram"];
+        trace?: never;
+    };
+    "/api/v1/academy/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The students table: who, where they train, and how it is going
+         * @description Every figure after `status` — attendance, fee state, renewal and the `flags` — is derived at request time from registers, enrolments and payments, never stored.
+         *
+         *     `attendance_pct` covers the last 30 days and is null when nothing was marked in that window. Rows with no value for the sort key always come last, so sorting attendance ascending leads with the students who are actually missing classes rather than the ones with no data.
+         *
+         *     `attention` keeps only students carrying that flag.
+         */
+        get: operations["academy_studentRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/academy/sessions": {
@@ -280,6 +501,30 @@ export interface paths {
         patch: operations["academy_updateStudent"];
         trace?: never;
     };
+    "/api/v1/academy/students/{student_id}/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review a student
+         * @description Records a dated review — an overall score, the skill scores behind it, and a comment. Reviews are kept as history so progress can be plotted.
+         *
+         *     The newest review is mirrored onto the student (`performance_rating`, and `skills` when supplied), so screens that read the student stay current. Back-dating a review never overwrites a newer one.
+         *
+         *     Manager and above. A review is distinct from a promotion: it scores how well someone is playing, whereas a promotion moves them up the ladder.
+         */
+        post: operations["academy_addAssessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/academy/students/{student_id}/enrollments": {
         parameters: {
             query?: never;
@@ -312,6 +557,23 @@ export interface paths {
          * @description One row per sport the student has been assessed in. A sport that is missing has simply never been assessed — it is not the same as beginner.
          */
         get: operations["academy_listStudentLevels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academy/students/{student_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything about one student: performance, attendance, standing, fees */
+        get: operations["academy_studentProfile"];
         put?: never;
         post?: never;
         delete?: never;
@@ -886,6 +1148,44 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List branches
+         * @description Active branches, default first. The counter tablet reads this to let staff pick which site it is sitting in. Reception and above may also pass `include_inactive` to see closed ones; for the tablet it is ignored.
+         */
+        get: operations["branches_listBranches"];
+        put?: never;
+        /** Add a branch */
+        post: operations["branches_createBranch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/branches/{branch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update a branch */
+        patch: operations["branches_updateBranch"];
         trace?: never;
     };
     "/api/v1/courts": {
@@ -2694,6 +2994,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AbsenceReason
+         * @enum {string}
+         */
+        AbsenceReason: "illness" | "travel" | "exam" | "no-notice" | "other";
+        /**
          * AcademyOverview
          * @description The summary cards on the Coaching dashboard.
          */
@@ -2720,6 +3025,71 @@ export interface components {
             sports_offered: number;
             /** Total Coaches */
             total_coaches: number;
+        };
+        /**
+         * ActiveCoaching
+         * @description One active enrolment, with what a profile needs to show it alone.
+         */
+        ActiveCoaching: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Batch Name */
+            batch_name: string | null;
+            /** Classes Per Month */
+            classes_per_month?: number | null;
+            /** Coach Name */
+            coach_name: string | null;
+            delivery_type: components["schemas"]["DeliveryType"];
+            /** Duration */
+            duration: string;
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /** Invoice Id */
+            invoice_id?: string | null;
+            /** Invoice No */
+            invoice_no?: string | null;
+            /** Paid */
+            paid: string;
+            /** Pending */
+            pending: string;
+            /**
+             * Program Id
+             * Format: uuid
+             */
+            program_id: string;
+            /** Program Name */
+            program_name: string | null;
+            /**
+             * Renewal Date
+             * Format: date
+             */
+            renewal_date: string;
+            /** Schedule */
+            schedule: string | null;
+            /** Sessions Remaining */
+            sessions_remaining?: number | null;
+            /**
+             * Sessions Used
+             * @default 0
+             */
+            sessions_used?: number;
+            /** Sport Id */
+            sport_id: string | null;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Time Label */
+            time_label: string | null;
+            /** Total Fee */
+            total_fee: string;
         };
         /**
          * ActiveGatewayOut
@@ -3126,24 +3496,91 @@ export interface components {
          * @enum {string}
          */
         AgeBand: "kids" | "adults";
+        /** AssessmentCreate */
+        AssessmentCreate: {
+            /** Assessed By */
+            assessed_by?: string | null;
+            /** Assessed On */
+            assessed_on?: string | null;
+            /** Comment */
+            comment?: string | null;
+            /** Rating */
+            rating: number | string;
+            /** Skills */
+            skills?: components["schemas"]["SkillScore"][];
+            /** Sport Id */
+            sport_id?: string | null;
+        };
+        /** AssessmentOut */
+        AssessmentOut: {
+            /** Assessed By */
+            assessed_by: string | null;
+            /**
+             * Assessed On
+             * Format: date
+             */
+            assessed_on: string;
+            /** Comment */
+            comment: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Rating */
+            rating: string;
+            /** Skills */
+            skills: components["schemas"]["SkillScore"][];
+            /** Sport Id */
+            sport_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /**
          * AttendanceBulkMark
-         * @description Reception marks a whole batch at once, not one student at a time.
+         * @description Mark a whole batch at once, not one student at a time.
+         *
+         *     `all_present` is the "mark all present, then fix the two exceptions" shortcut:
+         *     every enrolled student not listed in `marks` is marked present. Explicit marks
+         *     always win over it.
          */
         AttendanceBulkMark: {
+            /**
+             * All Present
+             * @default false
+             */
+            all_present?: boolean;
             /** Marks */
-            marks: components["schemas"]["AttendanceMark"][];
+            marks?: components["schemas"]["AttendanceMark"][];
         };
         /** AttendanceMark */
         AttendanceMark: {
             /** Note */
             note?: string | null;
+            reason?: components["schemas"]["AbsenceReason"] | null;
             status: components["schemas"]["AttendanceStatus"];
             /**
              * Student Id
              * Format: uuid
              */
             student_id: string;
+        };
+        /** AttendanceMonth */
+        AttendanceMonth: {
+            /** Marked */
+            marked: number;
+            /** Month */
+            month: string;
+            /** Pct */
+            pct: number | null;
         };
         /** AttendanceOut */
         AttendanceOut: {
@@ -3156,6 +3593,7 @@ export interface components {
             marked_at: string | null;
             /** Note */
             note: string | null;
+            reason?: components["schemas"]["AbsenceReason"] | null;
             /**
              * Session Id
              * Format: uuid
@@ -3172,7 +3610,87 @@ export interface components {
          * AttendanceStatus
          * @enum {string}
          */
-        AttendanceStatus: "present" | "absent" | "late" | "not-started";
+        AttendanceStatus: "present" | "absent" | "late" | "excused" | "trial" | "makeup" | "not-started";
+        /** AttendanceSummary */
+        AttendanceSummary: {
+            /** Absent */
+            absent: number;
+            /**
+             * Excused
+             * @default 0
+             */
+            excused?: number;
+            /** Last 30 Pct */
+            last_30_pct: number | null;
+            /** Late */
+            late: number;
+            /**
+             * Makeup Credits
+             * @default 0
+             */
+            makeup_credits?: number;
+            /** Monthly */
+            monthly: components["schemas"]["AttendanceMonth"][];
+            /** Overall Pct */
+            overall_pct: number | null;
+            /** Present */
+            present: number;
+            /** Reasons */
+            reasons?: {
+                [key: string]: number;
+            };
+            /** Recent */
+            recent: components["schemas"]["RecentSession"][];
+            /** Streak */
+            streak: number;
+            /** Total */
+            total: number;
+        };
+        /** AttentionCounts */
+        AttentionCounts: {
+            /** Low Attendance */
+            low_attendance: number;
+            /** Promotion Candidates */
+            promotion_candidates: number;
+            /** Renewals Due */
+            renewals_due: number;
+            /** Repeat Absentees */
+            repeat_absentees: number;
+        };
+        /** AttentionItem */
+        AttentionItem: {
+            /** Avatar Initials */
+            avatar_initials: string | null;
+            /** Batch Name */
+            batch_name: string | null;
+            /** Detail */
+            detail: string;
+            /** Name */
+            name: string;
+            /** Photo Url */
+            photo_url: string | null;
+            /** Sport Id */
+            sport_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student No */
+            student_no: string;
+        };
+        /** AttentionOut */
+        AttentionOut: {
+            counts: components["schemas"]["AttentionCounts"];
+            /** Low Attendance */
+            low_attendance: components["schemas"]["AttentionItem"][];
+            /** Promotion Candidates */
+            promotion_candidates: components["schemas"]["AttentionItem"][];
+            /** Renewals Due */
+            renewals_due: components["schemas"]["AttentionItem"][];
+            /** Repeat Absentees */
+            repeat_absentees: components["schemas"]["AttentionItem"][];
+        };
         /** AvailabilityResponse */
         AvailabilityResponse: {
             /** Courts */
@@ -3181,6 +3699,11 @@ export interface components {
             message: string;
             /** Requeststatus */
             requestStatus: string;
+        };
+        /** BatchAssign */
+        BatchAssign: {
+            /** Batch Ids */
+            batch_ids: string[];
         };
         /** BatchCreate */
         BatchCreate: {
@@ -3193,8 +3716,14 @@ export interface components {
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            /** Court Id */
+            court_id?: string | null;
+            /** Days */
+            days?: number[];
             /** End Date */
             end_date?: string | null;
+            /** End Time */
+            end_time?: string | null;
             /** Location */
             location?: string | null;
             /** Name */
@@ -3210,8 +3739,12 @@ export interface components {
             sport_id?: string | null;
             /** Start Date */
             start_date?: string | null;
+            /** Start Time */
+            start_time?: string | null;
             /** @default active */
             status?: components["schemas"]["BatchStatus"];
+            /** Target Size */
+            target_size?: number | null;
             /** Time Label */
             time_label?: string | null;
         };
@@ -3222,12 +3755,24 @@ export interface components {
              * @default 12
              */
             capacity?: number;
+            /**
+             * Capacity State
+             * @default ok
+             * @enum {string}
+             */
+            capacity_state?: "ok" | "near_full" | "full";
             /** Coach Id */
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            /** Court Id */
+            court_id?: string | null;
+            /** Days */
+            days?: number[];
             /** End Date */
             end_date?: string | null;
+            /** End Time */
+            end_time?: string | null;
             /**
              * Enrolled
              * @default 0
@@ -3258,8 +3803,12 @@ export interface components {
             sport_id?: string | null;
             /** Start Date */
             start_date?: string | null;
+            /** Start Time */
+            start_time?: string | null;
             /** @default active */
             status?: components["schemas"]["BatchStatus"];
+            /** Target Size */
+            target_size?: number | null;
             /** Time Label */
             time_label?: string | null;
         };
@@ -3276,8 +3825,14 @@ export interface components {
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            /** Court Id */
+            court_id?: string | null;
+            /** Days */
+            days?: number[] | null;
             /** End Date */
             end_date?: string | null;
+            /** End Time */
+            end_time?: string | null;
             /** Location */
             location?: string | null;
             /** Name */
@@ -3290,7 +3845,11 @@ export interface components {
             sport_id?: string | null;
             /** Start Date */
             start_date?: string | null;
+            /** Start Time */
+            start_time?: string | null;
             status?: components["schemas"]["BatchStatus"] | null;
+            /** Target Size */
+            target_size?: number | null;
             /** Time Label */
             time_label?: string | null;
         };
@@ -3409,7 +3968,14 @@ export interface components {
             amount_paid: string;
             /** Balance Due */
             balance_due: string;
+            booked_via?: components["schemas"]["BookingSource"] | null;
             booking_type: components["schemas"]["BookingType"];
+            branch?: components["schemas"]["BranchInfo"] | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
             /** Court Charge */
             court_charge: string;
             /**
@@ -3556,7 +4122,13 @@ export interface components {
             amount_paid: string;
             /** Balance Due */
             balance_due: string;
+            booked_via?: components["schemas"]["BookingSource"] | null;
             booking_type: components["schemas"]["BookingType"];
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
             /** Court Charge */
             court_charge: string;
             /**
@@ -3630,6 +4202,20 @@ export interface components {
             total: string;
         };
         /**
+         * BookingSource
+         * @description Which desk a booking was taken at. Stamped by the server from who was logged in.
+         *
+         *     Never read from the request body: the whole point of the field is that the
+         *     receipt and the reports can be trusted about it, and a client-supplied value
+         *     would let a mis-built (or hostile) frontend claim whatever it liked.
+         *
+         *     Distinct from `Booking.booking_type` (walk-in / advance / ...), which says what
+         *     *kind* of booking it is, and from `Booking.source_platform`, which names the
+         *     third-party marketplace — `PARTNER` is only the umbrella for that.
+         * @enum {string}
+         */
+        BookingSource: "counter" | "office_desk" | "partner";
+        /**
          * BookingStatus
          * @enum {string}
          */
@@ -3666,6 +4252,113 @@ export interface components {
             /** Starts At */
             starts_at?: string | null;
             status?: components["schemas"]["BookingStatus"] | null;
+        };
+        /** BranchCreate */
+        BranchCreate: {
+            /** Address */
+            address?: string | null;
+            /** City */
+            city?: string | null;
+            /** Email */
+            email?: string | null;
+            /**
+             * Gstin
+             * @description Leave empty to print the academy's own GSTIN from Settings.
+             */
+            gstin?: string | null;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** State */
+            state?: string | null;
+        };
+        /**
+         * BranchInfo
+         * @description A branch as it prints on a bill.
+         *
+         *     Carried inside booking and invoice responses so the POS and the dashboard render
+         *     the issuing site from the server's own record instead of a constant baked into the
+         *     bundle. `gstin` is already resolved: the branch's own when it has one, otherwise
+         *     the academy's — a client never has to know there was a fallback.
+         */
+        BranchInfo: {
+            /** Address */
+            address?: string | null;
+            /** City */
+            city?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Gstin */
+            gstin?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** State */
+            state?: string | null;
+        };
+        /** BranchOut */
+        BranchOut: {
+            /** Address */
+            address?: string | null;
+            /** City */
+            city?: string | null;
+            /** Effective Gstin */
+            effective_gstin?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Gstin */
+            gstin?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** State */
+            state?: string | null;
+        };
+        /** BranchUpdate */
+        BranchUpdate: {
+            /** Address */
+            address?: string | null;
+            /** City */
+            city?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Gstin */
+            gstin?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Is Default */
+            is_default?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** State */
+            state?: string | null;
         };
         /**
          * ChangePasswordRequest
@@ -3725,12 +4418,44 @@ export interface components {
             /** Messages */
             messages: number;
         };
+        /** CoachBatchRow */
+        CoachBatchRow: {
+            /** Attendance Pct */
+            attendance_pct: number | null;
+            /** Capacity */
+            capacity: number;
+            /** Enrolled */
+            enrolled: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location */
+            location: string | null;
+            /** Name */
+            name: string;
+            /** Program Name */
+            program_name: string | null;
+            /** Schedule */
+            schedule: string | null;
+            /** Sport Id */
+            sport_id: string | null;
+            status: components["schemas"]["BatchStatus"];
+            /** Time Label */
+            time_label: string | null;
+        };
         /** CoachCreate */
         CoachCreate: {
             /** Bio */
             bio?: string | null;
             /** Certifications */
             certifications?: string[];
+            /**
+             * Commission Pct
+             * @default 0
+             */
+            commission_pct?: number | string;
             /** Email */
             email?: string | null;
             /**
@@ -3761,6 +4486,8 @@ export interface components {
             morning_available?: boolean;
             /** Name */
             name: string;
+            /** @default fixed */
+            pay_model?: components["schemas"]["PayModel"];
             /** Phone */
             phone?: string | null;
             /**
@@ -3777,6 +4504,48 @@ export interface components {
             /** @default full-time */
             type?: components["schemas"]["CoachType"];
         };
+        /**
+         * CoachEarnings
+         * @description What a coach has earned for one month, recomputed from sessions and payments.
+         *
+         *     `payout` is what was actually paid, if anything — and when present it is the
+         *     record of truth, not these figures, which move with later refunds or rate changes.
+         */
+        CoachEarnings: {
+            /** Base Amount */
+            base_amount: string;
+            /**
+             * Coach Id
+             * Format: uuid
+             */
+            coach_id: string;
+            /** Commission Amount */
+            commission_amount: string;
+            /** Commission Pct */
+            commission_pct: string;
+            /** Fees Collected */
+            fees_collected: string;
+            /** Gross */
+            gross: string;
+            /** Hours */
+            hours: string;
+            /** Lines */
+            lines: components["schemas"]["EarningLine"][];
+            pay_model: components["schemas"]["PayModel"];
+            payout?: components["schemas"]["CoachPayoutOut"] | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Sessions */
+            sessions: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "paid" | "due" | "nothing";
+        };
         /** CoachOut */
         CoachOut: {
             /**
@@ -3792,6 +4561,11 @@ export interface components {
             certifications?: string[];
             /** Coach No */
             coach_no: string;
+            /**
+             * Commission Pct
+             * @default 0
+             */
+            commission_pct?: string;
             /** Email */
             email?: string | null;
             /**
@@ -3827,6 +4601,8 @@ export interface components {
             morning_available?: boolean;
             /** Name */
             name: string;
+            /** @default fixed */
+            pay_model?: components["schemas"]["PayModel"];
             /** Phone */
             phone?: string | null;
             /**
@@ -3852,6 +4628,174 @@ export interface components {
             total_students?: number;
             /** @default full-time */
             type?: components["schemas"]["CoachType"];
+            /** User Id */
+            user_id?: string | null;
+        };
+        /**
+         * CoachPay
+         * @description Everything about money, and only ever sent to a manager or admin.
+         */
+        CoachPay: {
+            /** Commission Pct */
+            commission_pct: string;
+            current: components["schemas"]["CoachEarnings"];
+            /** Hourly Rate */
+            hourly_rate: string;
+            /** Paid To Date */
+            paid_to_date: string;
+            pay_model: components["schemas"]["PayModel"];
+            /** Payouts */
+            payouts: components["schemas"]["CoachPayoutOut"][];
+            /** Salary */
+            salary: string;
+        };
+        /** CoachPayoutOut */
+        CoachPayoutOut: {
+            /** Adjustment */
+            adjustment: string;
+            /** Adjustment Note */
+            adjustment_note: string | null;
+            /** Base Amount */
+            base_amount: string;
+            /**
+             * Coach Id
+             * Format: uuid
+             */
+            coach_id: string;
+            /** Coach Name */
+            coach_name: string;
+            /** Commission Amount */
+            commission_amount: string;
+            /** Commission Pct */
+            commission_pct: string;
+            /** Fees Collected */
+            fees_collected: string;
+            /** Hours */
+            hours: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Method */
+            method: string;
+            /** Note */
+            note: string | null;
+            /** Paid By */
+            paid_by: string | null;
+            /**
+             * Paid On
+             * Format: date
+             */
+            paid_on: string;
+            pay_model: components["schemas"]["PayModel"];
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Reference */
+            reference: string | null;
+            /** Sessions */
+            sessions: number;
+            /** Total */
+            total: string;
+        };
+        /** CoachProfile */
+        CoachProfile: {
+            /** Batches */
+            batches: components["schemas"]["CoachBatchRow"][];
+            coach: components["schemas"]["CoachOut"];
+            /** Monthly */
+            monthly: components["schemas"]["MonthPoint"][];
+            pay?: components["schemas"]["CoachPay"] | null;
+            /** Rating Breakdown */
+            rating_breakdown: number[];
+            /** Recent */
+            recent: components["schemas"]["SessionBrief"][];
+            /** Reviews */
+            reviews: components["schemas"]["CoachReviewOut"][];
+            stats: components["schemas"]["CoachStats"];
+            /** Students */
+            students: components["schemas"]["StudentRow"][];
+            /** Students Total */
+            students_total: number;
+            /** Upcoming */
+            upcoming: components["schemas"]["SessionBrief"][];
+        };
+        /** CoachRemoval */
+        CoachRemoval: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "deleted" | "archived";
+            /** Reassigned Batches */
+            reassigned_batches: number;
+            /** Reassigned Programs */
+            reassigned_programs: number;
+        };
+        /** CoachReviewCreate */
+        CoachReviewCreate: {
+            /** Comment */
+            comment?: string | null;
+            /** Rating */
+            rating: number;
+            /** Reviewed On */
+            reviewed_on?: string | null;
+            /** Reviewer Name */
+            reviewer_name?: string | null;
+            /** Student Id */
+            student_id?: string | null;
+        };
+        /** CoachReviewOut */
+        CoachReviewOut: {
+            /**
+             * Coach Id
+             * Format: uuid
+             */
+            coach_id: string;
+            /** Comment */
+            comment: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Rating */
+            rating: number;
+            /** Recorded By */
+            recorded_by: string | null;
+            /**
+             * Reviewed On
+             * Format: date
+             */
+            reviewed_on: string;
+            /** Reviewer Name */
+            reviewer_name: string | null;
+            /** Student Id */
+            student_id: string | null;
+        };
+        /** CoachStats */
+        CoachStats: {
+            /** Avg Student Rating */
+            avg_student_rating: number | null;
+            /** Batches */
+            batches: number;
+            /** Hours 30D */
+            hours_30d: string;
+            /** Rating */
+            rating: string;
+            /** Review Count */
+            review_count: number;
+            /** Sessions Cancelled 30D */
+            sessions_cancelled_30d: number;
+            /** Sessions Completed 30D */
+            sessions_completed_30d: number;
+            /** Student Attendance Pct */
+            student_attendance_pct: number | null;
+            /** Students */
+            students: number;
         };
         /**
          * CoachStatus
@@ -3869,6 +4813,8 @@ export interface components {
             bio?: string | null;
             /** Certifications */
             certifications?: string[] | null;
+            /** Commission Pct */
+            commission_pct?: number | string | null;
             /** Email */
             email?: string | null;
             /** Evening Available */
@@ -3887,6 +4833,7 @@ export interface components {
             morning_available?: boolean | null;
             /** Name */
             name?: string | null;
+            pay_model?: components["schemas"]["PayModel"] | null;
             /** Phone */
             phone?: string | null;
             /** Salary */
@@ -3952,6 +4899,8 @@ export interface components {
         CourtCreate: {
             /** Amenities */
             amenities?: string[];
+            /** Branch Id */
+            branch_id?: string | null;
             /** Code */
             code: string;
             /**
@@ -3997,6 +4946,11 @@ export interface components {
         CourtOut: {
             /** Amenities */
             amenities?: string[];
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
             /** Code */
             code: string;
             /**
@@ -4047,6 +5001,8 @@ export interface components {
         CourtUpdate: {
             /** Amenities */
             amenities?: string[] | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /** Display Order */
             display_order?: number | null;
             /** Hourly Rate */
@@ -4093,6 +5049,11 @@ export interface components {
         CourtWithStatus: {
             /** Amenities */
             amenities?: string[];
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
             /** Code */
             code: string;
             /** Current Booking Id */
@@ -4366,6 +5327,16 @@ export interface components {
             slug: string;
         };
         /**
+         * DeliveryType
+         * @description Group coaching runs in batches; private coaching is one student, one coach.
+         *
+         *     A private enrolment still gets a batch — of one — so attendance, sessions and
+         *     fees work exactly as they do for a group, and nothing downstream needs a second
+         *     code path (see `service.private_batch`).
+         * @enum {string}
+         */
+        DeliveryType: "group" | "private";
+        /**
          * DialectOut
          * @description A wire format the gateway speaks. From `gateway.dialects.DIALECTS`.
          */
@@ -4387,6 +5358,18 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /**
+         * EarningLine
+         * @description One line of how a month's pay was worked out, so nobody has to take it on trust.
+         */
+        EarningLine: {
+            /** Amount */
+            amount: string;
+            /** Detail */
+            detail: string;
+            /** Label */
+            label: string;
+        };
         /** EnrollmentCreate */
         EnrollmentCreate: {
             /**
@@ -4404,6 +5387,7 @@ export interface components {
              * @default 3m
              */
             duration?: string;
+            pay_now?: components["schemas"]["PayNow"] | null;
             /** Start Date */
             start_date?: string | null;
             /**
@@ -4459,6 +5443,13 @@ export interface components {
         EnrollmentStatus: "active" | "completed" | "cancelled";
         /** EnrollmentWithInvoice */
         EnrollmentWithInvoice: {
+            /**
+             * Balance Due
+             * @default 0
+             */
+            balance_due?: string;
+            /** Capacity Warning */
+            capacity_warning?: string | null;
             enrollment: components["schemas"]["EnrollmentOut"];
             /**
              * Invoice Id
@@ -4724,11 +5715,85 @@ export interface components {
             /** Pending */
             pending: string;
         };
+        /** FeeHistoryRow */
+        FeeHistoryRow: {
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /** Paid */
+            paid: string;
+            /** Pending */
+            pending: string;
+            /** Program Name */
+            program_name: string | null;
+            /**
+             * Renewal Date
+             * Format: date
+             */
+            renewal_date: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            status: components["schemas"]["EnrollmentStatus"];
+            /** Total Fee */
+            total_fee: string;
+        };
+        /** FeeSummary */
+        FeeSummary: {
+            /** History */
+            history: components["schemas"]["FeeHistoryRow"][];
+            /** Paid */
+            paid: string;
+            /** Pending */
+            pending: string;
+            /** Total Fee */
+            total_fee: string;
+        };
         /**
          * Gender
          * @enum {string}
          */
         Gender: "male" | "female" | "other";
+        /** GuardianOut */
+        GuardianOut: {
+            /** Email */
+            email?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Payer
+             * @default false
+             */
+            is_payer?: boolean;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary?: boolean;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Receives Attendance
+             * @default false
+             */
+            receives_attendance?: boolean;
+            /**
+             * Receives Progress
+             * @default true
+             */
+            receives_progress?: boolean;
+            /** Relation */
+            relation?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -4777,6 +5842,9 @@ export interface components {
             billing_address: string | null;
             /** Booking Id */
             booking_id: string | null;
+            branch?: components["schemas"]["BranchInfo"] | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4869,6 +5937,8 @@ export interface components {
             billing_address: string | null;
             /** Booking Id */
             booking_id: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4975,6 +6045,31 @@ export interface components {
             total_bookings: number;
             /** Total Revenue */
             total_revenue: string;
+        };
+        /** LevelEntry */
+        LevelEntry: {
+            /**
+             * Assessed On
+             * Format: date
+             */
+            assessed_on: string;
+            level: components["schemas"]["SkillLevel"];
+            /**
+             * Sport Id
+             * Format: uuid
+             */
+            sport_id: string;
+        };
+        /** Lifetime */
+        Lifetime: {
+            /** Coaches */
+            coaches: string[];
+            /** Lifetime Paid */
+            lifetime_paid: string;
+            /** Renewals */
+            renewals: number;
+            /** Total Classes */
+            total_classes: number;
         };
         /**
          * LoginRequest
@@ -5206,6 +6301,21 @@ export interface components {
          * @enum {string}
          */
         MembershipTier: "gold" | "silver" | "bronze";
+        /** MonthPoint */
+        MonthPoint: {
+            /** Earned */
+            earned?: string | null;
+            /** Hours */
+            hours: string;
+            /** Month */
+            month: string;
+            /** Paid */
+            paid?: string | null;
+            /** Rating */
+            rating: number | null;
+            /** Sessions */
+            sessions: number;
+        };
         /** MovementCreate */
         MovementCreate: {
             /** Booking Id */
@@ -5272,6 +6382,23 @@ export interface components {
             external_ref?: string | null;
             /** Price */
             price?: number | string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
+        /** NextClass */
+        NextClass: {
+            /** Batch Name */
+            batch_name: string;
+            /** Court Name */
+            court_name?: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
             /**
              * Starts At
              * Format: date-time
@@ -5565,6 +6692,19 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Page[StudentRow] */
+        Page_StudentRow_: {
+            /** Items */
+            items: components["schemas"]["StudentRow"][];
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Size */
+            size: number;
+            /** Total */
+            total: number;
+        };
         /** Page[SubscriptionOut] */
         Page_SubscriptionOut_: {
             /** Items */
@@ -5811,6 +6951,30 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /**
+         * PayModel
+         * @description How a coach is paid. Which of `salary`, `hourly_rate` and `commission_pct`
+         *     count is decided by this, so a coach can carry all three numbers without anyone
+         *     having to blank the unused ones.
+         * @enum {string}
+         */
+        PayModel: "fixed" | "hourly" | "commission" | "hybrid";
+        /**
+         * PayNow
+         * @description Money received at the desk while enrolling, recorded against the new invoice.
+         */
+        PayNow: {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Method
+             * @default cash
+             * @enum {string}
+             */
+            method?: "cash" | "upi" | "card" | "bank" | "cheque";
+            /** Reference */
+            reference?: string | null;
+        };
         /** PaymentCreate */
         PaymentCreate: {
             /** Amount */
@@ -5898,6 +7062,88 @@ export interface components {
             total_pending: string;
             /** Transaction Count */
             transaction_count: number;
+        };
+        /** PayoutCreate */
+        PayoutCreate: {
+            /**
+             * Adjustment
+             * @default 0
+             */
+            adjustment?: number | string;
+            /** Adjustment Note */
+            adjustment_note?: string | null;
+            /**
+             * Method
+             * @default bank
+             * @enum {string}
+             */
+            method?: "cash" | "upi" | "bank" | "cheque";
+            /** Month */
+            month: string;
+            /** Note */
+            note?: string | null;
+            /** Paid On */
+            paid_on?: string | null;
+            /** Reference */
+            reference?: string | null;
+        };
+        /** Payroll */
+        Payroll: {
+            /**
+             * Current Period
+             * Format: date
+             */
+            current_period: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Rows */
+            rows: components["schemas"]["PayrollRow"][];
+            /** Total Due */
+            total_due: string;
+            /** Total Gross */
+            total_gross: string;
+            /** Total Paid */
+            total_paid: string;
+        };
+        /** PayrollRow */
+        PayrollRow: {
+            /** Avatar Initials */
+            avatar_initials: string | null;
+            /** Base Amount */
+            base_amount: string;
+            /**
+             * Coach Id
+             * Format: uuid
+             */
+            coach_id: string;
+            /** Coach No */
+            coach_no: string;
+            coach_status: components["schemas"]["CoachStatus"];
+            /** Commission Amount */
+            commission_amount: string;
+            /** Fees Collected */
+            fees_collected: string;
+            /** Gross */
+            gross: string;
+            /** Hours */
+            hours: string;
+            /** Name */
+            name: string;
+            /** Paid Total */
+            paid_total?: string | null;
+            pay_model: components["schemas"]["PayModel"];
+            /** Payout Id */
+            payout_id?: string | null;
+            /** Sessions */
+            sessions: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "paid" | "due" | "nothing";
         };
         /** PeakHour */
         PeakHour: {
@@ -6045,10 +7291,16 @@ export interface components {
             age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Classes Per Month */
+            classes_per_month?: number | null;
             /** Coach Id */
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            /** @default group */
+            delivery_type?: components["schemas"]["DeliveryType"];
             /** Duration Label */
             duration_label?: string | null;
             /**
@@ -6078,6 +7330,26 @@ export interface components {
             is_active?: boolean;
             /** Level */
             level?: string | null;
+            /**
+             * List 12M
+             * @default 0
+             */
+            list_12m?: number | string;
+            /**
+             * List 1M
+             * @default 0
+             */
+            list_1m?: number | string;
+            /**
+             * List 3M
+             * @default 0
+             */
+            list_3m?: number | string;
+            /**
+             * List 6M
+             * @default 0
+             */
+            list_6m?: number | string;
             /** Location */
             location?: string | null;
             /**
@@ -6087,6 +7359,8 @@ export interface components {
             max_students?: number;
             /** Name */
             name: string;
+            /** Offer Label */
+            offer_label?: string | null;
             /** Session Duration */
             session_duration?: string | null;
             /** Session Freq */
@@ -6106,10 +7380,16 @@ export interface components {
             age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Classes Per Month */
+            classes_per_month?: number | null;
             /** Coach Id */
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            /** @default group */
+            delivery_type?: components["schemas"]["DeliveryType"];
             /** Duration Label */
             duration_label?: string | null;
             /**
@@ -6144,6 +7424,26 @@ export interface components {
             is_active?: boolean;
             /** Level */
             level?: string | null;
+            /**
+             * List 12M
+             * @default 0
+             */
+            list_12m?: string;
+            /**
+             * List 1M
+             * @default 0
+             */
+            list_1m?: string;
+            /**
+             * List 3M
+             * @default 0
+             */
+            list_3m?: string;
+            /**
+             * List 6M
+             * @default 0
+             */
+            list_6m?: string;
             /** Location */
             location?: string | null;
             /**
@@ -6153,6 +7453,8 @@ export interface components {
             max_students?: number;
             /** Name */
             name: string;
+            /** Offer Label */
+            offer_label?: string | null;
             /** Session Duration */
             session_duration?: string | null;
             /** Session Freq */
@@ -6172,10 +7474,15 @@ export interface components {
             age_min?: number | null;
             /** Bg Color */
             bg_color?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Classes Per Month */
+            classes_per_month?: number | null;
             /** Coach Id */
             coach_id?: string | null;
             /** Color */
             color?: string | null;
+            delivery_type?: components["schemas"]["DeliveryType"] | null;
             /** Duration Label */
             duration_label?: string | null;
             /** Fee 12M */
@@ -6190,12 +7497,22 @@ export interface components {
             is_active?: boolean | null;
             /** Level */
             level?: string | null;
+            /** List 12M */
+            list_12m?: number | string | null;
+            /** List 1M */
+            list_1m?: number | string | null;
+            /** List 3M */
+            list_3m?: number | string | null;
+            /** List 6M */
+            list_6m?: number | string | null;
             /** Location */
             location?: string | null;
             /** Max Students */
             max_students?: number | null;
             /** Name */
             name?: string | null;
+            /** Offer Label */
+            offer_label?: string | null;
             /** Session Duration */
             session_duration?: string | null;
             /** Session Freq */
@@ -6428,6 +7745,22 @@ export interface components {
              */
             starts_at: string;
         };
+        /** RecentSession */
+        RecentSession: {
+            /** Batch Name */
+            batch_name: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            status: components["schemas"]["AttendanceStatus"];
+        };
         /** RefreshRequest */
         RefreshRequest: {
             /** Refresh Token */
@@ -6486,7 +7819,7 @@ export interface components {
          *     a valid token for the academy.
          * @enum {string}
          */
-        Role: "admin" | "manager" | "reception" | "kiosk";
+        Role: "admin" | "manager" | "reception" | "accountant" | "coach" | "kiosk";
         /**
          * RosterEntry
          * @description One student on a session's register, with their mark if one exists.
@@ -6497,8 +7830,33 @@ export interface components {
          *     from those would show an empty class.
          */
         RosterEntry: {
+            /**
+             * Emergency Contact Available
+             * @default false
+             */
+            emergency_contact_available?: boolean;
+            /**
+             * Has Medical Note
+             * @default false
+             */
+            has_medical_note?: boolean;
+            /**
+             * Is Trial
+             * @default false
+             */
+            is_trial?: boolean;
+            /**
+             * Makeup Credits
+             * @default 0
+             */
+            makeup_credits?: number;
+            /** Medical Note */
+            medical_note?: string | null;
             /** Note */
             note?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
+            reason?: components["schemas"]["AbsenceReason"] | null;
             status?: components["schemas"]["AttendanceStatus"] | null;
             /**
              * Student Id
@@ -6554,6 +7912,36 @@ export interface components {
             /** Steps */
             steps: components["schemas"]["Step"][];
         };
+        /** SessionBrief */
+        SessionBrief: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Batch Name */
+            batch_name: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Marked */
+            marked: number;
+            /** Present */
+            present: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            status: components["schemas"]["SessionStatus"];
+        };
         /** SessionCreate */
         SessionCreate: {
             /**
@@ -6563,6 +7951,8 @@ export interface components {
             batch_id: string;
             /** Coach Id */
             coach_id?: string | null;
+            /** Court Id */
+            court_id?: string | null;
             /**
              * Duration Min
              * @default 60
@@ -6590,8 +7980,14 @@ export interface components {
             batch_id: string;
             /** Batch Name */
             batch_name: string;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Coach Checked In At */
+            coach_checked_in_at?: string | null;
             /** Coach Id */
             coach_id: string | null;
+            /** Court Id */
+            court_id?: string | null;
             /** Duration Min */
             duration_min: number;
             /**
@@ -6604,6 +8000,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Incident Note */
+            incident_note?: string | null;
             /** Notes */
             notes: string | null;
             /**
@@ -6624,6 +8022,8 @@ export interface components {
              * @default 0
              */
             students_enrolled?: number;
+            /** Substitute For Coach Id */
+            substitute_for_coach_id?: string | null;
         };
         /**
          * SessionStatus
@@ -6632,6 +8032,8 @@ export interface components {
         SessionStatus: "scheduled" | "ongoing" | "completed" | "cancelled";
         /** SessionUpdate */
         SessionUpdate: {
+            /** Court Id */
+            court_id?: string | null;
             /** Duration Min */
             duration_min?: number | null;
             /** Notes */
@@ -6833,7 +8235,7 @@ export interface components {
          *     someone types.
          * @enum {string}
          */
-        SkillLevel: "beginner" | "intermediate" | "advanced";
+        SkillLevel: "beginner" | "intermediate" | "advanced" | "competitive";
         /** SkillScore */
         SkillScore: {
             /** Name */
@@ -6881,6 +8283,8 @@ export interface components {
              * @default 60
              */
             default_duration_min?: number;
+            /** Description */
+            description?: string | null;
             /**
              * Display Order
              * @default 0
@@ -6888,6 +8292,10 @@ export interface components {
             display_order?: number;
             /** Icon */
             icon?: string | null;
+            /** Image Url */
+            image_url?: string | null;
+            /** Images */
+            images?: string[];
             /**
              * Is Active
              * @default true
@@ -6918,6 +8326,8 @@ export interface components {
              * @default 60
              */
             default_duration_min?: number;
+            /** Description */
+            description?: string | null;
             /**
              * Display Order
              * @default 0
@@ -6930,6 +8340,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Image Url */
+            image_url?: string | null;
+            /** Images */
+            images?: string[];
             /**
              * Is Active
              * @default true
@@ -6980,10 +8394,16 @@ export interface components {
             color?: string | null;
             /** Default Duration Min */
             default_duration_min?: number | null;
+            /** Description */
+            description?: string | null;
             /** Display Order */
             display_order?: number | null;
             /** Icon */
             icon?: string | null;
+            /** Image Url */
+            image_url?: string | null;
+            /** Images */
+            images?: string[] | null;
             /** Is Active */
             is_active?: boolean | null;
             /** Name */
@@ -7042,6 +8462,24 @@ export interface components {
             shift?: string | null;
             status?: components["schemas"]["UserStatus"] | null;
         };
+        /**
+         * Standing
+         * @description Where the student ranks among their current batch.
+         *
+         *     Score is 60% overall rating (0-10 scaled to 100) plus 40% attendance. A weighting
+         *     chosen so that turning up counts for nearly as much as talent — the figure is for
+         *     a coach's conversation with a parent, not a league table.
+         */
+        Standing: {
+            /** Batch Name */
+            batch_name: string | null;
+            /** Batch Rank */
+            batch_rank: number | null;
+            /** Batch Size */
+            batch_size: number;
+            /** Score */
+            score: number | null;
+        };
         /** StartSignup */
         StartSignup: {
             /**
@@ -7085,14 +8523,22 @@ export interface components {
             achievements?: string[];
             /** Blood Group */
             blood_group?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /** Customer Id */
             customer_id?: string | null;
             /** Date Of Birth */
             date_of_birth?: string | null;
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
             /** Gender */
             gender?: string | null;
+            /** Medical Notes */
+            medical_notes?: string | null;
             /** Name */
             name: string;
             /** Parent Name */
@@ -7104,6 +8550,8 @@ export interface components {
             performance_rating?: number | string;
             /** Phone */
             phone?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
             /** Skills */
             skills?: components["schemas"]["SkillScore"][];
             /** @default active */
@@ -7131,6 +8579,8 @@ export interface components {
             batch_name?: string | null;
             /** Blood Group */
             blood_group?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /** Coach Id */
             coach_id?: string | null;
             /** Customer Id */
@@ -7139,6 +8589,10 @@ export interface components {
             date_of_birth?: string | null;
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
             /** Gender */
             gender?: string | null;
             /**
@@ -7148,6 +8602,8 @@ export interface components {
             id: string;
             /** Joining Date */
             joining_date?: string | null;
+            /** Medical Notes */
+            medical_notes?: string | null;
             /** Name */
             name: string;
             /** Parent Name */
@@ -7164,6 +8620,8 @@ export interface components {
             performance_rating?: string;
             /** Phone */
             phone?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
             /** Program Id */
             program_id?: string | null;
             /** Renewal Date */
@@ -7207,12 +8665,18 @@ export interface components {
             avatar_initials?: string | null;
             /** Blood Group */
             blood_group?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /** Customer Id */
             customer_id?: string | null;
             /** Date Of Birth */
             date_of_birth?: string | null;
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
             /** Gender */
             gender?: string | null;
             /**
@@ -7220,6 +8684,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Medical Notes */
+            medical_notes?: string | null;
             /** Name */
             name: string;
             /** Parent Name */
@@ -7231,6 +8697,8 @@ export interface components {
             performance_rating?: string;
             /** Phone */
             phone?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
             /** Skills */
             skills?: components["schemas"]["SkillScore"][];
             /** @default active */
@@ -7238,25 +8706,157 @@ export interface components {
             /** Student No */
             student_no: string;
         };
+        /** StudentPersonal */
+        StudentPersonal: {
+            /** Achievements */
+            achievements: string[];
+            /** Blood Group */
+            blood_group: string | null;
+            /** Date Of Birth */
+            date_of_birth: string | null;
+            /** Email */
+            email: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
+            /** Gender */
+            gender: string | null;
+            /** Joined On */
+            joined_on: string | null;
+            /** Medical Notes */
+            medical_notes?: string | null;
+        };
+        /** StudentProfile */
+        StudentProfile: {
+            /** Assessments */
+            assessments: components["schemas"]["AssessmentOut"][];
+            attendance: components["schemas"]["AttendanceSummary"];
+            /** Enrollments */
+            enrollments?: components["schemas"]["ActiveCoaching"][];
+            fees: components["schemas"]["FeeSummary"];
+            /** Guardians */
+            guardians?: components["schemas"]["GuardianOut"][];
+            lifetime?: components["schemas"]["Lifetime"] | null;
+            next_class?: components["schemas"]["NextClass"] | null;
+            personal: components["schemas"]["StudentPersonal"];
+            /** Previous Skills */
+            previous_skills: components["schemas"]["SkillScore"][];
+            /** Promotions */
+            promotions: components["schemas"]["PromotionOut"][];
+            row: components["schemas"]["StudentRow"];
+            /** Skills */
+            skills: components["schemas"]["SkillScore"][];
+            standing: components["schemas"]["Standing"];
+        };
+        /**
+         * StudentRow
+         * @description One line of the students table: who, where they train, and how it is going.
+         *
+         *     Everything after `status` is derived at request time — attendance, fee state and
+         *     the attention flags are never stored, so they cannot go stale between a register
+         *     being marked and somebody opening this screen.
+         */
+        StudentRow: {
+            /**
+             * Active Enrollments
+             * @default 0
+             */
+            active_enrollments?: number;
+            /** Age */
+            age: number | null;
+            /** Attendance Overall Pct */
+            attendance_overall_pct: number | null;
+            /** Attendance Pct */
+            attendance_pct: number | null;
+            /** Avatar Initials */
+            avatar_initials: string | null;
+            /** Batch Id */
+            batch_id: string | null;
+            /** Batch Name */
+            batch_name: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Coach Id */
+            coach_id: string | null;
+            /** Coach Name */
+            coach_name: string | null;
+            /** Days To Renewal */
+            days_to_renewal: number | null;
+            /**
+             * Fee Status
+             * @enum {string}
+             */
+            fee_status: "paid" | "due" | "none";
+            /** Flags */
+            flags: ("repeat_absentee" | "low_attendance" | "renewal_due" | "promotion_ready")[];
+            /** Gender */
+            gender: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Levels */
+            levels: components["schemas"]["LevelEntry"][];
+            /** Name */
+            name: string;
+            /** Parent Name */
+            parent_name: string | null;
+            /** Pending Fee */
+            pending_fee: string;
+            /** Phone */
+            phone: string | null;
+            /** Photo Url */
+            photo_url: string | null;
+            /** Program Id */
+            program_id: string | null;
+            /** Program Name */
+            program_name: string | null;
+            /** Rating */
+            rating: string;
+            /** Renewal Date */
+            renewal_date: string | null;
+            /**
+             * Renewal State
+             * @enum {string}
+             */
+            renewal_state: "ok" | "due_soon" | "lapsed" | "none";
+            /** Sessions Marked 30D */
+            sessions_marked_30d: number;
+            /** Sport Id */
+            sport_id: string | null;
+            status: components["schemas"]["StudentStatus"];
+            /** Student No */
+            student_no: string;
+        };
         /**
          * StudentStatus
          * @enum {string}
          */
-        StudentStatus: "active" | "paused" | "completed" | "inactive";
+        StudentStatus: "active" | "trial" | "paused" | "completed" | "inactive" | "alumni" | "restricted";
         /** StudentUpdate */
         StudentUpdate: {
             /** Achievements */
             achievements?: string[] | null;
             /** Blood Group */
             blood_group?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
             /** Customer Id */
             customer_id?: string | null;
             /** Date Of Birth */
             date_of_birth?: string | null;
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
             /** Gender */
             gender?: string | null;
+            /** Medical Notes */
+            medical_notes?: string | null;
             /** Name */
             name?: string | null;
             /** Parent Name */
@@ -7265,6 +8865,8 @@ export interface components {
             performance_rating?: number | string | null;
             /** Phone */
             phone?: string | null;
+            /** Photo Url */
+            photo_url?: string | null;
             /** Skills */
             skills?: components["schemas"]["SkillScore"][] | null;
             status?: components["schemas"]["StudentStatus"] | null;
@@ -7573,6 +9175,8 @@ export interface components {
              * @default 60
              */
             default_duration_min?: number;
+            /** Description */
+            description?: string | null;
             /**
              * Display Order
              * @default 0
@@ -7580,6 +9184,10 @@ export interface components {
             display_order?: number;
             /** Icon */
             icon?: string | null;
+            /** Image Url */
+            image_url?: string | null;
+            /** Images */
+            images?: string[];
             /**
              * Is Active
              * @default true
@@ -7605,6 +9213,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    academy_studentsNeedingAttention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionOut"];
+                };
+            };
+        };
+    };
     academy_listBatches: {
         parameters: {
             query?: {
@@ -7705,6 +9333,35 @@ export interface operations {
             };
         };
     };
+    academy_deleteCoachReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     academy_listCoaches: {
         parameters: {
             query?: {
@@ -7776,6 +9433,39 @@ export interface operations {
             };
         };
     };
+    academy_removeCoach: {
+        parameters: {
+            query?: {
+                reassign_to?: string | null;
+            };
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachRemoval"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     academy_updateCoach: {
         parameters: {
             query?: never;
@@ -7788,6 +9478,211 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CoachUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_assignBatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_coachEarnings: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM */
+                month?: string | null;
+            };
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachEarnings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_recordPayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayoutCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPayoutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_coachProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_addCoachReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachReviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_unassignBatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                coach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAssign"];
             };
         };
         responses: {
@@ -7860,6 +9755,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcademyOverview"];
+                };
+            };
+        };
+    };
+    academy_deletePayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payout_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_coachPayroll: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM */
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Payroll"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7950,6 +9906,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_studentRoster: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                status?: components["schemas"]["StudentStatus"] | null;
+                sport_id?: string | null;
+                batch_id?: string | null;
+                coach_id?: string | null;
+                level?: components["schemas"]["SkillLevel"] | null;
+                fee_status?: string | null;
+                attention?: string | null;
+                sort?: string;
+                desc?: boolean;
+                /** @description 1-indexed page number */
+                page?: number;
+                /** @description Items per page */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StudentRow_"];
                 };
             };
             /** @description Validation Error */
@@ -8299,6 +10299,41 @@ export interface operations {
             };
         };
     };
+    academy_addAssessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     academy_studentEnrollments: {
         parameters: {
             query?: never;
@@ -8348,6 +10383,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentLevelOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    academy_studentProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentProfile"];
                 };
             };
             /** @description Validation Error */
@@ -9446,10 +11512,110 @@ export interface operations {
             };
         };
     };
+    branches_listBranches: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    branches_createBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    branches_updateBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     booking_listCourts: {
         parameters: {
             query?: {
                 sport_id?: string | null;
+                branch_id?: string | null;
                 /** @description Defaults to now */
                 at?: string | null;
             };

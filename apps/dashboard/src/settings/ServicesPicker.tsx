@@ -11,8 +11,8 @@
  * as broken. See the rollback in `toggle` for the honest half of that bargain.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Monitor } from 'lucide-react'
 import { ApiError, api } from '../api/client'
+import { SettingsPanel } from './SettingsPanel'
 import { POS_SERVICES, isEnabled, type PosServiceKey } from './services'
 
 export function ServicesPicker() {
@@ -60,31 +60,18 @@ export function ServicesPicker() {
   }
 
   return (
-    <section className="rounded-2xl border border-border-card bg-surface p-6">
-      <div className="flex items-start gap-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-lime/20 text-lime-ink">
-          <Monitor size={20} />
-        </div>
-        <div>
-          <h2 className="font-display text-lg font-semibold text-ink">Counter services</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate">
-            What your front desk can do on the POS tablet. Switching one off removes its
-            tile from the counter — it does not delete anything, and turning it back on
-            restores it.
-          </p>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4">
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-negative/5 px-4 py-3 text-sm text-negative">
+        <p role="alert" className="rounded-lg bg-negative/5 px-4 py-3 text-sm text-negative">
           {error}
         </p>
       )}
 
-      <div className="mt-5 divide-y divide-border-card border-y border-border-card">
+      <SettingsPanel flush>
+      <div className="divide-y divide-dashed divide-border-soft">
         {services === null
           ? POS_SERVICES.map((service) => (
-              <div key={service.key} className="flex items-center gap-4 py-4">
+              <div key={service.key} className="flex items-center gap-4 py-5">
                 <div className="min-w-0 flex-1">
                   <div className="h-4 w-28 animate-pulse rounded bg-surface-muted" />
                   <div className="mt-2 h-3 w-64 animate-pulse rounded bg-surface-muted" />
@@ -95,10 +82,10 @@ export function ServicesPicker() {
               const on = isEnabled(services, service.key)
               const busy = pending === service.key
               return (
-                <div key={service.key} className="flex items-center gap-4 py-4">
+                <div key={service.key} className="flex items-center gap-4 py-5">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-medium text-ink">{service.label}</p>
-                    <p className="mt-0.5 text-[13px] leading-relaxed text-slate">
+                    <p className="text-[14px] font-medium text-ink">{service.label}</p>
+                    <p className="mt-0.5 text-[12px] leading-relaxed text-slate">
                       {service.blurb}
                     </p>
                   </div>
@@ -123,11 +110,12 @@ export function ServicesPicker() {
               )
             })}
       </div>
+      </SettingsPanel>
 
-      <p className="mt-4 text-[13px] leading-relaxed text-muted">
+      <p className="text-[12px] leading-relaxed text-muted">
         The tablet picks this up when it next loads. A counter already open on a
         removed tile finishes what it is doing.
       </p>
-    </section>
+    </div>
   )
 }
