@@ -31,7 +31,7 @@ from app.modules.booking.models import Court, Sport
 from app.modules.gateway.models import IntegrationPartner
 
 #: The production API, as deploy/build.sh builds the dashboard against it.
-DEFAULT_BASE_URL = "https://gamexo-i6mt.onrender.com"
+DEFAULT_BASE_URL = "https://api.turfleo.com"
 
 
 async def sheet(slug: str, base_url: str) -> str:

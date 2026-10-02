@@ -12,7 +12,7 @@ set -euo pipefail
 # None are secrets: they ship to every browser that loads the app either way.
 # Overridable from the environment so a different backend can be targeted without
 # editing this file: VITE_API_BASE_URL=... pnpm deploy:build
-API_BASE_URL="${VITE_API_BASE_URL:-https://gamexo-i6mt.onrender.com}"
+API_BASE_URL="${VITE_API_BASE_URL:-https://api.turfleo.com}"
 TENANT_SLUG="${VITE_TENANT_SLUG:-xcourt}"
 UPI_ID="${VITE_UPI_ID:-xcourtsports@upi}"
 # Where every image and icon is served from — the R2 bucket's public domain (see
