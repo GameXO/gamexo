@@ -20,8 +20,8 @@ set -euo pipefail
 # that link to production, which is exactly what building it via deploy/build.sh
 # used to do (that script built this app too, discarded the output, and never
 # passed this variable at all).
-API_BASE_URL="${VITE_API_BASE_URL:-https://gamexo-i6mt.onrender.com}"
-DASHBOARD_URL="${VITE_DASHBOARD_URL:-https://gamexo-dash.gamexo.workers.dev}"
+API_BASE_URL="${VITE_API_BASE_URL:-https://api.turfleo.com}"
+DASHBOARD_URL="${VITE_DASHBOARD_URL:-https://dashboard.turfleo.com}"
 # The asset CDN — see deploy/build.sh.
 ASSET_BASE_URL="${VITE_ASSET_BASE_URL:-https://cdn.turfleo.com}"
 

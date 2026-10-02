@@ -19,6 +19,12 @@
   "name": "gamexo-dash",
   "compatibility_date": "2026-08-11",
 
+  // The public address. Declared here so every deploy attaches it to THIS Worker:
+  // attached by hand in the Cloudflare dashboard, it stayed on the old
+  // "gamexo-demo" Worker after a rename and kept serving that Worker's stale build.
+  // It is also the origin the API's CORS_ORIGINS must list.
+  "routes": [{ "pattern": "dashboard.turfleo.com", "custom_domain": true }],
+
   // No "main". This is an assets-only Worker: there is no script to invoke, so
   // every request is served straight from the asset store. That is what keeps it
   // free and unmetered — the 100k requests/day cap on the free plan applies only
