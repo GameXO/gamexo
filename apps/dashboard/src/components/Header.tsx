@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Menu } from 'lucide-react'
+import { ChevronRight, Menu } from '../ui/icons'
 import HeaderSearch from './HeaderSearch'
 import DateRangePicker from './DateRangePicker'
 import type { View } from '../App'

@@ -22,10 +22,9 @@
  *   always meant to do here.
  */
 import { useMemo, useState } from 'react'
-import { ChevronRight, Eye, Pause, Pencil, Play, Plus, Search, Users } from 'lucide-react'
-import RowActionsMenu from '../ui/RowActionsMenu'
+import { ChevronRight, Eye, Pause, Pencil, Play, Plus, Search, Users } from '../ui/icons'
 import ConfirmDialog from '../ui/ConfirmDialog'
-import StatusPill from '../ui/StatusPill'
+import UiPlanCard, { monthlyEquivalent, tiersByPrice, type PlanTier } from '../ui/PlanCard'
 import {
   DURATION_LABEL,
   planPrice,
@@ -65,6 +64,22 @@ export default function Membership() {
   const [category, setCategory] = useState<string>(ALL)
 
   const all = useMemo(() => plans ?? [], [plans])
+  // Ranked across every plan so a card keeps its tier through search and filters.
+  const tiers = useMemo(
+    () =>
+      tiersByPrice(
+        all.map((p) => ({
+          id: p.id,
+          monthly: monthlyEquivalent({
+            '1m': planPrice(p, '1m'),
+            '3m': planPrice(p, '3m'),
+            '6m': planPrice(p, '6m'),
+            '12m': planPrice(p, '12m'),
+          }),
+        })),
+      ),
+    [all],
+  )
   const detailPlan = detailId ? (all.find((p) => p.id === detailId) ?? null) : null
 
   const counts = useMemo(
@@ -215,6 +230,7 @@ export default function Membership() {
             <PlanCard
               key={plan.id}
               plan={plan}
+              tier={tiers.get(plan.id) ?? 'standard'}
               actions={actionsFor(plan)}
               showCategory={activeCategory === ALL && categories.length > 1}
               onOpen={() => setDetailId(plan.id)}
@@ -279,11 +295,13 @@ export default function Membership() {
 
 function PlanCard({
   plan,
+  tier,
   actions,
   showCategory,
   onOpen,
 }: {
   plan: MembershipPlanOut
+  tier: PlanTier
   actions: Action[]
   /** Only worth saying when the list mixes categories — inside a category tab it is
    *  the same word on every card. */
@@ -291,7 +309,6 @@ function PlanCard({
   onOpen: () => void
 }) {
   const terms = sellableDurations(plan)
-  const benefits = plan.benefits ?? []
   const discount = Number(plan.discount_pct ?? 0)
   const joining = Number(plan.joining_fee ?? 0)
   const members = plan.active_count ?? 0
@@ -303,73 +320,29 @@ function PlanCard({
   ].filter((p): p is string => p !== null)
 
   return (
-    <article
-      onClick={onOpen}
-      className={`group flex cursor-pointer flex-col rounded-xl border border-border-card bg-white shadow-card transition-colors hover:border-border-soft ${
-        plan.is_active ? '' : 'opacity-70'
-      }`}
-    >
-      <header className="flex items-start justify-between gap-3 px-5 pt-5">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpen()
-            }}
-            className="block max-w-full truncate text-left text-[14px] font-semibold text-ink hover:underline"
-          >
-            {plan.name}
-          </button>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusPill label={plan.is_active ? 'Offered' : 'Retired'} tone={plan.is_active ? 'positive' : 'neutral'} />
-            {showCategory && <span className="text-xs text-muted">{plan.category || 'General'}</span>}
-          </div>
-        </div>
-        {/* The menu sits inside a clickable card, so it must not also open the plan. */}
-        <div onClick={(e) => e.stopPropagation()} className="-mr-2 -mt-1 shrink-0">
-          <RowActionsMenu actions={actions} />
-        </div>
-      </header>
-
-      <div className="mx-5 mt-4 border-t border-dashed border-border-soft pt-4">
-        {terms.length > 0 ? (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
-            {terms.map((d) => (
-              <div key={d}>
-                <dt className="text-xs text-muted">{DURATION_LABEL[d]}</dt>
-                <dd className="mt-0.5 text-base font-semibold text-ink">{rupees(planPrice(plan, d))}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="text-sm text-amber-700">No term priced — can't be sold</p>
-        )}
-      </div>
-
-      <div className="flex flex-1 flex-col gap-3 px-5 pb-4 pt-4">
-        <ul className="flex flex-wrap gap-1.5">
-          {perks.map((perk) => (
-            <li key={perk} className="rounded-md bg-surface-muted px-2 py-1 text-xs text-slate">
-              {perk}
-            </li>
-          ))}
-        </ul>
-        {benefits.length > 0 && (
-          <p className="line-clamp-2 text-[12px] leading-relaxed text-muted">{benefits.join(' · ')}</p>
-        )}
-      </div>
-
-      <footer className="flex items-center justify-between border-t border-dashed border-border-soft px-5 py-3 text-xs">
-        <span className="inline-flex items-center gap-1.5 text-slate">
+    <UiPlanCard
+      tier={tier}
+      name={plan.name}
+      subtitle={showCategory ? plan.category || 'General' : undefined}
+      status={{ label: plan.is_active ? 'Offered' : 'Retired', tone: plan.is_active ? 'positive' : 'neutral' }}
+      actions={actions}
+      prices={terms.map((d) => ({ label: DURATION_LABEL[d], amount: rupees(planPrice(plan, d)) }))}
+      perks={perks}
+      note={(plan.benefits ?? []).join(' · ') || undefined}
+      footerStart={
+        <>
           <Users size={13} />
           {members > 0 ? `${members} member${members === 1 ? '' : 's'}` : 'No members yet'}
-        </span>
-        <span className="inline-flex items-center gap-0.5 font-medium text-ink">
+        </>
+      }
+      footerEnd={
+        <>
           Details
           <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-        </span>
-      </footer>
-    </article>
+        </>
+      }
+      onOpen={onOpen}
+      dimmed={!plan.is_active}
+    />
   )
 }

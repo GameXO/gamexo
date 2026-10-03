@@ -23,7 +23,7 @@ import {
   Trash2,
   UserMinus,
   Users,
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   useCoachProfile,
   useDeleteCoachReview,
@@ -45,51 +45,12 @@ import { STATUS_CHIP, attendanceTone, formatDate, monthLabel, rupees } from './f
 import { useIsAdmin, useIsManager } from './permissions'
 import PayoutDrawer from './PayoutDrawer'
 import RemoveCoachDrawer from './RemoveCoachDrawer'
+import Card from '../ui/Card'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
+import StatTile from '../ui/StatTile'
 
 const TABS = ['Overview', 'Classes', 'Students', 'Reviews', 'Pay'] as const
 type Tab = (typeof TABS)[number]
-
-function Card({
-  title,
-  action,
-  children,
-  className = '',
-}: {
-  title: string
-  action?: React.ReactNode
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <section className={`rounded-2xl border border-border-card bg-white p-5 ${className}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function Tile({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string
-  value: React.ReactNode
-  sub?: React.ReactNode
-  tone?: string
-}) {
-  return (
-    <div className="rounded-xl border border-border-card bg-white px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-semibold ${tone ?? 'text-ink'}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate">{sub}</p>}
-    </div>
-  )
-}
 
 function Stars({ value, size = 14 }: { value: number; size?: number }) {
   return (
@@ -305,35 +266,35 @@ export default function CoachProfile({
 
       {/* ── Headline numbers */}
       <div className={`grid grid-cols-2 gap-3 ${pay ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
-        <Tile
+        <StatTile
           label="Students"
           value={stats.students}
           sub={`across ${stats.batches} ${stats.batches === 1 ? 'batch' : 'batches'}`}
         />
-        <Tile
+        <StatTile
           label="Rating"
           value={rating > 0 ? rating.toFixed(1) : '—'}
           sub={stats.review_count ? `${stats.review_count} ${stats.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
         />
-        <Tile
+        <StatTile
           label="Student attendance"
           value={stats.student_attendance_pct != null ? `${Math.round(stats.student_attendance_pct)}%` : '—'}
           tone={tone.text}
           sub="last 30 days"
         />
-        <Tile
+        <StatTile
           label="Classes taught"
           value={stats.sessions_completed_30d}
           sub={`${Number(stats.hours_30d)} h · last 30 days`}
         />
-        <Tile
+        <StatTile
           label="Cancelled"
           value={stats.sessions_cancelled_30d}
           tone={stats.sessions_cancelled_30d > 2 ? 'text-amber-700' : undefined}
           sub="last 30 days"
         />
         {pay && (
-          <Tile
+          <StatTile
             label="This month"
             value={rupees(pay.current.payout?.total ?? pay.current.gross)}
             tone={pay.current.status === 'due' ? 'text-amber-700' : undefined}
@@ -423,80 +384,78 @@ export default function CoachProfile({
               )}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                    <th className="py-2 pr-4 font-medium">Batch</th>
-                    <th className="py-2 pr-4 font-medium">When</th>
-                    <th className="py-2 pr-4 font-medium">Students</th>
-                    <th className="py-2 pr-4 font-medium">Attendance</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {batches.map((b) => {
-                    const t = attendanceTone(b.attendance_pct ?? null)
-                    const full = b.enrolled >= b.capacity
-                    return (
-                      <tr key={b.id} className="border-b border-border-card last:border-0">
-                        <td className="py-3 pr-4">
-                          <p className="font-medium text-ink">{b.name}</p>
-                          <p className="text-xs text-muted">{b.program_name ?? '—'}</p>
-                        </td>
-                        <td className="py-3 pr-4 text-slate">
-                          {[b.schedule, b.time_label].filter(Boolean).join(' · ') || '—'}
-                          {b.location && <span className="block text-xs text-muted">{b.location}</span>}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className="font-medium text-ink">
-                            {b.enrolled}/{b.capacity}
-                          </span>
-                          <div className="mt-1 h-1.5 w-20 rounded-full bg-surface-muted">
-                            <div
-                              className={`h-1.5 rounded-full ${full ? 'bg-amber-400' : 'bg-lime-ink'}`}
-                              style={{ width: `${Math.min(100, (b.enrolled / b.capacity) * 100)}%` }}
-                            />
-                          </div>
-                        </td>
-                        <td className={`py-3 pr-4 font-medium ${t.text}`}>
-                          {b.attendance_pct != null ? `${Math.round(b.attendance_pct)}%` : '—'}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_CHIP[b.status === 'active' ? 'active' : b.status === 'upcoming' ? 'paused' : 'completed']}`}>
-                            {b.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">
-                          {isManager && b.status !== 'completed' && (
-                            <button
-                              type="button"
-                              disabled={unassign.isPending}
-                              onClick={() => {
-                                if (!confirmed(`un-${b.id}`)) return arm(`un-${b.id}`)
-                                setConfirm(null)
-                                void guard(
-                                  () => unassign.mutateAsync({ coachId: coach.id, batchIds: [b.id], unassign: true }),
-                                  'Could not take the batch off this coach.',
-                                )
-                              }}
-                              className={`rounded-lg border px-2.5 py-1.5 text-xs ${
-                                confirmed(`un-${b.id}`)
-                                  ? 'border-negative bg-negative text-white'
-                                  : 'border-border-card text-slate hover:text-ink'
-                              }`}
-                            >
-                              {confirmed(`un-${b.id}`) ? 'Sure? Students move off too' : 'Unassign'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table inset minWidth={720}>
+              <Thead>
+                <Tr>
+                  <Th>Batch</Th>
+                  <Th>When</Th>
+                  <Th>Students</Th>
+                  <Th>Attendance</Th>
+                  <Th>Status</Th>
+                  <Th />
+                </Tr>
+              </Thead>
+              <Tbody>
+                {batches.map((b) => {
+                  const t = attendanceTone(b.attendance_pct ?? null)
+                  const full = b.enrolled >= b.capacity
+                  return (
+                    <Tr key={b.id}>
+                      <Td>
+                        <p className="font-medium text-ink">{b.name}</p>
+                        <p className="text-xs text-muted">{b.program_name ?? '—'}</p>
+                      </Td>
+                      <Td className="text-slate">
+                        {[b.schedule, b.time_label].filter(Boolean).join(' · ') || '—'}
+                        {b.location && <span className="block text-xs text-muted">{b.location}</span>}
+                      </Td>
+                      <Td>
+                        <span className="font-medium text-ink">
+                          {b.enrolled}/{b.capacity}
+                        </span>
+                        <div className="mt-1 h-1.5 w-20 rounded-full bg-surface-muted">
+                          <div
+                            className={`h-1.5 rounded-full ${full ? 'bg-amber-400' : 'bg-lime-ink'}`}
+                            style={{ width: `${Math.min(100, (b.enrolled / b.capacity) * 100)}%` }}
+                          />
+                        </div>
+                      </Td>
+                      <Td className={`font-medium ${t.text}`}>
+                        {b.attendance_pct != null ? `${Math.round(b.attendance_pct)}%` : '—'}
+                      </Td>
+                      <Td>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_CHIP[b.status === 'active' ? 'active' : b.status === 'upcoming' ? 'paused' : 'completed']}`}>
+                          {b.status}
+                        </span>
+                      </Td>
+                      <Td align="right">
+                        {isManager && b.status !== 'completed' && (
+                          <button
+                            type="button"
+                            disabled={unassign.isPending}
+                            onClick={() => {
+                              if (!confirmed(`un-${b.id}`)) return arm(`un-${b.id}`)
+                              setConfirm(null)
+                              void guard(
+                                () => unassign.mutateAsync({ coachId: coach.id, batchIds: [b.id], unassign: true }),
+                                'Could not take the batch off this coach.',
+                              )
+                            }}
+                            className={`rounded-lg border px-2.5 py-1.5 text-xs ${
+                              confirmed(`un-${b.id}`)
+                                ? 'border-negative bg-negative text-white'
+                                : 'border-border-card text-slate hover:text-ink'
+                            }`}
+                          >
+                            {confirmed(`un-${b.id}`) ? 'Sure? Students move off too' : 'Unassign'}
+                          </button>
+                        )}
+                      </Td>
+                    </Tr>
+                  )
+                })}
+              </Tbody>
+            </Table>
           )}
         </Card>
       )}
@@ -520,55 +479,49 @@ export default function CoachProfile({
           {students.length === 0 ? (
             <p className={EMPTY}>No active students are with {coach.name} right now.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                    <th className="py-2 pr-4 font-medium">Student</th>
-                    <th className="py-2 pr-4 font-medium">Batch</th>
-                    <th className="py-2 pr-4 font-medium">Attendance</th>
-                    <th className="py-2 pr-4 font-medium">Rating</th>
-                    <th className="py-2 font-medium">Fees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => {
-                    const t = attendanceTone(s.attendance_pct ?? null)
-                    return (
-                      <tr
-                        key={s.id}
-                        onClick={() => onOpenStudent(s.id)}
-                        className="cursor-pointer border-b border-border-card last:border-0 hover:bg-surface/60"
-                      >
-                        <td className="py-3 pr-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar name={s.name} initials={s.avatar_initials} photoUrl={s.photo_url} />
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-ink">{s.name}</p>
-                              <p className="text-xs text-muted">{s.student_no}</p>
-                            </div>
+            <Table inset minWidth={720}>
+              <Thead>
+                <Tr>
+                  <Th>Student</Th>
+                  <Th>Batch</Th>
+                  <Th>Attendance</Th>
+                  <Th>Rating</Th>
+                  <Th>Fees</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {students.map((s) => {
+                  const t = attendanceTone(s.attendance_pct ?? null)
+                  return (
+                    <Tr key={s.id} onClick={() => onOpenStudent(s.id)}>
+                      <Td>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={s.name} initials={s.avatar_initials} photoUrl={s.photo_url} />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink">{s.name}</p>
+                            <p className="text-xs text-muted">{s.student_no}</p>
                           </div>
-                        </td>
-                        <td className="py-3 pr-4 text-slate">{s.batch_name ?? '—'}</td>
-                        <td className={`py-3 pr-4 font-medium ${t.text}`}>
-                          {s.attendance_pct != null ? `${Math.round(s.attendance_pct)}%` : '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-ink">{Number(s.rating) > 0 ? Number(s.rating).toFixed(1) : '—'}</td>
-                        <td className="py-3">
-                          {s.fee_status === 'due' ? (
-                            <span className="text-amber-700">{rupees(s.pending_fee)} due</span>
-                          ) : s.fee_status === 'paid' ? (
-                            <span className="text-positive">Paid</span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </Td>
+                      <Td className="text-slate">{s.batch_name ?? '—'}</Td>
+                      <Td className={`font-medium ${t.text}`}>
+                        {s.attendance_pct != null ? `${Math.round(s.attendance_pct)}%` : '—'}
+                      </Td>
+                      <Td className="text-ink">{Number(s.rating) > 0 ? Number(s.rating).toFixed(1) : '—'}</Td>
+                      <Td>
+                        {s.fee_status === 'due' ? (
+                          <span className="text-amber-700">{rupees(s.pending_fee)} due</span>
+                        ) : s.fee_status === 'paid' ? (
+                          <span className="text-positive">Paid</span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </Td>
+                    </Tr>
+                  )
+                })}
+              </Tbody>
+            </Table>
           )}
         </Card>
       )}
@@ -713,116 +666,112 @@ export default function CoachProfile({
           </Card>
 
           <Card title="Last six months" className="lg:col-span-2">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                    <th className="py-2 pr-4 font-medium">Month</th>
-                    <th className="py-2 pr-4 font-medium">Sessions</th>
-                    <th className="py-2 pr-4 font-medium">Hours</th>
-                    <th className="py-2 pr-4 text-right font-medium">Earned</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...monthly].reverse().map((m) => {
-                    const earned = Number(m.earned ?? 0)
-                    const paid = m.paid != null
-                    return (
-                      <tr key={m.month} className="border-b border-border-card last:border-0">
-                        <td className="py-2.5 pr-4 font-medium text-ink">{longMonth(m.month)}</td>
-                        <td className="py-2.5 pr-4 text-slate">{m.sessions}</td>
-                        <td className="py-2.5 pr-4 text-slate">{Number(m.hours)}</td>
-                        <td className="py-2.5 pr-4 text-right text-ink">{rupees(earned)}</td>
-                        <td className="py-2.5 pr-4">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${PAYOUT_STATUS_CHIP[paid ? 'paid' : earned > 0 ? 'due' : 'nothing']}`}
+            <Table inset minWidth={560}>
+              <Thead>
+                <Tr>
+                  <Th>Month</Th>
+                  <Th>Sessions</Th>
+                  <Th>Hours</Th>
+                  <Th align="right">Earned</Th>
+                  <Th>Status</Th>
+                  <Th />
+                </Tr>
+              </Thead>
+              <Tbody>
+                {[...monthly].reverse().map((m) => {
+                  const earned = Number(m.earned ?? 0)
+                  const paid = m.paid != null
+                  return (
+                    <Tr key={m.month}>
+                      <Td className="font-medium text-ink">{longMonth(m.month)}</Td>
+                      <Td className="text-slate">{m.sessions}</Td>
+                      <Td className="text-slate">{Number(m.hours)}</Td>
+                      <Td align="right" className="text-ink">{rupees(earned)}</Td>
+                      <Td>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${PAYOUT_STATUS_CHIP[paid ? 'paid' : earned > 0 ? 'due' : 'nothing']}`}
+                        >
+                          {paid ? 'Paid' : earned > 0 ? 'Due' : '—'}
+                        </span>
+                      </Td>
+                      <Td align="right">
+                        {!paid && earned > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPaying(m.month)}
+                            className="rounded-lg border border-border-card px-2.5 py-1 text-xs text-slate hover:text-ink"
                           >
-                            {paid ? 'Paid' : earned > 0 ? 'Due' : '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-right">
-                          {!paid && earned > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setPaying(m.month)}
-                              className="rounded-lg border border-border-card px-2.5 py-1 text-xs text-slate hover:text-ink"
-                            >
-                              Record payout
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            Record payout
+                          </button>
+                        )}
+                      </Td>
+                    </Tr>
+                  )
+                })}
+              </Tbody>
+            </Table>
           </Card>
 
           <Card title="Payout history" className="lg:col-span-2">
             {pay.payouts.length === 0 ? (
               <p className={EMPTY}>No payouts recorded yet.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                      <th className="py-2 pr-4 font-medium">For</th>
-                      <th className="py-2 pr-4 font-medium">Breakdown</th>
-                      <th className="py-2 pr-4 text-right font-medium">Paid</th>
-                      <th className="py-2 pr-4 font-medium">How</th>
-                      <th className="py-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pay.payouts.map((p) => (
-                      <tr key={p.id} className="border-b border-border-card align-top last:border-0">
-                        <td className="py-3 pr-4 font-medium text-ink">{longMonth(p.period.slice(0, 7))}</td>
-                        <td className="py-3 pr-4 text-xs text-slate">
-                          {Number(p.base_amount) > 0 && <span className="block">Base {rupees(p.base_amount)}</span>}
-                          {Number(p.commission_amount) > 0 && (
-                            <span className="block">Commission {rupees(p.commission_amount)}</span>
-                          )}
-                          {Number(p.adjustment) !== 0 && (
-                            <span className="block">
-                              {Number(p.adjustment) > 0 ? 'Bonus' : 'Deduction'} {rupees(Math.abs(Number(p.adjustment)))}
-                              {p.adjustment_note && ` — ${p.adjustment_note}`}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4 text-right font-medium text-ink">{rupees(p.total)}</td>
-                        <td className="py-3 pr-4 text-xs capitalize text-slate">
-                          {p.method}
-                          {p.reference && ` · ${p.reference}`}
-                          <span className="block normal-case text-muted">{formatDate(p.paid_on)}</span>
-                        </td>
-                        <td className="py-3 text-right">
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              disabled={deletePayout.isPending}
-                              onClick={() => {
-                                if (!confirmed(`po-${p.id}`)) return arm(`po-${p.id}`)
-                                setConfirm(null)
-                                void guard(() => deletePayout.mutateAsync(p.id), 'Could not undo the payout.')
-                              }}
-                              className={`rounded-lg border px-2.5 py-1 text-xs ${
-                                confirmed(`po-${p.id}`)
-                                  ? 'border-negative bg-negative text-white'
-                                  : 'border-border-card text-slate hover:text-ink'
-                              }`}
-                            >
-                              {confirmed(`po-${p.id}`) ? 'Sure? This reopens the month' : 'Undo'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table inset minWidth={760}>
+                <Thead>
+                  <Tr>
+                    <Th>For</Th>
+                    <Th>Breakdown</Th>
+                    <Th align="right">Paid</Th>
+                    <Th>How</Th>
+                    <Th />
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {pay.payouts.map((p) => (
+                    <Tr key={p.id} className="align-top">
+                      <Td className="font-medium text-ink">{longMonth(p.period.slice(0, 7))}</Td>
+                      <Td className="text-xs text-slate">
+                        {Number(p.base_amount) > 0 && <span className="block">Base {rupees(p.base_amount)}</span>}
+                        {Number(p.commission_amount) > 0 && (
+                          <span className="block">Commission {rupees(p.commission_amount)}</span>
+                        )}
+                        {Number(p.adjustment) !== 0 && (
+                          <span className="block">
+                            {Number(p.adjustment) > 0 ? 'Bonus' : 'Deduction'} {rupees(Math.abs(Number(p.adjustment)))}
+                            {p.adjustment_note && ` — ${p.adjustment_note}`}
+                          </span>
+                        )}
+                      </Td>
+                      <Td align="right" className="font-medium text-ink">{rupees(p.total)}</Td>
+                      <Td className="text-xs capitalize text-slate">
+                        {p.method}
+                        {p.reference && ` · ${p.reference}`}
+                        <span className="block normal-case text-muted">{formatDate(p.paid_on)}</span>
+                      </Td>
+                      <Td align="right">
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            disabled={deletePayout.isPending}
+                            onClick={() => {
+                              if (!confirmed(`po-${p.id}`)) return arm(`po-${p.id}`)
+                              setConfirm(null)
+                              void guard(() => deletePayout.mutateAsync(p.id), 'Could not undo the payout.')
+                            }}
+                            className={`rounded-lg border px-2.5 py-1 text-xs ${
+                              confirmed(`po-${p.id}`)
+                                ? 'border-negative bg-negative text-white'
+                                : 'border-border-card text-slate hover:text-ink'
+                            }`}
+                          >
+                            {confirmed(`po-${p.id}`) ? 'Sure? This reopens the month' : 'Undo'}
+                          </button>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
             )}
           </Card>
         </div>

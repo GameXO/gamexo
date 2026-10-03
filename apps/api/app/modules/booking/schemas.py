@@ -372,10 +372,16 @@ class EquipmentSelection(BaseModel):
         return self
 
 
+#: The longest one booking may run — six hours. A business rule, held here so that every
+#: way of making or changing a booking meets it, not just the screen that happens to
+#: show a six-hour picker.
+MAX_BOOKING_MINUTES = 360
+
+
 class BookingCreate(BaseModel):
     court_id: uuid.UUID
     starts_at: datetime
-    duration_min: int = Field(ge=15, le=1440)
+    duration_min: int = Field(ge=15, le=MAX_BOOKING_MINUTES)
     customer_id: uuid.UUID | None = None
     # Walk-ins are frequently anonymous — someone turns up and pays cash. Name and
     # phone alone are enough to take the booking.
@@ -413,7 +419,7 @@ class BookingUpdate(BaseModel):
 
     court_id: uuid.UUID | None = None
     starts_at: datetime | None = None
-    duration_min: int | None = Field(default=None, ge=15, le=1440)
+    duration_min: int | None = Field(default=None, ge=15, le=MAX_BOOKING_MINUTES)
     equipment: list[EquipmentSelection] | None = None
     discount: Decimal | None = Field(default=None, ge=0)
     notes: str | None = None

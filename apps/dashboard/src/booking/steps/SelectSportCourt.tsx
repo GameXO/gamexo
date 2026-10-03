@@ -33,6 +33,10 @@ function OfflineBadge() {
   )
 }
 
+/**
+ * The classic flow's first step: a sport, then one of its courts. (The single-page view
+ * does this and the time on one screen — see `SelectSlot.tsx`.)
+ */
 export default function SelectSportCourt({
   draft,
   setDraft,
@@ -55,7 +59,7 @@ export default function SelectSportCourt({
   const branchNames = new Map((branches ?? []).map((b) => [b.id, b.name]))
 
   const pickSport = (sportId: string) => {
-    setDraft({ sportId, courtId: null, startHour: null })
+    setDraft({ sportId, courtId: null, startHour: null, hours: draft.slotUnit })
     setCourtListOpen(true)
   }
 

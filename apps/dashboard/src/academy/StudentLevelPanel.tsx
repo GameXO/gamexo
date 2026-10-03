@@ -12,7 +12,7 @@
  * makes a carefully-tended ladder look untended.
  */
 import { useState } from 'react'
-import { ArrowRight, Loader2, X } from 'lucide-react'
+import { ArrowRight, Loader2, X } from '../ui/icons'
 import {
   SKILL_LEVELS,
   usePromoteStudent,

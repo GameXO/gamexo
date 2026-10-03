@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Upload } from 'lucide-react'
+import { ArrowLeft, Upload } from '../ui/icons'
 import {
   stockStatus,
   useCreateInventoryItem,

@@ -350,6 +350,63 @@ export function useAllCourts() {
   })
 }
 
+/** One bookable hour of one court, as the booking screen draws it. */
+export type HourSlot = {
+  hour: number
+  state: 'open' | 'booked' | 'past'
+  /** The server's rate for this hour — the court's peak rate in peak hours or at a weekend. */
+  rate: number
+  isPeak: boolean
+}
+
+/**
+ * Free hours for one court on one day, from the server.
+ *
+ * This replaces a placeholder that derived "booked" from a hash of the court and
+ * hour, so a slot could read free here and be refused when the booking was made.
+ * The answer now respects the court's own opening hours, every live booking and hold,
+ * and whether the court is switched on.
+ *
+ * Only whole hours on the chosen day are kept: the booking flow works in hours and
+ * takes a date, so a half-hour start or a slot that rolls past midnight cannot be
+ * expressed in it. A slot that has already begun is `past` rather than dropped, so
+ * the day still reads as a full row of times. Refetched on mount and every minute —
+ * unlike the reference data, this goes stale as other desks and partners book.
+ */
+export function useCourtAvailability(courtId: string | null, dateISO: string) {
+  return useQuery({
+    queryKey: ['availability', courtId, dateISO] as const,
+    enabled: !!courtId,
+    queryFn: () =>
+      api.courtAvailability({
+        court_id: courtId!,
+        // Local noon: unambiguously inside the day whatever the offset.
+        date: new Date(`${dateISO}T12:00:00`).toISOString(),
+        duration_min: 60,
+        slot_minutes: 60,
+      }),
+    select: (rows): HourSlot[] => {
+      const now = Date.now()
+      const slots = rows[0]?.slots ?? []
+      const out: HourSlot[] = []
+      for (const slot of slots) {
+        const start = new Date(slot.starts_at)
+        if (start.getMinutes() !== 0 || toISO(start) !== dateISO) continue
+        out.push({
+          hour: start.getHours(),
+          state: start.getTime() <= now ? 'past' : slot.available ? 'open' : 'booked',
+          rate: Number(slot.rate ?? 0),
+          isPeak: !!slot.is_peak,
+        })
+      }
+      return out
+    },
+    staleTime: 15_000,
+    refetchOnMount: 'always',
+    refetchInterval: 60_000,
+  })
+}
+
 /* ── Sports & Courts management ─────────────────────────────────────────────
  * The management screens work on the API's own records rather than the counter's
  * lossy `Sport`/`Court` view (no per-day hours, no images, no active flag), so they
@@ -997,6 +1054,8 @@ export function useCreateBooking() {
       // the slot, so both stock levels and court occupancy are now stale.
       qc.invalidateQueries({ queryKey: queryKeys.inventory })
       qc.invalidateQueries({ queryKey: ['courts'] })
+      // The slot just taken must read as taken on the next screen that shows it.
+      qc.invalidateQueries({ queryKey: ['availability'] })
     },
   })
 }

@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react'
+import { Check, X } from '../ui/icons'
 import { useSports } from '../api/hooks'
 
 export default function SportPickerModal({

@@ -1,35 +1,37 @@
 import type { View } from '../App'
 
-import { asset } from '../lib/asset'
+import {
+  Calendar,
+  Cashier,
+  CartPlus,
+  FootballPitch,
+  GraduationCap,
+  HelpCircle,
+  Layers,
+  LayoutGrid,
+  Package,
+  Settings2,
+  Trophy,
+  UsersRound,
+  type IconComponent,
+} from '../ui/icons'
 import { SETTINGS_NAV, type SettingsSectionId } from '../settings/settingsNav'
 
-const dashboardSquare = asset('dashboard/dashboard-square.svg')
-const dices = asset('dashboard/dices.svg')
-const shoppingCartAdd = asset('dashboard/shopping-cart-add.svg')
-const calendar = asset('dashboard/calendar.svg')
-const storeManagement = asset('dashboard/store-management.svg')
-const packageDelivered = asset('dashboard/package-delivered.svg')
-const mortarboard = asset('dashboard/mortarboard.svg')
-const olympicTorch = asset('dashboard/olympic-torch.svg')
-const userPlusDark = asset('dashboard/user-plus-dark.svg')
-const settingsIcon = asset('dashboard/settings.svg')
-const helpIcon = asset('dashboard/help-square-rounded.svg')
-
-export type NavItem = { label: string; icon: string; view?: View; submenu?: boolean }
+export type NavItem = { label: string; icon: IconComponent; view?: View; submenu?: boolean }
 
 /** The sidebar's own list — kept here (not in Sidebar.tsx) so the header search
  *  can index the same destinations without duplicating them. */
 export const primaryItems: NavItem[] = [
-  { label: 'Dashboard', icon: dashboardSquare, view: 'dashboard' },
-  { label: 'Active Courts', icon: dices, view: 'activeCourts' },
-  { label: 'Add ons', icon: shoppingCartAdd, view: 'addons' },
-  { label: 'Bookings', icon: calendar, view: 'bookings' },
-  { label: 'Members', icon: userPlusDark, view: 'members' },
-  { label: 'Manage', icon: storeManagement, submenu: true },
-  { label: 'Sales', icon: storeManagement, view: 'sales' },
-  { label: 'Inventory', icon: packageDelivered, view: 'equipment' },
-  { label: 'Academy', icon: mortarboard, view: 'academy' },
-  { label: 'Events', icon: olympicTorch, view: 'events' },
+  { label: 'Dashboard', icon: LayoutGrid, view: 'dashboard' },
+  { label: 'Active Courts', icon: FootballPitch, view: 'activeCourts' },
+  { label: 'Add ons', icon: CartPlus, view: 'addons' },
+  { label: 'Bookings', icon: Calendar, view: 'bookings' },
+  { label: 'Members', icon: UsersRound, view: 'members' },
+  { label: 'Manage', icon: Layers, submenu: true },
+  { label: 'Sales', icon: Cashier, view: 'sales' },
+  { label: 'Inventory', icon: Package, view: 'equipment' },
+  { label: 'Academy', icon: GraduationCap, view: 'academy' },
+  { label: 'Events', icon: Trophy, view: 'events' },
 ]
 
 /** Day-to-day records. Configuration — plans, staff, payments, notifications,
@@ -76,7 +78,7 @@ export const SEARCHABLE_PAGES: {
   ),
 ]
 
-/** Pinned to the bottom of the sidebar. Settings opens a panel of its sections, the
- *  way Manage does — for an admin; anyone else gets a plain link. */
-export const helpItem: NavItem = { label: 'Help Center', icon: helpIcon, view: 'helpCenter' }
-export const settingsItem: NavItem = { label: 'Settings', icon: settingsIcon, view: 'settings', submenu: true }
+/** Settings is the last row of the sidebar's main list and opens a panel, the way Manage
+ *  does: its sections for an admin, and Help Center beneath them for everyone. */
+export const helpItem: NavItem = { label: 'Help Center', icon: HelpCircle, view: 'helpCenter' }
+export const settingsItem: NavItem = { label: 'Settings', icon: Settings2, view: 'settings', submenu: true }

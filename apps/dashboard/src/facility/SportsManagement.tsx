@@ -7,8 +7,10 @@
  * real row, and the booking flow reads the same sports and courts.
  */
 import { useMemo, useState } from 'react'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, Plus } from '../ui/icons'
+import Card from '../ui/Card'
 import StatusPill from '../ui/StatusPill'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 import { useToast } from '../ui/useToast'
 import { useManagedCourts, useManagedSports } from '../api/hooks'
 import AddSportDialog from './AddSportDialog'
@@ -59,16 +61,20 @@ export default function SportsManagement() {
             </button>
           </div>
 
-          <section className="overflow-hidden rounded-xl border border-border-card bg-white shadow-card">
-            {sportsQuery.isPending ? (
-              <p className="px-5 py-14 text-center text-sm text-muted">Loading sports…</p>
-            ) : sportsQuery.error ? (
-              <p role="alert" className="px-5 py-14 text-center text-sm text-negative">
+          {sportsQuery.isPending ? (
+            <Card>
+              <p className="py-8 text-center text-sm text-muted">Loading sports…</p>
+            </Card>
+          ) : sportsQuery.error ? (
+            <Card>
+              <p role="alert" className="py-8 text-center text-sm text-negative">
                 Could not load sports:{' '}
                 {sportsQuery.error instanceof Error ? sportsQuery.error.message : 'unknown error'}
               </p>
-            ) : sports.length === 0 ? (
-              <div className="px-6 py-16 text-center">
+            </Card>
+          ) : sports.length === 0 ? (
+            <Card>
+              <div className="py-8 text-center">
                 <p className="text-sm font-medium text-ink">No sports yet</p>
                 <p className="mx-auto mt-1 max-w-sm text-sm text-slate">
                   Add the first sport you offer, then add its courts.
@@ -82,73 +88,60 @@ export default function SportsManagement() {
                   Add sport
                 </button>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                      <th className="px-5 py-3 font-medium">Sport</th>
-                      <th className="px-3 py-3 font-medium">Courts</th>
-                      <th className="px-3 py-3 font-medium">Starting at</th>
-                      <th className="px-3 py-3 font-medium">Status</th>
-                      <th className="w-10 px-3 py-3" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sports.map((sport) => {
-                      const total = counts.total.get(sport.id) ?? 0
-                      const open = counts.open.get(sport.id) ?? 0
-                      return (
-                        <tr
-                          key={sport.id}
-                          onClick={() => setOpenId(sport.id)}
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              setOpenId(sport.id)
-                            }
-                          }}
-                          className="group cursor-pointer border-b border-border-card/70 transition-colors last:border-0 hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 focus-visible:outline-none"
-                        >
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3.5">
-                              <SportThumb sport={sport} />
-                              <span className={`font-semibold ${sport.is_active ? 'text-ink' : 'text-muted'}`}>
-                                {sport.name}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <p className="font-medium text-ink">
-                              {total} {total === 1 ? 'court' : 'courts'}
-                            </p>
-                            {total > 0 && open !== total && (
-                              <p className="text-xs text-muted">{open} open for booking</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3.5 font-medium text-ink">
-                            {Number(sport.price_base) > 0 ? `${rupees(sport.price_base)}/hr` : (
-                              <span className="font-normal text-muted">Not priced</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <StatusPill
-                              label={sport.is_active ? 'Active' : 'Disabled'}
-                              tone={sport.is_active ? 'positive' : 'neutral'}
-                            />
-                          </td>
-                          <td className="px-3 py-3.5 text-muted">
-                            <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+            </Card>
+          ) : (
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th>Sport</Th>
+                  <Th>Courts</Th>
+                  <Th>Starting at</Th>
+                  <Th>Status</Th>
+                  <Th className="w-10" />
+                </Tr>
+              </Thead>
+              <Tbody>
+                {sports.map((sport) => {
+                  const total = counts.total.get(sport.id) ?? 0
+                  const open = counts.open.get(sport.id) ?? 0
+                  return (
+                    <Tr key={sport.id} onClick={() => setOpenId(sport.id)} className="group">
+                      <Td>
+                        <div className="flex items-center gap-3.5">
+                          <SportThumb sport={sport} />
+                          <span className={`font-semibold ${sport.is_active ? 'text-ink' : 'text-muted'}`}>
+                            {sport.name}
+                          </span>
+                        </div>
+                      </Td>
+                      <Td>
+                        <p className="font-medium text-ink">
+                          {total} {total === 1 ? 'court' : 'courts'}
+                        </p>
+                        {total > 0 && open !== total && (
+                          <p className="text-xs text-muted">{open} open for booking</p>
+                        )}
+                      </Td>
+                      <Td className="font-medium text-ink">
+                        {Number(sport.price_base) > 0 ? `${rupees(sport.price_base)}/hr` : (
+                          <span className="font-normal text-muted">Not priced</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <StatusPill
+                          label={sport.is_active ? 'Active' : 'Disabled'}
+                          tone={sport.is_active ? 'positive' : 'neutral'}
+                        />
+                      </Td>
+                      <Td className="text-muted">
+                        <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                      </Td>
+                    </Tr>
+                  )
+                })}
+              </Tbody>
+            </Table>
+          )}
         </>
       )}
 

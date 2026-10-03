@@ -2949,7 +2949,7 @@
             "title": "Discount"
           },
           "duration_min": {
-            "maximum": 1440.0,
+            "maximum": 360.0,
             "minimum": 15.0,
             "title": "Duration Min",
             "type": "integer"
@@ -3795,7 +3795,7 @@
           "duration_min": {
             "anyOf": [
               {
-                "maximum": 1440.0,
+                "maximum": 360.0,
                 "minimum": 15.0,
                 "type": "integer"
               },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Download, LayoutGrid, Package, Plus, Search, Table2 } from 'lucide-react'
+import { Download, LayoutGrid, Package, Plus, Search, Table2 } from '../ui/icons'
 import { useUpdateInventoryItem, useDeleteInventoryItem, type InventoryItem, type StockStatus } from '../api/hooks'
 import BulkActionBar from '../ui/BulkActionBar'
 import ConfirmDialog from '../ui/ConfirmDialog'

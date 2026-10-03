@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import { getImpersonatedTenant, setImpersonatedTenant } from '../auth/platform'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 
 type Tenant = {
   id: string
@@ -217,112 +218,105 @@ export default function AllTenants() {
       )}
 
       {tenants !== null && !error && (
-        <div className="overflow-x-auto rounded-xl border border-border-card bg-surface">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border-card text-left text-[11px] uppercase tracking-wide text-muted">
-                <th className="px-4 py-3 font-medium">Academy</th>
-                <th className="px-4 py-3 font-medium">Address</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Set up</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((tenant) => {
-                const busy = busyId === tenant.id
-                const suspended = tenant.status === 'suspended'
-                return (
-                  <tr
-                    key={tenant.id}
-                    className={`border-b border-border-card last:border-0 ${busy ? 'opacity-50' : ''}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-ink">{tenant.name}</td>
-                    <td className="px-4 py-3 font-mono text-[12px] text-slate">{tenant.slug}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={tenant.plan_tier}
-                        disabled={busy}
-                        onChange={(e) =>
-                          changePlan(tenant, e.target.value as (typeof PLANS)[number])
-                        }
-                        className="rounded-lg border border-border-input bg-white px-2 py-1 text-[12px] capitalize text-ink outline-none focus:border-lime-ink disabled:opacity-50"
-                      >
-                        {/* A tier the API does not know about would 422, so the
-                            options are the enum rather than whatever is stored. A
-                            legacy value still shows, as its own disabled option. */}
-                        {!PLANS.includes(tenant.plan_tier as (typeof PLANS)[number]) && (
-                          <option value={tenant.plan_tier} disabled>
-                            {tenant.plan_tier}
-                          </option>
-                        )}
-                        {PLANS.map((plan) => (
-                          <option key={plan} value={plan}>
-                            {plan}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize ${
-                          STATUS_STYLES[tenant.status] ?? 'bg-surface-muted text-slate'
-                        }`}
-                      >
-                        {tenant.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate">
-                      {/* An academy that paid but never finished the wizard is the
-                          one row an operator actually needs to spot. */}
-                      {tenant.onboarding_completed ? (
-                        'Complete'
-                      ) : (
-                        <span className="text-negative">Onboarding unfinished</span>
+        <Table minWidth={900}>
+          <Thead>
+            <Tr>
+              <Th>Academy</Th>
+              <Th>Address</Th>
+              <Th>Plan</Th>
+              <Th>Status</Th>
+              <Th>Set up</Th>
+              <Th />
+            </Tr>
+          </Thead>
+          <Tbody>
+            {filtered.map((tenant) => {
+              const busy = busyId === tenant.id
+              const suspended = tenant.status === 'suspended'
+              return (
+                <Tr key={tenant.id} className={busy ? 'opacity-50' : ''}>
+                  <Td className="font-medium text-ink">{tenant.name}</Td>
+                  <Td className="font-mono text-[12px] text-slate">{tenant.slug}</Td>
+                  <Td>
+                    <select
+                      value={tenant.plan_tier}
+                      disabled={busy}
+                      onChange={(e) =>
+                        changePlan(tenant, e.target.value as (typeof PLANS)[number])
+                      }
+                      className="rounded-lg border border-border-input bg-white px-2 py-1 text-[12px] capitalize text-ink outline-none focus:border-lime-ink disabled:opacity-50"
+                    >
+                      {/* A tier the API does not know about would 422, so the
+                          options are the enum rather than whatever is stored. A
+                          legacy value still shows, as its own disabled option. */}
+                      {!PLANS.includes(tenant.plan_tier as (typeof PLANS)[number]) && (
+                        <option value={tenant.plan_tier} disabled>
+                          {tenant.plan_tier}
+                        </option>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <RowAction disabled={busy} onClick={() => resetPassword(tenant)}>
-                          Reset password
-                        </RowAction>
-                        <RowAction
-                          disabled={busy}
-                          danger={!suspended}
-                          onClick={() => toggleSuspended(tenant)}
-                        >
-                          {suspended ? 'Reactivate' : 'Suspend'}
-                        </RowAction>
-                        <RowAction disabled={busy} danger onClick={() => setDeleting(tenant)}>
-                          Delete
-                        </RowAction>
-                        {/* Stepping in is impersonation: every request from here on
-                            carries X-Impersonate-Tenant, runs against that academy's
-                            own RLS policies, and is audit-logged server-side. */}
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setImpersonatedTenant(tenant.slug)}
-                          className="rounded-lg border border-border-soft bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50"
-                        >
-                          Open
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate">
-                    {query ? 'No academy matches that search.' : 'No academies yet.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      {PLANS.map((plan) => (
+                        <option key={plan} value={plan}>
+                          {plan}
+                        </option>
+                      ))}
+                    </select>
+                  </Td>
+                  <Td>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize ${
+                        STATUS_STYLES[tenant.status] ?? 'bg-surface-muted text-slate'
+                      }`}
+                    >
+                      {tenant.status}
+                    </span>
+                  </Td>
+                  <Td className="text-slate">
+                    {/* An academy that paid but never finished the wizard is the
+                        one row an operator actually needs to spot. */}
+                    {tenant.onboarding_completed ? (
+                      'Complete'
+                    ) : (
+                      <span className="text-negative">Onboarding unfinished</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <RowAction disabled={busy} onClick={() => resetPassword(tenant)}>
+                        Reset password
+                      </RowAction>
+                      <RowAction
+                        disabled={busy}
+                        danger={!suspended}
+                        onClick={() => toggleSuspended(tenant)}
+                      >
+                        {suspended ? 'Reactivate' : 'Suspend'}
+                      </RowAction>
+                      <RowAction disabled={busy} danger onClick={() => setDeleting(tenant)}>
+                        Delete
+                      </RowAction>
+                      {/* Stepping in is impersonation: every request from here on
+                          carries X-Impersonate-Tenant, runs against that academy's
+                          own RLS policies, and is audit-logged server-side. */}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setImpersonatedTenant(tenant.slug)}
+                        className="rounded-lg border border-border-soft bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </Td>
+                </Tr>
+              )
+            })}
+            {filtered.length === 0 && (
+              <TableMessage colSpan={6}>
+                  {query ? 'No academy matches that search.' : 'No academies yet.'}
+                </TableMessage>
+            )}
+          </Tbody>
+        </Table>
       )}
     </div>
   )

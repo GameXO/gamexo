@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Plus, Search } from 'lucide-react'
+import { Store, Check, ChevronsUpDown, Plus, Search } from '../ui/icons'
 import { useBranches, type BranchOut } from '../api/hooks'
 import { useActiveBranch } from '../branch/activeBranch'
 
 const addressOf = (b: BranchOut) => [b.address, b.city].filter(Boolean).join(', ')
+
+/** Branches beyond this many get a search box above the list. */
+const SEARCH_FROM = 6
 
 type Row = { id: string | null; name: string; hint: string; isDefault?: boolean }
 
@@ -74,7 +77,7 @@ export default function BranchSwitcher({
     const r = trigger.current?.getBoundingClientRect()
     if (r) {
       // Anchored to the row, but kept on screen on a narrow viewport.
-      const width = Math.min(Math.max(r.width, 320), window.innerWidth - 16)
+      const width = Math.min(Math.max(r.width, 260), window.innerWidth - 16)
       setAnchor({ left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + 8, width })
     }
     setOpen((v) => !v)
@@ -155,20 +158,25 @@ export default function BranchSwitcher({
             style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
             className="fixed z-[56] origin-top-left animate-pop overflow-hidden rounded-xl border border-border-card bg-white"
           >
-            <div className="flex items-center gap-2.5 border-b border-border-card px-3.5 py-3">
-              <Search size={16} className="shrink-0 text-muted" />
-              <input
-                ref={search}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onSearchKey}
-                placeholder="Search branches…"
-                aria-label="Search branches"
-                className="no-ring min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-muted"
-              />
-            </div>
+            {/* A "group by"-style menu: a quiet heading, then rows with the choice ticked.
+                Search only earns its place once the list is long enough to need it. */}
+            {list.length > SEARCH_FROM && (
+              <div className="flex items-center gap-2.5 border-b border-border-card px-3.5 py-2.5">
+                <Search size={16} className="shrink-0 text-muted" />
+                <input
+                  ref={search}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={onSearchKey}
+                  placeholder="Search branches…"
+                  aria-label="Search branches"
+                  className="no-ring min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-muted"
+                />
+              </div>
+            )}
 
             <div role="listbox" aria-label="Branches" className="max-h-[50vh] overflow-y-auto p-1.5">
+              <p className="px-2.5 pb-1 pt-1.5 font-display text-[12px] font-semibold text-muted">Branch</p>
               {rows.length === 0 && <p className="px-3 py-4 text-center text-sm text-muted">No branch matches “{query}”.</p>}
               {rows.map((r, i) => {
                 const selected = r.id === branchId
@@ -180,12 +188,13 @@ export default function BranchSwitcher({
                     aria-selected={selected}
                     onClick={() => choose(r.id)}
                     onMouseEnter={() => setCursor(i)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left ${
                       i === cursor || selected ? 'bg-hover' : ''
                     }`}
                   >
+                    <Store size={16} className="shrink-0 text-slate" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium text-ink">
+                      <span className="block truncate text-[14px] text-ink">
                         {r.name}
                         {r.isDefault && (
                           <span className="ml-2 rounded-full border border-border-soft px-1.5 py-px text-[11px] font-normal text-slate">
@@ -208,7 +217,7 @@ export default function BranchSwitcher({
                   close()
                   onManage()
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[14px] text-ink hover:bg-hover"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[14px] text-ink hover:bg-hover"
               >
                 <Plus size={16} className="text-slate" />
                 Add or manage branches

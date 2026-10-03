@@ -12,8 +12,8 @@ import {
   ShieldCheck,
   User,
   Users,
-  type LucideIcon,
-} from 'lucide-react'
+  type IconComponent,
+} from '../ui/icons'
 
 /** Every id has a matching branch in `SettingsPage`'s `renderSection` — ids
  *  without a real screen yet render as a "coming soon" card rather than being
@@ -34,7 +34,7 @@ export type SettingsSectionId =
   | 'security'
   | 'integrations'
 
-export type SettingsNavItem = { id: SettingsSectionId; label: string; icon: LucideIcon }
+export type SettingsNavItem = { id: SettingsSectionId; label: string; icon: IconComponent }
 export type SettingsNavGroup = { label: string; items: SettingsNavItem[] }
 
 export const SETTINGS_NAV: SettingsNavGroup[] = [

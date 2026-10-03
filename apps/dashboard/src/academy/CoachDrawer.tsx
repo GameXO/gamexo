@@ -8,7 +8,7 @@
  * does not lose what was typed.
  */
 import { useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError, type CoachBody, type CoachType, type PayModel } from '../api/client'
 import { useSaveCoach, useSports, type CoachOut } from '../api/hooks'

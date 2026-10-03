@@ -1,4 +1,4 @@
-import { Minus, Package, Plus } from 'lucide-react'
+import { Minus, Package, Plus } from '../../ui/icons'
 import { equipmentForSport, money, priceEquipment, type Draft } from '../../data/booking'
 import { offersFor, unitsClaimed } from '../../addons/offers'
 import * as db from '../../lib/db'

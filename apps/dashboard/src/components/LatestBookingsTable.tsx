@@ -1,12 +1,14 @@
+import { Calendar } from '../ui/icons'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useAllCourts, useSports } from '../api/hooks'
 import { channelOf, formatINR, type ChannelKey } from '../dashboard/insights'
 import type { View } from '../App'
-import { asset } from '../lib/asset'
+import Card from '../ui/Card'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
+import BookingPanel from './BookingPanel'
 
-const calendar05 = asset('dashboard/calendar-05.svg')
 
 const STATUS_TONE: Record<string, string> = {
   held: 'bg-amber-50 text-amber-700',
@@ -74,54 +76,6 @@ type Row = {
 
 type SortKey = 'when' | 'amount'
 
-function SortIcon({ active, dir }: { active: boolean; dir: 1 | -1 }) {
-  return (
-    <svg
-      width="10"
-      height="10"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`shrink-0 transition-opacity duration-100 ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
-      style={{ transform: active && dir === -1 ? 'rotate(180deg)' : undefined }}
-    >
-      <path d="M12 5v14M5 12l7 7 7-7" />
-    </svg>
-  )
-}
-
-function SortableTh({
-  label,
-  active,
-  dir,
-  onClick,
-  align = 'left',
-}: {
-  label: string
-  active: boolean
-  dir: 1 | -1
-  onClick: () => void
-  align?: 'left' | 'right'
-}) {
-  return (
-    <th className={`px-3 py-3 ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`group inline-flex items-center gap-1 transition-colors duration-100 hover:text-ink ${
-          align === 'right' ? 'flex-row-reverse' : ''
-        }`}
-      >
-        <span>{label}</span>
-        <SortIcon active={active} dir={dir} />
-      </button>
-    </th>
-  )
-}
-
 const initialOf = (name: string) => name.trim().slice(0, 1).toUpperCase() || '?'
 
 export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view: View) => void }) {
@@ -130,6 +84,7 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
   const sports = useSports(true)
   const courts = useAllCourts()
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'when', dir: -1 })
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const rows = useMemo((): Row[] => {
     const sportName = (id: string) => sports.data?.find((s) => s.id === id)?.name ?? 'Unknown'
@@ -158,14 +113,21 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
   const toggleSort = (key: SortKey) =>
     setSort((current) => (current.key === key ? { key, dir: (current.dir * -1) as 1 | -1 } : { key, dir: -1 }))
 
+  // Looked up in what is loaded, so the panel reflects the same row that was clicked and
+  // closes itself if the list refreshes and that booking is no longer in it.
+  const selectedRow = sortedRows.find((r) => r.id === selectedId) ?? null
+  const selectedBooking = latest.data?.find((b) => b.id === selectedId) ?? null
+
   const totalShown = sortedRows.reduce((sum, row) => sum + row.total, 0)
 
+  const sortDir = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? 'asc' : 'desc') : null)
+
   return (
-    <div className="flex w-full shrink-0 flex-col items-start gap-5 overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full items-center gap-2.5">
-        <img src={calendar05} alt="" className="size-5" />
-        <p className="flex-1 text-sm font-medium text-ink">Latest Bookings</p>
-        {onNavigate && (
+    <Card
+      icon={<Calendar size={18} className="text-slate" />}
+      title="Latest Bookings"
+      action={
+        onNavigate && (
           <button
             type="button"
             onClick={() => onNavigate('bookings')}
@@ -173,9 +135,10 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
           >
             View all
           </button>
-        )}
-      </div>
-
+        )
+      }
+      className="w-full shrink-0"
+    >
       {latest.isPending ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : latest.error ? (
@@ -183,81 +146,91 @@ export default function LatestBookingsTable({ onNavigate }: { onNavigate?: (view
       ) : sortedRows.length === 0 ? (
         <p className="text-sm text-muted">No bookings yet.</p>
       ) : (
-        <div className="w-full overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-border-card text-xs font-medium uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-3 py-3">Customer</th>
-                <th className="px-3 py-3">Sport &amp; Court</th>
-                <SortableTh
-                  label="When"
-                  active={sort.key === 'when'}
-                  dir={sort.dir}
-                  onClick={() => toggleSort('when')}
-                />
-                <th className="px-3 py-3">Source</th>
-                <th className="px-3 py-3">Status</th>
-                <SortableTh
-                  label="Amount"
-                  active={sort.key === 'amount'}
-                  dir={sort.dir}
-                  onClick={() => toggleSort('amount')}
-                  align="right"
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((row) => (
-                <tr key={row.id} className="border-b border-border-card/80 transition-colors duration-100 last:border-none hover:bg-surface-muted/70">
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-ink text-[11px] font-semibold text-lime">
-                        {initialOf(row.customer)}
-                      </span>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate font-medium text-ink">{row.customer}</span>
-                        <span className="text-xs text-muted">{row.reference}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-ink">{row.sport}</span>
-                      <span className="text-xs text-muted">{row.court}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-slate">{row.whenLabel}</td>
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${CHANNEL_TONE[row.channel]}`}>
-                      {CHANNEL_LABEL[row.channel]}
+        <Table inset>
+          <Thead>
+            <Tr>
+              <Th>Customer</Th>
+              <Th>Sport &amp; Court</Th>
+              <Th sort={sortDir('when')} onSort={() => toggleSort('when')}>
+                When
+              </Th>
+              <Th>Source</Th>
+              <Th>Status</Th>
+              <Th align="right" sort={sortDir('amount')} onSort={() => toggleSort('amount')}>
+                Amount
+              </Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {sortedRows.map((row) => (
+              <Tr key={row.id} onClick={() => setSelectedId(row.id)}>
+                <Td>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-ink text-[11px] font-semibold text-lime">
+                      {initialOf(row.customer)}
                     </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
-                        STATUS_TONE[row.status] ?? 'bg-surface-muted text-slate'
-                      }`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-right font-semibold text-ink">{formatINR(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td className="px-3 pt-3 text-xs text-muted" colSpan={4}>
-                  {sortedRows.length} booking{sortedRows.length === 1 ? '' : 's'} shown
-                </td>
-                <td className="px-3 pt-3 text-right text-xs font-medium text-muted" colSpan={2}>
-                  {formatINR(totalShown)} total
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium text-ink">{row.customer}</span>
+                      <span className="text-xs text-muted">{row.reference}</span>
+                    </div>
+                  </div>
+                </Td>
+                <Td>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-ink">{row.sport}</span>
+                    <span className="text-xs text-muted">{row.court}</span>
+                  </div>
+                </Td>
+                <Td className="text-slate">{row.whenLabel}</Td>
+                <Td>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${CHANNEL_TONE[row.channel]}`}>
+                    {CHANNEL_LABEL[row.channel]}
+                  </span>
+                </Td>
+                <Td>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
+                      STATUS_TONE[row.status] ?? 'bg-surface-muted text-slate'
+                    }`}
+                  >
+                    {row.status}
+                  </span>
+                </Td>
+                <Td align="right" className="font-semibold text-ink">
+                  {formatINR(row.total)}
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+          <tfoot>
+            <tr>
+              <td className="border-t border-border-card pt-3 text-xs text-muted" colSpan={4}>
+                {sortedRows.length} booking{sortedRows.length === 1 ? '' : 's'} shown
+              </td>
+              <td className="border-t border-border-card pt-3 text-right text-xs font-medium text-muted" colSpan={2}>
+                {formatINR(totalShown)} total
+              </td>
+            </tr>
+          </tfoot>
+        </Table>
       )}
-    </div>
+      {selectedRow && selectedBooking && (
+        <BookingPanel
+          booking={selectedBooking}
+          sport={selectedRow.sport}
+          court={selectedRow.court}
+          channel={CHANNEL_LABEL[selectedRow.channel]}
+          onClose={() => setSelectedId(null)}
+          onOpenBookings={
+            onNavigate
+              ? () => {
+                  setSelectedId(null)
+                  onNavigate('bookings')
+                }
+              : undefined
+          }
+        />
+      )}
+    </Card>
   )
 }

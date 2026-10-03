@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Sidebar from './components/Sidebar'
+import { PanelDockProvider } from './ui/PanelDock'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
 import BookingsPage from './components/BookingsPage'
@@ -137,6 +138,7 @@ function Shell() {
 
   return (
     <div className="flex h-screen w-full items-stretch overflow-hidden bg-page">
+      <PanelDockProvider>
       <BrandTheme />
       <PublishedEquipmentBridge />
       <SportCourtBridge />
@@ -286,6 +288,7 @@ function Shell() {
           </>
         )}
       </div>
+      </PanelDockProvider>
     </div>
   )
 }

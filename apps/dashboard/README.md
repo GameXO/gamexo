@@ -69,3 +69,15 @@ sectionId)`. Header search indexes every Settings section as well as the pages.
   figures client-side via `select` in `api/hooks.ts`, so switching needs no refetch. Anyone who
   cannot switch, or a single-branch academy, sees the branch name without the menu. Server-side
   KPI/revenue reports and invoice lists are not branch-filtered yet.
+- **New Booking** has two views, switched with the 1 / 2 toggle above the stepper (remembered per
+  browser): **1 · Step by step** (sport and court, then day and time) and **2 · One page**
+  (`booking/steps/SelectSlot.tsx`: sport chips, court list, day strip and slots together, with a
+  summary bar pinned to the bottom; it opens with the first sport and court selected). The draft
+  survives a switch. Free hours come from `GET /courts/availability` via `useCourtAvailability`
+  (the court's own hours, live bookings and holds), refetched each minute and after a booking.
+  Sports are drawn with Hugeicons glyphs picked by name in `facility/sportIcons.ts` (Dance, which has
+  no glyph, gets a music note; anything unmatched gets a generic sport icon) — a sport's uploaded
+  photo is still used in the Sports & Courts screens.
+- **A booking is at most 6 hours.** You pick a slot length (1, 2 or 3 hr) and then back-to-back
+  slots of that length — up to 6 × 1 hr, 3 × 2 hr or 2 × 3 hr (`booking/slotPicker.ts`). The API
+  enforces the same ceiling (`MAX_BOOKING_MINUTES` = 360), so it holds for every caller.

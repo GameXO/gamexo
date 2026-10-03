@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Search, X } from 'lucide-react'
+import { Check, Search, X } from '../ui/icons'
 import { courtById, listEquipment, money, priceEquipment, type Booking } from '../data/booking'
 import { useAttachKitToBooking, useOpenCounterTab, useTodaysBookings } from '../api/hooks'
 import { ApiError } from '../api/client'

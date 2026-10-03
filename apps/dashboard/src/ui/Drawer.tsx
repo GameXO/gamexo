@@ -1,15 +1,18 @@
-import { X } from 'lucide-react'
+import { X } from './icons'
 import type { ReactNode } from 'react'
 
 export default function Drawer({
   title,
   subtitle,
+  icon,
   onClose,
   children,
   footer,
 }: {
   title: string
   subtitle?: string
+  /** A logo or glyph shown before the title. */
+  icon?: ReactNode
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
@@ -24,6 +27,7 @@ export default function Drawer({
       />
       <div className="fixed inset-y-0 right-0 z-50 flex h-screen w-full max-w-[440px] animate-slide-in flex-col overflow-y-auto border-l border-border-soft bg-page shadow-pop">
         <div className="flex shrink-0 items-center gap-3 border-b border-border-soft px-5 py-4">
+          {icon}
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-ink">{title}</p>
             {subtitle && <p className="truncate text-xs text-slate">{subtitle}</p>}

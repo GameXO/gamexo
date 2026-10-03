@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, Loader2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { useCourts, useUpdateBooking } from '../api/hooks'
-import { platformName, type Booking } from '../data/booking'
+import { MAX_BOOKING_HOURS, platformName, type Booking } from '../data/booking'
 
 /**
  * Reschedule a booking, move it to another court, or correct who was playing.
@@ -173,7 +173,7 @@ export default function EditBookingDrawer({
           onChange={(e) => setDurationMin(Number(e.target.value))}
           className="h-11 w-full rounded-lg border border-border-input bg-white px-3 text-sm text-ink"
         >
-          {[30, 60, 90, 120, 150, 180].map((mins) => (
+          {Array.from({ length: MAX_BOOKING_HOURS * 2 }, (_, i) => (i + 1) * 30).map((mins) => (
             <option key={mins} value={mins}>
               {mins < 60 ? `${mins} min` : `${mins / 60} hr${mins > 60 ? 's' : ''}`}
             </option>

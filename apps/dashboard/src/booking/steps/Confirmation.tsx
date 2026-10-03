@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Download, Mail, MessageCircle, Printer, RotateCcw, Send } from 'lucide-react'
+import { Check, Download, Mail, MessageCircle, Printer, RotateCcw, Send } from '../../ui/icons'
 import { sourceLabel, type Draft } from '../../data/booking'
 import type { BookingQuote } from '../../api/hooks'
 import { buildInvoice, invoiceSummaryText } from '../invoice'

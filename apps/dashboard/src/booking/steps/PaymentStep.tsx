@@ -4,7 +4,6 @@ import { buildInvoice } from '../invoice'
 import { downloadInvoicePdf } from '../../lib/invoicePdf'
 import InvoiceDocument from '../InvoiceDocument'
 import BookingTicket from '../BookingTicket'
-import { STEPS } from '../Stepper'
 import { useIssuer } from '../useIssuer'
 
 export default function PaymentStep({
@@ -14,6 +13,7 @@ export default function PaymentStep({
   quoteLoading,
   error,
   onPay,
+  steps,
   onEditStep,
 }: {
   draft: Draft
@@ -22,6 +22,8 @@ export default function PaymentStep({
   quoteLoading?: boolean
   error?: string | null
   onPay: () => void
+  /** Labels of this view's steps, so the checklist matches the stepper above. */
+  steps: readonly string[]
   onEditStep: (step: number) => void
 }) {
   const issuer = useIssuer(draft.courtId)
@@ -39,9 +41,9 @@ export default function PaymentStep({
         <BookingTicket invoice={invoice} />
 
         <div className="flex w-full flex-col gap-1 rounded-2xl bg-white p-4">
-          {STEPS.map((label, i) => {
+          {steps.map((label, i) => {
             const step = i + 1
-            const done = step < 5
+            const done = step < steps.length
             return (
               <button
                 key={label}

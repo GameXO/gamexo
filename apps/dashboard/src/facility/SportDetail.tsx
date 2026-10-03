@@ -8,7 +8,7 @@
  * offers both and reports the server's reason when Remove is refused.
  */
 import { useMemo, useState } from 'react'
-import { ChevronRight, Clock, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Clock, Loader2, Pencil, Plus, Trash2 } from '../ui/icons'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import StatusPill from '../ui/StatusPill'
 import RowActionsMenu from '../ui/RowActionsMenu'
@@ -27,6 +27,8 @@ import {
 import CourtDrawer from './CourtDrawer'
 import { ImageGallery, ImageUploader } from './ImageFields'
 import SportThumb from './SportThumb'
+import Card from '../ui/Card'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 import { hoursLabel } from './hours'
 
 const MAX_SPORT_IMAGES = 8
@@ -233,81 +235,67 @@ function CourtsTab({
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border-card bg-white shadow-card">
-        {courts.length === 0 ? (
-          <div className="px-6 py-14 text-center">
+      {courts.length === 0 ? (
+        <Card>
+          <div className="py-8 text-center">
             <p className="text-sm font-medium text-ink">No courts yet</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-slate">
               Add a court and it can be booked straight away, with the default hours (6:00 AM – 10:00 PM).
             </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-3 font-medium">Court</th>
-                  <th className="px-3 py-3 font-medium">Booking hours</th>
-                  <th className="px-3 py-3 font-medium">Rate</th>
-                  <th className="px-3 py-3 font-medium">Open for booking</th>
-                  <th className="w-12 px-3 py-3" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {courts.map((court) => {
-                  const busy = busyId === court.id
-                  return (
-                    <tr
-                      key={court.id}
-                      onClick={() => setDrawer(court)}
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.target !== e.currentTarget) return
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          setDrawer(court)
-                        }
-                      }}
-                      className="cursor-pointer border-b border-border-card/70 transition-colors last:border-0 hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 focus-visible:outline-none"
-                    >
-                      <td className="px-5 py-3.5">
-                        <p className={`font-semibold ${court.is_bookable ? 'text-ink' : 'text-muted'}`}>{court.name}</p>
-                        <p className="text-xs text-muted">
-                          {court.is_bookable ? court.code : (court.maintenance_note || 'Disabled')}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3.5 text-slate">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock size={14} className="text-muted" />
-                          {hoursLabel(court.operating_hours)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <p className="font-medium text-ink">{rupees(court.hourly_rate)}/hr</p>
-                        <p className="text-xs text-muted">Peak {rupees(court.peak_rate)}/hr</p>
-                      </td>
-                      <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <Toggle checked={court.is_bookable ?? true} disabled={busy} onChange={() => toggleBookable(court)} />
-                          {busy && <Loader2 size={14} className="animate-spin text-muted" />}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
-                        <RowActionsMenu
-                          actions={[
-                            { label: 'Edit court', icon: Pencil, onClick: () => setDrawer(court) },
-                            { label: 'Remove', icon: Trash2, danger: true, onClick: () => setConfirmRemove(court) },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Court</Th>
+              <Th>Booking hours</Th>
+              <Th>Rate</Th>
+              <Th>Open for booking</Th>
+              <Th className="w-12" />
+            </Tr>
+          </Thead>
+          <Tbody>
+            {courts.map((court) => {
+              const busy = busyId === court.id
+              return (
+                <Tr key={court.id} onClick={() => setDrawer(court)}>
+                  <Td>
+                    <p className={`font-semibold ${court.is_bookable ? 'text-ink' : 'text-muted'}`}>{court.name}</p>
+                    <p className="text-xs text-muted">
+                      {court.is_bookable ? court.code : (court.maintenance_note || 'Disabled')}
+                    </p>
+                  </Td>
+                  <Td className="text-slate">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock size={14} className="text-muted" />
+                      {hoursLabel(court.operating_hours)}
+                    </span>
+                  </Td>
+                  <Td>
+                    <p className="font-medium text-ink">{rupees(court.hourly_rate)}/hr</p>
+                    <p className="text-xs text-muted">Peak {rupees(court.peak_rate)}/hr</p>
+                  </Td>
+                  <Td onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2">
+                      <Toggle checked={court.is_bookable ?? true} disabled={busy} onChange={() => toggleBookable(court)} />
+                      {busy && <Loader2 size={14} className="animate-spin text-muted" />}
+                    </div>
+                  </Td>
+                  <Td onClick={(e) => e.stopPropagation()}>
+                    <RowActionsMenu
+                      actions={[
+                        { label: 'Edit court', icon: Pencil, onClick: () => setDrawer(court) },
+                        { label: 'Remove', icon: Trash2, danger: true, onClick: () => setConfirmRemove(court) },
+                      ]}
+                    />
+                  </Td>
+                </Tr>
+              )
+            })}
+          </Tbody>
+        </Table>
+      )}
 
       {drawer && (
         <CourtDrawer

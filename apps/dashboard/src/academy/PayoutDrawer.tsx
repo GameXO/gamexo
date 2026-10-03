@@ -10,7 +10,7 @@
  * Recording a payout does not move money; it records that it was moved.
  */
 import { useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError, type PayoutBody } from '../api/client'
 import { toISO } from '../data/booking'

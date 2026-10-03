@@ -1,4 +1,4 @@
-import { Users, Package, Plus } from 'lucide-react'
+import { Users, Package, Plus } from '../ui/icons'
 import { sportById, balanceOf, money, type Court, type Booking } from '../data/booking'
 import { bookingWindow } from './derive'
 import { countdown, minutesBetween, formatClock } from './slots'

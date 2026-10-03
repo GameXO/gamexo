@@ -17,7 +17,7 @@ import {
   Pencil,
   ReceiptText,
   UserRound,
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   balanceOf,
   courtById,
@@ -34,7 +34,9 @@ import { useBookings, useBookingsAwaitingPartnerCancel, useBranches, useRecordPa
 import * as db from '../lib/db'
 import EditBookingDrawer from '../booking/EditBookingDrawer'
 import PlatformBookingCard from '../booking/PlatformBookingCard'
+import Card from '../ui/Card'
 import StatusPill from '../ui/StatusPill'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 
 const paymentLabel = (booking: Booking) => {
   if (booking.payment?.status === 'paid') return 'Paid'
@@ -92,13 +94,9 @@ function Panel({
   className?: string
 }) {
   return (
-    <section className={`overflow-hidden rounded-xl border border-border-card bg-white ${className}`}>
-      <header className="flex items-center gap-2.5 border-b border-border-card px-5 py-4">
-        <Icon size={18} className="text-slate" />
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-      </header>
+    <Card flush icon={<Icon size={18} className="text-slate" />} title={title} className={className}>
       {children}
-    </section>
+    </Card>
   )
 }
 
@@ -398,7 +396,7 @@ export default function BookingsPage() {
                   value={startDate}
                   disabled={waitingOnly}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="rounded-md border-none bg-transparent text-sm text-ink"
+                  className="date-field rounded-md border-none bg-transparent text-sm text-ink"
                 />
               </label>
               <label
@@ -413,25 +411,22 @@ export default function BookingsPage() {
                   value={endDate}
                   disabled={waitingOnly}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="rounded-md border-none bg-transparent text-sm text-ink"
+                  className="date-field rounded-md border-none bg-transparent text-sm text-ink"
                 />
               </label>
             </div>
           </div>
 
-          <section className="overflow-hidden rounded-xl border border-border-card bg-white">
-            <header className="flex items-center justify-between gap-3 border-b border-border-card px-5 py-4">
-              <div className="flex items-center gap-2.5">
-                <CalendarDays size={18} className="text-slate" />
-                <h2 className="text-sm font-semibold text-ink">
-                  {waitingOnly ? 'Waiting on the platform' : 'Bookings'}
-                </h2>
-              </div>
+          <Card
+            flush
+            icon={<CalendarDays size={18} className="text-slate" />}
+            title={waitingOnly ? 'Waiting on the platform' : 'Bookings'}
+            action={
               <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-semibold text-slate">
                 {visibleBookings.length} {visibleBookings.length === 1 ? 'result' : 'results'}
               </span>
-            </header>
-
+            }
+          >
             {bookingsQuery.isPending ? (
               <p className="px-5 py-14 text-center text-sm text-muted">Loading bookings…</p>
             ) : bookingsQuery.error ? (
@@ -444,105 +439,90 @@ export default function BookingsPage() {
                 {waitingOnly ? 'Nothing is waiting on a platform.' : 'No bookings match the selected dates.'}
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">Booking</th>
-                      <th className="px-3 py-3 font-medium">Customer</th>
-                      <th className="px-3 py-3 font-medium">Game &amp; Court</th>
-                      <th className="px-3 py-3 font-medium">When</th>
-                      <th className="px-3 py-3 font-medium">Source</th>
-                      <th className="px-3 py-3 font-medium">Amount</th>
-                      <th className="px-3 py-3 font-medium">Payment</th>
-                      <th className="w-10 px-3 py-3" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleBookings.map((booking) => {
-                      const court = courtById(booking.courtId)
-                      return (
-                        <tr
-                          key={booking.id}
-                          onClick={() => open(booking.id)}
-                          // The row is the target, so it also has to answer the
-                          // keyboard — it replaced a real button, which came with
-                          // focus and Enter for free.
-                          tabIndex={0}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter' && event.key !== ' ') return
-                            event.preventDefault()
-                            open(booking.id)
-                          }}
-                          className="group cursor-pointer border-b border-border-card/70 transition-colors last:border-none hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 focus-visible:outline-none"
-                        >
-                          <td className="px-5 py-3.5">
-                            <div className="flex flex-col items-start gap-1">
-                              <span className="font-semibold text-ink">{booking.reference}</span>
-                              {booking.platform && (
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                    booking.platform.cancelRequestedAt
-                                      ? 'bg-amber-50 text-amber-800'
-                                      : 'bg-surface-muted text-slate'
-                                  }`}
-                                >
-                                  {platformName(booking.platform.slug)}
-                                  {booking.platform.cancelRequestedAt ? ' · cancel requested' : ''}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <Avatar name={booking.customer.name} />
-                              <div className="flex min-w-0 flex-col">
-                                <span className="truncate font-semibold text-ink">{booking.customer.name}</span>
-                                <span className="text-xs text-muted">{booking.customer.phone}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-ink">
-                                {sportById(booking.sportId)?.name || booking.sportId}
+              <Table bare>
+                <Thead>
+                  <Tr>
+                    <Th>Booking</Th>
+                    <Th>Customer</Th>
+                    <Th>Game &amp; Court</Th>
+                    <Th>When</Th>
+                    <Th>Source</Th>
+                    <Th>Amount</Th>
+                    <Th>Payment</Th>
+                    <Th className="w-10" />
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {visibleBookings.map((booking) => {
+                    const court = courtById(booking.courtId)
+                    return (
+                      <Tr key={booking.id} onClick={() => open(booking.id)} className="group">
+                        <Td>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="font-semibold text-ink">{booking.reference}</span>
+                            {booking.platform && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  booking.platform.cancelRequestedAt
+                                    ? 'bg-amber-50 text-amber-800'
+                                    : 'bg-surface-muted text-slate'
+                                }`}
+                              >
+                                {platformName(booking.platform.slug)}
+                                {booking.platform.cancelRequestedAt ? ' · cancel requested' : ''}
                               </span>
-                              <span className="text-xs text-muted">{court?.name || booking.courtId}</span>
+                            )}
+                          </div>
+                        </Td>
+                        <Td>
+                          <div className="flex items-center gap-3">
+                            <Avatar name={booking.customer.name} />
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate font-semibold text-ink">{booking.customer.name}</span>
+                              <span className="text-xs text-muted">{booking.customer.phone}</span>
                             </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-ink">{formatDate(booking.date)}</span>
-                              <span className="text-xs text-muted">
-                                {rangeLabel(booking.startHour, booking.hours)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-ink">
-                                {sourceLabel(booking.bookedVia, booking.platform?.slug) ?? '—'}
-                              </span>
-                              {branchNames.size > 1 && booking.branchId && (
-                                <span className="text-xs text-muted">{branchNames.get(booking.branchId)}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5 font-semibold text-ink">{money(booking.total)}</td>
-                          <td className="px-3 py-3.5">
-                            <StatusPill label={paymentLabel(booking)} tone={paymentLabel(booking) === 'Due' ? 'warning' : 'positive'} />
-                          </td>
-                          <td className="px-3 py-3.5 text-muted">
-                            <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </Td>
+                        <Td>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-ink">
+                              {sportById(booking.sportId)?.name || booking.sportId}
+                            </span>
+                            <span className="text-xs text-muted">{court?.name || booking.courtId}</span>
+                          </div>
+                        </Td>
+                        <Td>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-ink">{formatDate(booking.date)}</span>
+                            <span className="text-xs text-muted">
+                              {rangeLabel(booking.startHour, booking.hours)}
+                            </span>
+                          </div>
+                        </Td>
+                        <Td>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-ink">
+                              {sourceLabel(booking.bookedVia, booking.platform?.slug) ?? '—'}
+                            </span>
+                            {branchNames.size > 1 && booking.branchId && (
+                              <span className="text-xs text-muted">{branchNames.get(booking.branchId)}</span>
+                            )}
+                          </div>
+                        </Td>
+                        <Td className="font-semibold text-ink">{money(booking.total)}</Td>
+                        <Td>
+                          <StatusPill label={paymentLabel(booking)} tone={paymentLabel(booking) === 'Due' ? 'warning' : 'positive'} />
+                        </Td>
+                        <Td className="text-muted">
+                          <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                        </Td>
+                      </Tr>
+                    )
+                  })}
+                </Tbody>
+              </Table>
             )}
-          </section>
+          </Card>
         </>
       )}
     </div>

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Tag, Trash2 } from 'lucide-react'
+import { Tag, Trash2 } from '../ui/icons'
 import { toISO } from '../data/booking'
 import * as db from '../lib/db'
+import Card from '../ui/Card'
 import Toggle from './Toggle'
 
 const randomCode = () => `XC${Math.floor(1000 + Math.random() * 9000)}`
@@ -71,7 +72,7 @@ export default function Coupons() {
         </button>
       </div>
 
-      <div className="w-full overflow-hidden rounded-2xl border border-border-card bg-white shadow-card">
+      <Card flush title="Coupons">
         {coupons.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted">No coupons generated yet.</p>
         ) : (
@@ -105,7 +106,7 @@ export default function Coupons() {
             </div>
           ))
         )}
-      </div>
+      </Card>
     </div>
   )
 }

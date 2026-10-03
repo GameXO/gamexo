@@ -530,6 +530,11 @@ export const api = {
   listSports: (query?: { include_inactive?: boolean }) =>
     request<Ok<'/api/v1/sports', 'get'>>('/api/v1/sports', { query }),
 
+  /** Which slots are free on a day, for one court. `date` is any instant on that day.
+   *  The server answers from the court's own hours and every live booking and hold. */
+  courtAvailability: (query: { date: string; court_id: string; duration_min?: number; slot_minutes?: number }) =>
+    request<Ok<'/api/v1/courts/availability', 'get'>>('/api/v1/courts/availability', { query }),
+
   /** The fixed menu of sports a turf can pick from. Manager and above. Not this
    *  academy's sports — `listSports` is that. */
   sportCatalogue: () =>

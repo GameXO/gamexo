@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Clock, Loader2, Store } from 'lucide-react'
+import { AlertTriangle, Clock, Loader2, Store } from '../ui/icons'
 import { useRequestPartnerCancel } from '../api/hooks'
 import { platformName, type Booking } from '../data/booking'
 

@@ -10,7 +10,7 @@
  * the screen where they can see what they are filling.
  */
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Plus, Users } from 'lucide-react'
+import { ArrowLeft, Plus, Users } from '../ui/icons'
 import {
   DEFAULT_AGE_BOUNDS,
   DURATION_LABEL,
@@ -24,12 +24,14 @@ import {
   type ProgramOut,
 } from '../api/hooks'
 import { AcademyPrograms } from '../settings/AcademyPrograms'
+import PlanCard, { monthlyEquivalent, tiersByPrice, type PlanTier } from '../ui/PlanCard'
 import BatchDrawer from './BatchDrawer'
 import { LEVEL_TITLE, rupees } from './format'
 import { useIsManager } from './permissions'
 
 const BAND_TITLE: Record<string, string> = { kids: 'Kids', adults: 'Adults' }
 const LEVEL_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 }
+const SKILL_TIER: Record<string, PlanTier> = { beginner: 'basic', intermediate: 'standard', advanced: 'premium' }
 const rankOf = (p: ProgramOut) => (p.skill_level ? LEVEL_RANK[p.skill_level] : 99)
 
 function bandLabel(program: ProgramOut): string {
@@ -65,6 +67,31 @@ export default function PlansTab({ onViewBatch }: { onViewBatch: (batchId: strin
     }
     return byProgram
   }, [batches])
+
+  // A programme that names a skill level is tiered by it (beginner → Basic, advanced →
+  // Premium); the rest are ranked by price, as membership plans are. Ranked across every
+  // programme so a card keeps its tier through the sport filter.
+  const tiers = useMemo(() => {
+    const out = new Map<string, PlanTier>()
+    const unleveled: { id: string; monthly: number }[] = []
+    for (const p of programs ?? []) {
+      const level = p.skill_level ? SKILL_TIER[p.skill_level] : undefined
+      if (level) out.set(p.id, level)
+      else {
+        unleveled.push({
+          id: p.id,
+          monthly: monthlyEquivalent({
+            '1m': Number(p.fee_1m ?? 0),
+            '3m': Number(p.fee_3m ?? 0),
+            '6m': Number(p.fee_6m ?? 0),
+            '12m': Number(p.fee_12m ?? 0),
+          }),
+        })
+      }
+    }
+    for (const [id, tier] of tiersByPrice(unleveled)) out.set(id, tier)
+    return out
+  }, [programs])
 
   /** Sport → band → programmes, each sorted up the ladder. */
   const grouped = useMemo(() => {
@@ -177,35 +204,57 @@ export default function PlansTab({ onViewBatch }: { onViewBatch: (batchId: strin
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">
                   {bandKey === 'any' ? 'Any age' : BAND_TITLE[bandKey]}
                 </p>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
                   {list.map((program) => {
                     const programBatches = batchesFor.get(program.id) ?? []
                     const fees = PLAN_DURATIONS.map((d) => ({
                       d,
                       amount: Number(program[`fee_${d}` as keyof ProgramOut] ?? 0),
                     })).filter((f) => f.amount > 0)
+                    const enrolledTotal = programBatches.reduce((sum, batch) => sum + (batch.enrolled ?? 0), 0)
+                    const perks = [
+                      program.classes_per_month ? `${program.classes_per_month} sessions/month` : null,
+                      program.delivery_type === 'private' ? 'Private coaching' : null,
+                      program.max_students ? `Up to ${program.max_students} students` : null,
+                    ].filter((p): p is string => p !== null)
                     return (
-                      <div key={program.id} className="flex flex-col gap-3 rounded-xl border border-border-card bg-white p-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-ink">{program.name}</p>
-                          <p className="mt-0.5 text-xs text-muted">
-                            {bandLabel(program)}
-                            {program.skill_level && ` · ${LEVEL_TITLE[program.skill_level as keyof typeof LEVEL_TITLE]}`}
-                            {program.coach_id && coachName.get(program.coach_id) && ` · ${coachName.get(program.coach_id)}`}
-                          </p>
-                        </div>
-
-                        {fees.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {fees.map((f) => (
-                              <span key={f.d} className="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-slate">
-                                <span className="font-medium text-positive">{rupees(f.amount)}</span> /{' '}
-                                {DURATION_LABEL[f.d].toLowerCase()}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
+                      <PlanCard
+                        key={program.id}
+                        tier={tiers.get(program.id) ?? 'standard'}
+                        name={program.name}
+                        subtitle={[
+                          bandLabel(program),
+                          program.skill_level && LEVEL_TITLE[program.skill_level as keyof typeof LEVEL_TITLE],
+                          program.coach_id && coachName.get(program.coach_id),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        status={{
+                          label: program.is_active === false ? 'Retired' : 'Offered',
+                          tone: program.is_active === false ? 'neutral' : 'positive',
+                        }}
+                        dimmed={program.is_active === false}
+                        prices={fees.map((f) => ({ label: DURATION_LABEL[f.d], amount: rupees(f.amount) }))}
+                        noPriceMessage="No fee set — can't be enrolled"
+                        perks={perks}
+                        footerStart={
+                          <>
+                            <Users size={13} />
+                            {enrolledTotal > 0 ? `${enrolledTotal} enrolled` : 'No students yet'}
+                          </>
+                        }
+                        footerEnd={
+                          isManager && (
+                            <button
+                              type="button"
+                              onClick={() => setBatchFor({ programId: program.id })}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-ink hover:underline"
+                            >
+                              <Plus size={12} /> Add batch
+                            </button>
+                          )
+                        }
+                      >
                         <div className="flex flex-col gap-1.5">
                           {programBatches.map((batch) => {
                             const enrolled = batch.enrolled ?? 0
@@ -245,17 +294,7 @@ export default function PlansTab({ onViewBatch }: { onViewBatch: (batchId: strin
                             <p className="text-xs text-muted">No batches scheduled.</p>
                           )}
                         </div>
-
-                        {isManager && (
-                          <button
-                            type="button"
-                            onClick={() => setBatchFor({ programId: program.id })}
-                            className="inline-flex items-center gap-1 self-start text-xs font-medium text-lime-ink hover:underline"
-                          >
-                            <Plus size={12} /> Add batch
-                          </button>
-                        )}
-                      </div>
+                      </PlanCard>
                     )
                   })}
                 </div>

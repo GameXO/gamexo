@@ -1,4 +1,4 @@
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download } from '../ui/icons'
 import { money } from '../data/booking'
 import type { InvoiceData } from './invoice'
 

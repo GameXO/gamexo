@@ -9,7 +9,7 @@
  * showing a column of zeros.
  */
 import { useMemo, useState } from 'react'
-import { ChevronRight, Plus, Search, Star } from 'lucide-react'
+import { ChevronRight, Plus, Search, Star } from '../ui/icons'
 import { useCoaches, useSports } from '../api/hooks'
 import Avatar from './Avatar'
 import CoachDrawer from './CoachDrawer'
@@ -17,6 +17,7 @@ import { payTerms } from './coachFormat'
 import { STATUS_CHIP } from './format'
 import { useIsManager } from './permissions'
 import PayrollView from './PayrollView'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 
 type View = 'coaches' | 'payroll'
 
@@ -111,127 +112,111 @@ export default function CoachesTab({ onOpen }: { onOpen: (coachId: string) => vo
       {view === 'payroll' && isManager ? (
         <PayrollView onOpen={onOpen} />
       ) : (
-        <div className="shrink-0 overflow-x-auto rounded-xl border border-border-card bg-white">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                <th className="px-4 py-3 font-medium">Coach</th>
-                <th className="px-4 py-3 font-medium">Sports</th>
-                <th className="px-4 py-3 font-medium">Batches</th>
-                <th className="px-4 py-3 font-medium">Students</th>
-                <th className="px-4 py-3 font-medium">Rating</th>
-                {isManager && <th className="px-4 py-3 font-medium">Pay</th>}
-                <th className="px-4 py-3 font-medium">Available</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {coaches.map((coach) => (
-                <tr
-                  key={coach.id}
-                  onClick={() => onOpen(coach.id)}
-                  className="cursor-pointer border-b border-border-card last:border-0 hover:bg-surface/60"
-                >
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onOpen(coach.id)
-                      }}
-                      className="flex items-center gap-3 text-left"
-                    >
-                      <Avatar name={coach.name} initials={coach.avatar_initials} />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-ink">{coach.name}</span>
-                        <span className="block truncate text-xs text-muted">
-                          {coach.coach_no}
-                          {coach.specialization && ` · ${coach.specialization}`}
-                        </span>
+        <Table minWidth={900}>
+          <Thead>
+            <Tr>
+              <Th>Coach</Th>
+              <Th>Sports</Th>
+              <Th>Batches</Th>
+              <Th>Students</Th>
+              <Th>Rating</Th>
+              {isManager && <Th>Pay</Th>}
+              <Th>Available</Th>
+              <Th>Status</Th>
+              <Th />
+            </Tr>
+          </Thead>
+          <Tbody>
+            {coaches.map((coach) => (
+              <Tr key={coach.id} onClick={() => onOpen(coach.id)}>
+                <Td>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen(coach.id)
+                    }}
+                    className="flex items-center gap-3 text-left"
+                  >
+                    <Avatar name={coach.name} initials={coach.avatar_initials} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-ink">{coach.name}</span>
+                      <span className="block truncate text-xs text-muted">
+                        {coach.coach_no}
+                        {coach.specialization && ` · ${coach.specialization}`}
                       </span>
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-slate">
-                    {(coach.sport_ids ?? []).length ? (
-                      (coach.sport_ids ?? []).map(sportName).join(', ')
-                    ) : (
-                      <span className="text-xs text-muted">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink">{coach.active_batches ?? 0}</td>
-                  <td className="px-4 py-3 font-medium text-ink">{coach.total_students ?? 0}</td>
-                  <td className="px-4 py-3">
-                    {Number(coach.rating) > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-ink">
-                        <Star size={13} className="fill-amber-400 text-amber-400" />
-                        {Number(coach.rating).toFixed(1)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted">—</span>
-                    )}
-                  </td>
-                  {isManager && <td className="px-4 py-3 text-xs text-slate">{payTerms(coach)}</td>}
-                  <td className="px-4 py-3 text-xs text-slate">
-                    {[coach.morning_available !== false && 'Mornings', coach.evening_available !== false && 'Evenings']
-                      .filter(Boolean)
-                      .join(' · ') || 'Not available'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_CHIP[coach.status ?? 'active'] ?? 'bg-surface-muted text-slate'}`}
-                    >
-                      {coach.status ?? 'active'}
                     </span>
-                    {coach.type === 'guest' && (
-                      <span className="ml-1.5 rounded-full bg-surface-muted px-2 py-1 text-xs text-slate">Guest</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right text-muted">
-                    <ChevronRight size={16} />
-                  </td>
-                </tr>
-              ))}
+                  </button>
+                </Td>
+                <Td className="text-slate">
+                  {(coach.sport_ids ?? []).length ? (
+                    (coach.sport_ids ?? []).map(sportName).join(', ')
+                  ) : (
+                    <span className="text-xs text-muted">—</span>
+                  )}
+                </Td>
+                <Td className="font-medium text-ink">{coach.active_batches ?? 0}</Td>
+                <Td className="font-medium text-ink">{coach.total_students ?? 0}</Td>
+                <Td>
+                  {Number(coach.rating) > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-ink">
+                      <Star size={13} className="fill-amber-400 text-amber-400" />
+                      {Number(coach.rating).toFixed(1)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted">—</span>
+                  )}
+                </Td>
+                {isManager && <Td className="text-xs text-slate">{payTerms(coach)}</Td>}
+                <Td className="text-xs text-slate">
+                  {[coach.morning_available !== false && 'Mornings', coach.evening_available !== false && 'Evenings']
+                    .filter(Boolean)
+                    .join(' · ') || 'Not available'}
+                </Td>
+                <Td>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_CHIP[coach.status ?? 'active'] ?? 'bg-surface-muted text-slate'}`}
+                  >
+                    {coach.status ?? 'active'}
+                  </span>
+                  {coach.type === 'guest' && (
+                    <span className="ml-1.5 rounded-full bg-surface-muted px-2 py-1 text-xs text-slate">Guest</span>
+                  )}
+                </Td>
+                <Td align="right" className="text-muted">
+                  <ChevronRight size={16} />
+                </Td>
+              </Tr>
+            ))}
 
-              {isLoading && (
-                <tr>
-                  <td colSpan={columns} className="px-4 py-10 text-center text-sm text-muted">
-                    Loading coaches…
-                  </td>
-                </tr>
-              )}
-              {isError && (
-                <tr>
-                  <td colSpan={columns} className="px-4 py-10 text-center text-sm text-negative">
-                    Could not load coaches.
-                  </td>
-                </tr>
-              )}
-              {!isLoading && !isError && coaches.length === 0 && (
-                <tr>
-                  <td colSpan={columns} className="px-4 py-10 text-center text-sm text-muted">
-                    {all.length === 0 ? (
+            {isLoading && <TableMessage colSpan={columns}>Loading coaches…</TableMessage>}
+            {isError && (
+              <TableMessage colSpan={columns} tone="negative">
+                Could not load coaches.
+              </TableMessage>
+            )}
+            {!isLoading && !isError && coaches.length === 0 && (
+              <TableMessage colSpan={columns}>
+                {all.length === 0 ? (
+                  <>
+                    No coaches on staff yet.
+                    {isManager && (
                       <>
-                        No coaches on staff yet.
-                        {isManager && (
-                          <>
-                            {' '}
-                            <button type="button" onClick={() => setAdding(true)} className="text-lime-ink underline">
-                              Add the first one
-                            </button>
-                            .
-                          </>
-                        )}
+                        {' '}
+                        <button type="button" onClick={() => setAdding(true)} className="text-lime-ink underline">
+                          Add the first one
+                        </button>
+                        .
                       </>
-                    ) : (
-                      'No coach matches that search.'
                     )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </>
+                ) : (
+                  'No coach matches that search.'
+                )}
+              </TableMessage>
+            )}
+          </Tbody>
+        </Table>
       )}
 
       {adding && <CoachDrawer onClose={() => setAdding(false)} onSaved={(c) => onOpen(c.id)} />}

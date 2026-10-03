@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import Card from '../ui/Card'
+import { ArrowDown, ArrowUp, PieChart } from '../ui/icons'
 import { useBookingsInRange, useSports, type BookingOut } from '../api/hooks'
 import {
   formatINRCompact,
@@ -10,9 +11,7 @@ import {
   type DashboardRange,
   type SportRevenueRow,
 } from '../dashboard/insights'
-import { asset } from '../lib/asset'
 
-const chartPie = asset('dashboard/chart-pie.svg')
 
 const TRACK_HEIGHT = 120
 const BAR_WIDTH = 56
@@ -166,13 +165,12 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
   )
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-6 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex items-center gap-2.5 py-[9px]">
-        <img src={chartPie} alt="" className="size-5" />
-        <p className="text-sm font-medium text-ink">
-          {labels.current} vs {labels.previous}
-        </p>
-      </div>
+    <Card
+      icon={<PieChart size={18} className="text-slate" />}
+      title={`${labels.current} vs ${labels.previous}`}
+      className="h-full flex-1 self-stretch"
+      bodyClassName="flex flex-col items-start gap-6"
+    >
 
       <div className="flex w-full flex-col items-start gap-1">
         <div className="flex items-baseline gap-2.5">
@@ -256,6 +254,6 @@ export default function MonthlyRevenueCard({ range }: { range: DashboardRange })
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

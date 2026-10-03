@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { MoreHorizontal } from './icons'
+import type { IconComponent } from './icons'
 
 export type RowAction = {
   label: string
   onClick: () => void
-  icon?: LucideIcon
+  icon?: IconComponent
   danger?: boolean
   disabled?: boolean
 }

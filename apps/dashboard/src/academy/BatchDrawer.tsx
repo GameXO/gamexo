@@ -10,7 +10,7 @@
  * same list.
  */
 import { useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError } from '../api/client'
 import { useCoaches, useCreateBatch, type ProgramOut } from '../api/hooks'

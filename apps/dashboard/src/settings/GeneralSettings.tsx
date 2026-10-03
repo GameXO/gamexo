@@ -16,7 +16,7 @@
  * and an invoice for a branch that no longer exists is one nobody can reprint.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Loader2, Pencil, Phone, Plus, Star } from 'lucide-react'
+import { Check, Loader2, Pencil, Phone, Plus, Star } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { SettingsPanel, SettingsRow } from './SettingsPanel'
 import { ApiError } from '../api/client'

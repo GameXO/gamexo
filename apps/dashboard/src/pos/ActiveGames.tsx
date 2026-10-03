@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CircleDot, Circle, CalendarCheck2, IndianRupee } from 'lucide-react'
+import { CircleDot, Circle, CalendarCheck2, IndianRupee } from '../ui/icons'
 import { balanceOf, courtById, equipmentForSport, money } from '../data/booking'
 import { asset } from '../lib/asset'
 import {

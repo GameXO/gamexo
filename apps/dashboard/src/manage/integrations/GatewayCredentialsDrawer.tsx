@@ -5,9 +5,10 @@
  * here knows that Razorpay has a Key ID and PhonePe has a Salt Index. Adding a
  * gateway is a catalog entry on the server; this file does not change.
  */
-import { useState } from 'react'
-import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
-import Drawer from '../../ui/Drawer'
+import { useState, type CSSProperties } from 'react'
+import { AlertTriangle, ExternalLink, Loader2 } from '../../ui/icons'
+import SidePanel from '../../ui/PanelDock'
+import IntegrationLogo from './IntegrationLogo'
 import { credentialProblems, type ProviderOut, useSaveGateway } from './hooks'
 
 const MODES = [
@@ -65,9 +66,10 @@ export default function GatewayCredentialsDrawer({
   const switchingToLive = mode === 'live' && connected?.mode !== 'live'
 
   return (
-    <Drawer
+    <SidePanel
       title={connected ? `Edit ${provider.label}` : `Connect ${provider.label}`}
       subtitle={provider.tagline}
+      icon={<IntegrationLogo id={provider.id} name={provider.label} size={40} />}
       onClose={onClose}
       footer={
         <div className="flex items-center gap-3">
@@ -158,9 +160,18 @@ export default function GatewayCredentialsDrawer({
             </label>
             <input
               id={`gw-${field.name}`}
-              type={field.secret ? 'password' : 'text'}
+              // A gateway key is not a login. Chrome treats a text field followed by a
+              // password field as username + password and fills in the signed-in
+              // admin, so the secret is a masked text field instead — `type=password`
+              // is what invites the password manager in.
+              type="text"
+              name={`gateway-${provider.id}-${field.name}`}
               autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
               spellCheck={false}
+              style={field.secret ? ({ WebkitTextSecurity: 'disc' } as CSSProperties) : undefined}
               value={values[field.name] ?? ''}
               onChange={(e) => set(field.name, e.target.value)}
               placeholder={
@@ -195,6 +206,6 @@ export default function GatewayCredentialsDrawer({
           ? ` Saving checks them against ${provider.label} straight away.`
           : ` ${provider.label} has no way to test credentials without starting a payment, so these are checked for format only.`}
       </p>
-    </Drawer>
+    </SidePanel>
   )
 }

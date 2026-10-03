@@ -1,9 +1,9 @@
+import { Zap } from '../ui/icons'
 import { useMemo } from 'react'
+import Card from '../ui/Card'
 import { useBookingsInRange, useSports } from '../api/hooks'
 import { formatHourRange, primeHoursBySport, type DashboardRange } from '../dashboard/insights'
-import { asset } from '../lib/asset'
 
-const bolt = asset('dashboard/bolt.svg')
 
 /** The single busiest hour of day per sport over the selected period — the slot
  *  a turf prices its peak rate around. Read straight off each booking's own
@@ -21,14 +21,13 @@ export default function PrimeHoursCard({ range }: { range: DashboardRange }) {
   const loading = bookings.isPending || sports.isPending
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full items-center gap-6">
-        <div className="flex flex-1 items-center gap-2.5">
-          <img src={bolt} alt="" className="size-5" />
-          <p className="text-sm font-medium text-ink">Prime Hours by Sport</p>
-        </div>
-        <span className="text-xs font-medium text-slate">{range.label}</span>
-      </div>
+    <Card
+      icon={<Zap size={18} className="text-slate" />}
+      title="Prime Hours by Sport"
+      action={<span className="text-xs font-medium text-slate">{range.label}</span>}
+      className="h-full flex-1 self-stretch"
+      bodyClassName="flex flex-col items-start gap-6"
+    >
 
       {loading ? (
         <p className="text-sm text-muted">Loading…</p>
@@ -55,6 +54,6 @@ export default function PrimeHoursCard({ range }: { range: DashboardRange }) {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

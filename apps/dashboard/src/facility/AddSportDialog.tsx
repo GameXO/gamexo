@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, X } from '../ui/icons'
 import { ApiError } from '../api/client'
 import { useSaveSport, useSportCatalogue, type SportRecord } from '../api/hooks'
 import { ImageUploader } from './ImageFields'

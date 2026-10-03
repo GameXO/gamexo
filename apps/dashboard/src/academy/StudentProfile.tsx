@@ -17,7 +17,7 @@ import {
   Phone,
   TrendingDown,
   TrendingUp,
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   useBusinessSettings,
   useSports,
@@ -33,50 +33,11 @@ import { LEVEL_TITLE, STATUS_CHIP, attendanceTone, formatDate, monthLabel, rupee
 import { downloadParentReport } from './parentReport'
 import { useIsManager } from './permissions'
 import StudentLevelPanel from './StudentLevelPanel'
+import Card from '../ui/Card'
+import { Table, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
+import StatTile from '../ui/StatTile'
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
-
-function Card({
-  title,
-  action,
-  children,
-  className = '',
-}: {
-  title: string
-  action?: React.ReactNode
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <section className={`rounded-2xl border border-border-card bg-white p-5 ${className}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function Tile({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string
-  value: React.ReactNode
-  sub?: React.ReactNode
-  tone?: string
-}) {
-  return (
-    <div className="rounded-xl border border-border-card bg-white px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-semibold ${tone ?? 'text-ink'}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate">{sub}</p>}
-    </div>
-  )
-}
 
 const shortDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -275,7 +236,7 @@ export default function StudentProfile({
 
       {/* ── Headline numbers */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Tile
+        <StatTile
           label="Rating"
           value={Number(row.rating) > 0 ? `${Number(row.rating).toFixed(1)}` : '—'}
           sub={
@@ -290,7 +251,7 @@ export default function StudentProfile({
             )
           }
         />
-        <Tile
+        <StatTile
           label="Attendance"
           value={attendance.last_30_pct !== null ? `${Math.round(attendance.last_30_pct)}%` : '—'}
           tone={tone30.text}
@@ -300,12 +261,12 @@ export default function StudentProfile({
               : 'No sessions marked yet'
           }
         />
-        <Tile
+        <StatTile
           label="Streak"
           value={attendance.streak}
           sub={attendance.streak === 1 ? 'session in a row' : 'sessions in a row'}
         />
-        <Tile
+        <StatTile
           label="Standing"
           value={standing.batch_rank ? `#${standing.batch_rank}` : '—'}
           sub={
@@ -316,7 +277,7 @@ export default function StudentProfile({
                 : 'Not in a batch'
           }
         />
-        <Tile
+        <StatTile
           label="Fees"
           value={row.fee_status === 'none' ? '—' : row.fee_status === 'paid' ? 'Paid' : rupees(row.pending_fee)}
           tone={row.fee_status === 'due' ? 'text-amber-700' : undefined}
@@ -454,35 +415,33 @@ export default function StudentProfile({
           {fees.history.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted">No enrolments yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                    <th className="py-2 pr-3 font-medium">Plan</th>
-                    <th className="py-2 pr-3 font-medium">Term</th>
-                    <th className="py-2 pr-3 text-right font-medium">Fee</th>
-                    <th className="py-2 text-right font-medium">Paid</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fees.history.map((h) => (
-                    <tr key={h.enrollment_id} className="border-b border-border-card last:border-0">
-                      <td className="py-2.5 pr-3">
-                        <p className="text-ink">{h.program_name ?? 'Plan'}</p>
-                        <p className="text-xs capitalize text-muted">{h.status}</p>
-                      </td>
-                      <td className="py-2.5 pr-3 text-xs text-slate">
-                        {formatDate(h.start_date)} – {formatDate(h.renewal_date)}
-                      </td>
-                      <td className="py-2.5 pr-3 text-right text-ink">{rupees(h.total_fee)}</td>
-                      <td className={`py-2.5 text-right ${Number(h.pending) > 0 ? 'text-amber-700' : 'text-positive'}`}>
-                        {rupees(h.paid)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table inset minWidth={420}>
+              <Thead>
+                <Tr>
+                  <Th>Plan</Th>
+                  <Th>Term</Th>
+                  <Th align="right">Fee</Th>
+                  <Th align="right">Paid</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {fees.history.map((h) => (
+                  <Tr key={h.enrollment_id}>
+                    <Td>
+                      <p className="text-ink">{h.program_name ?? 'Plan'}</p>
+                      <p className="text-xs capitalize text-muted">{h.status}</p>
+                    </Td>
+                    <Td className="text-xs text-slate">
+                      {formatDate(h.start_date)} – {formatDate(h.renewal_date)}
+                    </Td>
+                    <Td align="right" className="text-ink">{rupees(h.total_fee)}</Td>
+                    <Td className={`text-right ${Number(h.pending) > 0 ? 'text-amber-700' : 'text-positive'}`}>
+                      {rupees(h.paid)}
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
           )}
         </Card>
       </div>

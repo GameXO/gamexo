@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search } from '../ui/icons'
 import { SEARCHABLE_PAGES } from '../data/navigation'
 import type { View } from '../App'
 import type { SettingsSectionId } from '../settings/settingsNav'

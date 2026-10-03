@@ -17,7 +17,7 @@
  *   is shown so staff can explain that without having to work it out.
  */
 import { useState } from 'react'
-import { Loader2, Pause, Play, Plus, RotateCw, Search, X } from 'lucide-react'
+import { Loader2, Pause, Play, Plus, RotateCw, Search, X } from '../ui/icons'
 import RowActionsMenu, { type RowAction } from '../ui/RowActionsMenu'
 import StatusPill, { type StatusTone } from '../ui/StatusPill'
 import {
@@ -32,6 +32,7 @@ import {
 } from '../api/hooks'
 import Membership from '../manage/Membership'
 import NewMembershipWizard from './NewMembershipWizard'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 
 const rupees = (n: number) =>
   n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
@@ -177,130 +178,122 @@ function MembersList() {
         </div>
       )}
 
-      <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white shadow-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                <th className="px-5 py-3 font-medium">Member</th>
-                <th className="px-3 py-3 font-medium">Plan</th>
-                <th className="px-3 py-3 font-medium">Status</th>
-                <th className="px-3 py-3 font-medium">Expires</th>
-                <th className="px-3 py-3 font-medium">Paid</th>
-                <th className="px-5 py-3 text-right font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const plan = (plans ?? []).find((p) => p.id === row.plan_id)
-                const busy = busyId === row.id
-                const actions: RowAction[] = [
-                  ...(row.status === 'active'
-                    ? [{ label: 'Pause', icon: Pause, onClick: () => void act(row, 'pause') }]
-                    : []),
-                  ...(row.status === 'paused'
-                    ? [{ label: 'Resume', icon: Play, onClick: () => void act(row, 'resume') }]
-                    : []),
-                  ...(row.status !== 'cancelled'
-                    ? [{ label: 'Cancel membership', icon: X, danger: true, onClick: () => void act(row, 'cancel') }]
-                    : []),
-                ]
-                return (
-                  <tr key={row.id} className="border-b border-border-card/70 last:border-0">
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-ink">{row.member_no}</p>
-                      {(row.paused_days_total ?? 0) > 0 && (
-                        <p className="text-xs text-muted">
-                          {row.paused_days_total} paused day
-                          {row.paused_days_total === 1 ? '' : 's'} added
-                        </p>
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>Member</Th>
+            <Th>Plan</Th>
+            <Th>Status</Th>
+            <Th>Expires</Th>
+            <Th>Paid</Th>
+            <Th align="right">
+              <span className="sr-only">Actions</span>
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {rows.map((row) => {
+            const plan = (plans ?? []).find((p) => p.id === row.plan_id)
+            const busy = busyId === row.id
+            const actions: RowAction[] = [
+              ...(row.status === 'active'
+                ? [{ label: 'Pause', icon: Pause, onClick: () => void act(row, 'pause') }]
+                : []),
+              ...(row.status === 'paused'
+                ? [{ label: 'Resume', icon: Play, onClick: () => void act(row, 'resume') }]
+                : []),
+              ...(row.status !== 'cancelled'
+                ? [{ label: 'Cancel membership', icon: X, danger: true, onClick: () => void act(row, 'cancel') }]
+                : []),
+            ]
+            return (
+              <Tr key={row.id}>
+                <Td>
+                  <p className="font-semibold text-ink">{row.member_no}</p>
+                  {(row.paused_days_total ?? 0) > 0 && (
+                    <p className="text-xs text-muted">
+                      {row.paused_days_total} paused day
+                      {row.paused_days_total === 1 ? '' : 's'} added
+                    </p>
+                  )}
+                </Td>
+                <Td>
+                  <p className="font-medium text-ink">{row.plan_name}</p>
+                  <p className="text-xs text-muted">{DURATION_LABEL[row.duration as PlanDuration]}</p>
+                </Td>
+                <Td>
+                  <StatusPill label={row.status ?? 'active'} tone={STATUS_TONE[row.status ?? 'active'] ?? 'neutral'} />
+                </Td>
+                <Td>
+                  <p className="text-ink">{row.expiry_date}</p>
+                  <p className="text-xs text-muted">{whenLabel(row)}</p>
+                </Td>
+                <Td className="font-medium text-ink">{rupees(Number(row.total_paid ?? 0))}</Td>
+                <Td>
+                  <div className="flex items-center justify-end gap-2">
+                    {busy && <Loader2 size={15} className="animate-spin text-muted" />}
+
+                    {row.status !== 'cancelled' && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setRenewing(row)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border-card bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-control hover:bg-surface-muted disabled:opacity-40"
+                      >
+                        <RotateCw size={13} />
+                        Renew
+                      </button>
+                    )}
+
+                    {actions.length > 0 && <RowActionsMenu actions={actions} />}
+                  </div>
+
+                  {renewing?.id === row.id && (
+                    <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                      <span className="text-xs text-muted">Renew for</span>
+                      {(plan ? sellableDurations(plan) : []).map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => doRenew(row, d)}
+                          className="rounded-lg bg-ink px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
+                        >
+                          {DURATION_LABEL[d]}
+                        </button>
+                      ))}
+                      {plan && sellableDurations(plan).length === 0 && (
+                        <span className="text-xs text-amber-700">This plan no longer prices any term.</span>
                       )}
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <p className="font-medium text-ink">{row.plan_name}</p>
-                      <p className="text-xs text-muted">{DURATION_LABEL[row.duration as PlanDuration]}</p>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <StatusPill label={row.status ?? 'active'} tone={STATUS_TONE[row.status ?? 'active'] ?? 'neutral'} />
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <p className="text-ink">{row.expiry_date}</p>
-                      <p className="text-xs text-muted">{whenLabel(row)}</p>
-                    </td>
-                    <td className="px-3 py-3.5 font-medium text-ink">{rupees(Number(row.total_paid ?? 0))}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-2">
-                        {busy && <Loader2 size={15} className="animate-spin text-muted" />}
+                      <button
+                        type="button"
+                        onClick={() => setRenewing(null)}
+                        className="text-xs text-muted underline"
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  )}
+                </Td>
+              </Tr>
+            )
+          })}
 
-                        {row.status !== 'cancelled' && (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setRenewing(row)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border-card bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-control hover:bg-surface-muted disabled:opacity-40"
-                          >
-                            <RotateCw size={13} />
-                            Renew
-                          </button>
-                        )}
+          {isLoading && (
+            <TableMessage colSpan={6}>
+                Loading memberships…
+              </TableMessage>
+          )}
 
-                        {actions.length > 0 && <RowActionsMenu actions={actions} />}
-                      </div>
-
-                      {renewing?.id === row.id && (
-                        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-                          <span className="text-xs text-muted">Renew for</span>
-                          {(plan ? sellableDurations(plan) : []).map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              disabled={busy}
-                              onClick={() => doRenew(row, d)}
-                              className="rounded-lg bg-ink px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
-                            >
-                              {DURATION_LABEL[d]}
-                            </button>
-                          ))}
-                          {plan && sellableDurations(plan).length === 0 && (
-                            <span className="text-xs text-amber-700">This plan no longer prices any term.</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setRenewing(null)}
-                            className="text-xs text-muted underline"
-                          >
-                            cancel
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {isLoading && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted">
-                    Loading memberships…
-                  </td>
-                </tr>
-              )}
-
-              {!isLoading && rows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted">
-                    {query || filter !== 'all'
-                      ? 'No memberships match.'
-                      : 'No memberships sold yet. Create a plan on the Plans tab, then sell one here.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          {!isLoading && rows.length === 0 && (
+            <TableMessage colSpan={6}>
+                {query || filter !== 'all'
+                  ? 'No memberships match.'
+                  : 'No memberships sold yet. Create a plan on the Plans tab, then sell one here.'}
+              </TableMessage>
+          )}
+        </Tbody>
+      </Table>
 
       {wizardOpen && (
         <NewMembershipWizard onClose={() => setWizardOpen(false)} onCreated={() => setWizardOpen(false)} />

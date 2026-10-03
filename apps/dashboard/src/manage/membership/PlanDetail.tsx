@@ -7,8 +7,11 @@
  * disagreeing in a meeting.
  */
 import { useState } from 'react'
-import { ChevronRight, Pencil } from 'lucide-react'
+import { ChevronRight, Pencil } from '../../ui/icons'
+import Card from '../../ui/Card'
+import StatTile from '../../ui/StatTile'
 import StatusPill, { type StatusTone } from '../../ui/StatusPill'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../../ui/Table'
 import {
   DURATION_LABEL,
   PLAN_DURATIONS,
@@ -88,14 +91,11 @@ export default function PlanDetail({
         </button>
       </header>
 
-      <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-border-card bg-white px-5 py-4 shadow-card">
-            <dt className="text-xs text-muted">{s.label}</dt>
-            <dd className="mt-1.5 text-xl font-semibold text-ink">{s.value}</dd>
-          </div>
+          <StatTile key={s.label} label={s.label} value={s.value} />
         ))}
-      </dl>
+      </div>
 
       <div role="tablist" className="flex gap-6 border-b border-border-soft">
         {TABS.map((t) => (
@@ -117,10 +117,7 @@ export default function PlanDetail({
 
       {tab === 'Overview' && (
         <div className="grid gap-5 xl:grid-cols-2">
-          <section className="rounded-xl border border-border-card bg-white shadow-card">
-            <h2 className="border-b border-dashed border-border-soft px-5 py-4 text-sm font-semibold text-ink">
-              Pricing
-            </h2>
+          <Card flush title="Pricing">
             <dl className="divide-y divide-dashed divide-border-soft text-sm">
               {PLAN_DURATIONS.map((d) => {
                 const price = planPrice(plan, d)
@@ -140,12 +137,9 @@ export default function PlanDetail({
                 </dd>
               </div>
             </dl>
-          </section>
+          </Card>
 
-          <section className="rounded-xl border border-border-card bg-white shadow-card">
-            <h2 className="border-b border-dashed border-border-soft px-5 py-4 text-sm font-semibold text-ink">
-              What's included
-            </h2>
+          <Card flush title="What's included">
             {benefits.length > 0 ? (
               <ul className="divide-y divide-dashed divide-border-soft text-sm">
                 {benefits.map((b) => (
@@ -158,51 +152,45 @@ export default function PlanDetail({
             ) : (
               <p className="px-5 py-6 text-sm text-muted">No extra benefits listed for this plan.</p>
             )}
-          </section>
+          </Card>
         </div>
       )}
 
       {tab === 'Members' && (
-        <div className="shrink-0 overflow-hidden rounded-xl border border-border-card bg-white shadow-card">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-                <th className="px-5 py-3 font-medium">Member</th>
-                <th className="px-3 py-3 font-medium">Term</th>
-                <th className="px-3 py-3 font-medium">Status</th>
-                <th className="px-3 py-3 font-medium">Expires</th>
-                <th className="px-5 py-3 text-right font-medium">Paid</th>
-              </tr>
-            </thead>
-            <tbody>
-              {onThisPlan.map((m) => (
-                <tr key={m.id} className="border-b border-border-card/70 last:border-0">
-                  <td className="px-5 py-3.5 font-medium text-ink">{m.member_no}</td>
-                  <td className="px-3 py-3.5 text-slate">{DURATION_LABEL[m.duration as PlanDuration]}</td>
-                  <td className="px-3 py-3.5">
-                    <StatusPill label={m.status ?? 'active'} tone={STATUS_TONE[m.status ?? 'active'] ?? 'neutral'} />
-                  </td>
-                  <td className="px-3 py-3.5 text-slate">{m.expiry_date}</td>
-                  <td className="px-5 py-3.5 text-right font-medium text-ink">{rupees(Number(m.total_paid ?? 0))}</td>
-                </tr>
-              ))}
-              {isLoading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!isLoading && onThisPlan.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted">
-                    Nobody is on this plan yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Member</Th>
+              <Th>Term</Th>
+              <Th>Status</Th>
+              <Th>Expires</Th>
+              <Th align="right">Paid</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {onThisPlan.map((m) => (
+              <Tr key={m.id}>
+                <Td className="font-medium text-ink">{m.member_no}</Td>
+                <Td className="text-slate">{DURATION_LABEL[m.duration as PlanDuration]}</Td>
+                <Td>
+                  <StatusPill label={m.status ?? 'active'} tone={STATUS_TONE[m.status ?? 'active'] ?? 'neutral'} />
+                </Td>
+                <Td className="text-slate">{m.expiry_date}</Td>
+                <Td align="right" className="font-medium text-ink">{rupees(Number(m.total_paid ?? 0))}</Td>
+              </Tr>
+            ))}
+            {isLoading && (
+              <TableMessage colSpan={5}>
+                  Loading…
+                </TableMessage>
+            )}
+            {!isLoading && onThisPlan.length === 0 && (
+              <TableMessage colSpan={5}>
+                  Nobody is on this plan yet.
+                </TableMessage>
+            )}
+          </Tbody>
+        </Table>
       )}
     </div>
   )

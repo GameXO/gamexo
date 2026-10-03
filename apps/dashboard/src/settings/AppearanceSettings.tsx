@@ -7,7 +7,7 @@
  * colour by hand — a palette is only a shortcut to filling the three fields in.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import { ApiError } from '../api/client'
 import { useBusinessSettings, useSaveBusinessSettings } from '../api/hooks'
 import {

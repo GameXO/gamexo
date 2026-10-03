@@ -8,6 +8,9 @@ const badminton = asset('sports/badminton.jpg')
 const pickleball = asset('sports/pickleball.jpg')
 const tableTennis = asset('sports/table-tennis.jpg')
 
+/** The longest one booking may run. Mirrors `MAX_BOOKING_MINUTES` on the API. */
+export const MAX_BOOKING_HOURS = 6
+
 export const GST_RATE = 0.18
 export const VENUE_OPENS = 6
 export const VENUE_CLOSES = 24
@@ -241,15 +244,6 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
 
 /* ---------- slots ---------- */
 
-function hash(str: string) {
-  let h = 2166136261
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return h >>> 0
-}
-
 export const toISO = (d: Date) => {
   const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
   return z.toISOString().slice(0, 10)
@@ -269,25 +263,6 @@ export function nextDays(count = 7) {
       label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short' }),
     })
   }
-  return out
-}
-
-export type SlotState = 'open' | 'booked' | 'past'
-
-/** Deterministic per court/date/hour so availability never flickers between renders. */
-export function slotState(courtId: string, iso: string, hour: number): SlotState {
-  const now = new Date()
-  const todayISO = toISO(now)
-  if (iso < todayISO) return 'past'
-  if (iso === todayISO && hour <= now.getHours()) return 'past'
-  const n = hash(`${courtId}|${iso}|${hour}`) % 100
-  const pressure = hour >= 17 && hour < 22 ? 46 : hour >= 12 && hour < 17 ? 20 : 14
-  return n < pressure ? 'booked' : 'open'
-}
-
-export function slotsForDay(courtId: string, iso: string) {
-  const out: { hour: number; state: SlotState }[] = []
-  for (let h = VENUE_OPENS; h < VENUE_CLOSES; h++) out.push({ hour: h, state: slotState(courtId, iso, h) })
   return out
 }
 
@@ -337,7 +312,10 @@ export type Draft = {
   courtId: string | null
   date: string | null
   startHour: number | null
+  /** The whole booking, in hours — up to `MAX_BOOKING_HOURS`. */
   hours: number
+  /** How long each slot picked is (1, 2 or 3 hr); `hours` is that times how many. */
+  slotUnit: number
   customer: { name: string; phone: string; email: string; players: string; notes: string }
   equipment: Record<string, number>
   payment: string | null
@@ -349,6 +327,7 @@ export const emptyDraft = (): Draft => ({
   date: null,
   startHour: null,
   hours: 1,
+  slotUnit: 1,
   customer: { name: '', phone: '', email: '', players: '', notes: '' },
   equipment: {},
   payment: null,

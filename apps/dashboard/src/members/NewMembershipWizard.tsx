@@ -10,7 +10,7 @@
  * server, so there is no half-state to clean up if this closes mid-flight.
  */
 import { useEffect, useState } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, Loader2, X } from '../ui/icons'
 import {
   DURATION_LABEL,
   planPrice,

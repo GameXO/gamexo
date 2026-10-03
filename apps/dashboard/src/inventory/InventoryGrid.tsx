@@ -1,4 +1,4 @@
-import { ShoppingBag } from 'lucide-react'
+import { ShoppingBag } from '../ui/icons'
 import { stockStatus, useUpdateInventoryItem, type InventoryItem } from '../api/hooks'
 import { money } from '../data/booking'
 import Toggle from '../manage/Toggle'

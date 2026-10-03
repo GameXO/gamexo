@@ -10,23 +10,15 @@
  * browser's clock — the two disagree for a few hours either side of midnight.
  */
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2 } from '../ui/icons'
 import { usePayroll } from '../api/hooks'
 import Avatar from './Avatar'
 import { PAY_MODEL_LABEL, PAYOUT_STATUS_CHIP, addMonths, longMonth } from './coachFormat'
 import { cell, downloadCsv } from './exportCsv'
 import { rupees } from './format'
 import PayoutDrawer from './PayoutDrawer'
-
-function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
-  return (
-    <div className="rounded-xl border border-border-card bg-white px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-semibold ${tone ?? 'text-ink'}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate">{sub}</p>}
-    </div>
-  )
-}
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
+import StatTile from '../ui/StatTile'
 
 export default function PayrollView({ onOpen }: { onOpen: (coachId: string) => void }) {
   // `undefined` is "the academy's current month"; once the person navigates it is explicit.
@@ -116,9 +108,9 @@ export default function PayrollView({ onOpen }: { onOpen: (coachId: string) => v
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Tile label="Payroll" value={data ? rupees(data.total_gross) : '—'} sub={`${rows.length} coaches`} />
-        <Tile label="Paid" value={data ? rupees(data.total_paid) : '—'} tone="text-positive" />
-        <Tile
+        <StatTile label="Payroll" value={data ? rupees(data.total_gross) : '—'} sub={`${rows.length} coaches`} />
+        <StatTile label="Paid" value={data ? rupees(data.total_paid) : '—'} tone="text-positive" />
+        <StatTile
           label="Still to pay"
           value={data ? rupees(data.total_due) : '—'}
           tone={data && Number(data.total_due) > 0 ? 'text-amber-700' : undefined}
@@ -126,99 +118,91 @@ export default function PayrollView({ onOpen }: { onOpen: (coachId: string) => v
         />
       </div>
 
-      <div className="shrink-0 overflow-x-auto rounded-xl border border-border-card bg-white">
-        <table className="w-full min-w-[900px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-              <th className="px-4 py-3 font-medium">Coach</th>
-              <th className="px-4 py-3 font-medium">Pay</th>
-              <th className="px-4 py-3 font-medium">Taught</th>
-              <th className="px-4 py-3 font-medium">Fees collected</th>
-              <th className="px-4 py-3 text-right font-medium">Earned</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.coach_id} className="border-b border-border-card last:border-0">
-                <td className="px-4 py-3">
-                  <button type="button" onClick={() => onOpen(r.coach_id)} className="flex items-center gap-3 text-left">
-                    <Avatar name={r.name} initials={r.avatar_initials} />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-ink hover:underline">{r.name}</span>
-                      <span className="block text-xs text-muted">{r.coach_no}</span>
-                    </span>
-                  </button>
-                </td>
-                <td className="px-4 py-3 text-slate">{PAY_MODEL_LABEL[r.pay_model]}</td>
-                <td className="px-4 py-3 text-slate">
-                  {r.sessions} {r.sessions === 1 ? 'session' : 'sessions'}
-                  <span className="block text-xs text-muted">{Number(r.hours)} h</span>
-                </td>
-                <td className="px-4 py-3 text-slate">
-                  {r.pay_model === 'commission' || r.pay_model === 'hybrid' ? rupees(r.fees_collected) : '—'}
-                </td>
-                <td className="px-4 py-3 text-right font-medium text-ink">
-                  {rupees(r.paid_total ?? r.gross)}
-                  {r.paid_total != null && Number(r.paid_total) !== Number(r.gross) && (
-                    <span className="block text-xs font-normal text-muted">would be {rupees(r.gross)} now</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${PAYOUT_STATUS_CHIP[r.status] ?? ''}`}
-                  >
-                    {r.status === 'paid' ? 'Paid' : r.status === 'due' ? 'Due' : 'Nothing earned'}
+      <Table minWidth={900}>
+        <Thead>
+          <Tr>
+            <Th>Coach</Th>
+            <Th>Pay</Th>
+            <Th>Taught</Th>
+            <Th>Fees collected</Th>
+            <Th align="right">Earned</Th>
+            <Th>Status</Th>
+            <Th />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {rows.map((r) => (
+            <Tr key={r.coach_id}>
+              <Td>
+                <button type="button" onClick={() => onOpen(r.coach_id)} className="flex items-center gap-3 text-left">
+                  <Avatar name={r.name} initials={r.avatar_initials} />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-ink hover:underline">{r.name}</span>
+                    <span className="block text-xs text-muted">{r.coach_no}</span>
                   </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {r.status === 'due' && (
-                    <button
-                      type="button"
-                      onClick={() => setPaying({ id: r.coach_id, name: r.name })}
-                      className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white"
-                    >
-                      Record payout
-                    </button>
-                  )}
-                  {r.status === 'paid' && (
-                    <button
-                      type="button"
-                      onClick={() => onOpen(r.coach_id)}
-                      className="rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate hover:text-ink"
-                    >
-                      Details
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                </button>
+              </Td>
+              <Td className="text-slate">{PAY_MODEL_LABEL[r.pay_model]}</Td>
+              <Td className="text-slate">
+                {r.sessions} {r.sessions === 1 ? 'session' : 'sessions'}
+                <span className="block text-xs text-muted">{Number(r.hours)} h</span>
+              </Td>
+              <Td className="text-slate">
+                {r.pay_model === 'commission' || r.pay_model === 'hybrid' ? rupees(r.fees_collected) : '—'}
+              </Td>
+              <Td align="right" className="font-medium text-ink">
+                {rupees(r.paid_total ?? r.gross)}
+                {r.paid_total != null && Number(r.paid_total) !== Number(r.gross) && (
+                  <span className="block text-xs font-normal text-muted">would be {rupees(r.gross)} now</span>
+                )}
+              </Td>
+              <Td>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${PAYOUT_STATUS_CHIP[r.status] ?? ''}`}
+                >
+                  {r.status === 'paid' ? 'Paid' : r.status === 'due' ? 'Due' : 'Nothing earned'}
+                </span>
+              </Td>
+              <Td align="right">
+                {r.status === 'due' && (
+                  <button
+                    type="button"
+                    onClick={() => setPaying({ id: r.coach_id, name: r.name })}
+                    className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white"
+                  >
+                    Record payout
+                  </button>
+                )}
+                {r.status === 'paid' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen(r.coach_id)}
+                    className="rounded-lg border border-border-card px-2.5 py-1.5 text-xs text-slate hover:text-ink"
+                  >
+                    Details
+                  </button>
+                )}
+              </Td>
+            </Tr>
+          ))}
 
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted">
-                  Loading payroll…
-                </td>
-              </tr>
-            )}
-            {isError && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-negative">
-                  Could not load payroll.
-                </td>
-              </tr>
-            )}
-            {!isLoading && !isError && rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted">
-                  No coaches to pay for {shown ? longMonth(shown) : 'this month'}.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          {isLoading && (
+            <TableMessage colSpan={7}>
+                Loading payroll…
+              </TableMessage>
+          )}
+          {isError && (
+            <TableMessage colSpan={7} tone="negative">
+                Could not load payroll.
+              </TableMessage>
+          )}
+          {!isLoading && !isError && rows.length === 0 && (
+            <TableMessage colSpan={7}>
+                No coaches to pay for {shown ? longMonth(shown) : 'this month'}.
+              </TableMessage>
+          )}
+        </Tbody>
+      </Table>
 
       <p className="text-xs text-muted">
         Commission is a share of fees <em>received</em> in the month, not fees invoiced. Hours count sessions whose

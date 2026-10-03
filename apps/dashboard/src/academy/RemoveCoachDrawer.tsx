@@ -10,7 +10,7 @@
  * where it can, and reports which happened.
  */
 import { useState } from 'react'
-import { AlertTriangle, Loader2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError } from '../api/client'
 import { useCoaches, useRemoveCoach, type CoachProfile } from '../api/hooks'

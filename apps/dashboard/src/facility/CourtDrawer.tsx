@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, Loader2, X } from 'lucide-react'
+import { Clock, Loader2, X } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import Toggle from '../manage/Toggle'
 import { ApiError } from '../api/client'

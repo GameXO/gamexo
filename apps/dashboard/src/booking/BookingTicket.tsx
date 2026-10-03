@@ -1,4 +1,4 @@
-import { Wallet } from 'lucide-react'
+import { Wallet } from '../ui/icons'
 import { money } from '../data/booking'
 import type { InvoiceData } from './invoice'
 

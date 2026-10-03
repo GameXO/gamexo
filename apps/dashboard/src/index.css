@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
-@import "@fontsource/geist-sans/400.css";
-@import "@fontsource/geist-sans/500.css";
-@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/manrope/500.css";
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
 
 /*
  * Design language: flat, bordered, quiet — a working interface rather than a
@@ -13,11 +16,9 @@
  * system around them — type, density, borders, motion — follows this language.
  */
 @theme {
-  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
-  /* Same face as the body: the display weight is set by `.font-display` below
-     rather than by a second family, which is what keeps headings and body reading
-     as one voice. */
-  --font-display: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Headings and figures are Manrope; everything else is DM Sans. */
+  --font-display: "Manrope", "DM Sans", ui-sans-serif, system-ui, sans-serif;
 
   /* Near-white page, white cards, and borders that do all the separating. The
      neutrals carry no blue: warm greys read as paper, cool ones as a form. */
@@ -245,6 +246,21 @@ textarea:focus-visible {
 
 .no-ring:focus-visible {
   outline: none;
+}
+
+/* A date field that draws its own calendar icon beside the label: the browser's built-in
+   one is hidden but stretched over the whole input, so clicking anywhere still opens
+   the picker and there is one icon rather than two. */
+.date-field {
+  position: relative;
+}
+.date-field::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Loading: a soft sweep rather than a blink. Replaces Tailwind's opacity pulse for

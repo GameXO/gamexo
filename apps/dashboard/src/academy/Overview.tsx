@@ -7,7 +7,7 @@
  * filtered to exactly those people.
  */
 import { useState } from 'react'
-import { AlertTriangle, CalendarClock, ChevronDown, CircleCheck, TrendingUp, UserX } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronDown, CircleCheck, TrendingUp, UserX } from '../ui/icons'
 import {
   useAcademyOverview,
   useAttention,
@@ -16,30 +16,7 @@ import {
 } from '../api/hooks'
 import Avatar from './Avatar'
 import { rupees } from './format'
-
-function Tile({
-  label,
-  value,
-  sub,
-  loading,
-}: {
-  label: string
-  value: string
-  sub?: string
-  loading: boolean
-}) {
-  return (
-    <div className="rounded-xl border border-border-card bg-white px-4 py-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      {loading ? (
-        <div className="mt-2 h-7 w-20 animate-pulse rounded bg-surface-muted" />
-      ) : (
-        <p className="mt-1 font-display text-2xl font-semibold text-ink">{value}</p>
-      )}
-      {sub && !loading && <p className="mt-0.5 text-xs text-slate">{sub}</p>}
-    </div>
-  )
-}
+import StatTile from '../ui/StatTile'
 
 export function SummaryStrip() {
   const { data, isLoading } = useAcademyOverview()
@@ -47,13 +24,13 @@ export function SummaryStrip() {
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Tile
+      <StatTile
         label="Active students"
         value={String(data?.active_students ?? 0)}
         sub={`${data?.new_admissions_this_month ?? 0} joined this month`}
         loading={isLoading}
       />
-      <Tile
+      <StatTile
         label="Today's attendance"
         value={marked ? `${data?.present_today}/${marked}` : '—'}
         sub={
@@ -63,13 +40,13 @@ export function SummaryStrip() {
         }
         loading={isLoading}
       />
-      <Tile
+      <StatTile
         label="Fees pending"
         value={rupees(data?.fee_pending ?? 0)}
         sub={`${rupees(data?.fee_collected ?? 0)} collected`}
         loading={isLoading}
       />
-      <Tile
+      <StatTile
         label="Coaches"
         value={String(data?.active_coaches ?? 0)}
         sub={`${data?.sports_offered ?? 0} sports offered`}

@@ -11,7 +11,7 @@
  * calculated by hand either.
  */
 import { useState } from 'react'
-import { Check, Loader2, Plus, X } from 'lucide-react'
+import { Check, Loader2, Plus, X } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError } from '../api/client'
 import { toISO } from '../data/booking'

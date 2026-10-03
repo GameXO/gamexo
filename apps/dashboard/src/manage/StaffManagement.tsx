@@ -8,12 +8,14 @@
  * touching a login.)
  */
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Plus, Search } from 'lucide-react'
+import { Plus, Search } from '../ui/icons'
 import { ApiError } from '../api/client'
 import { useStaff, useUpdateStaff, type StaffOut } from '../api/hooks'
 import { useAuth } from '../auth/AuthProvider'
+import Card from '../ui/Card'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import RowActionsMenu from '../ui/RowActionsMenu'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 import Tabs from '../ui/Tabs'
 import { useToast } from '../ui/useToast'
 import StaffDrawer from './staff/StaffDrawer'
@@ -61,23 +63,16 @@ function SortHead({
   k,
   sort,
   onSort,
-  className = '',
 }: {
   label: string
   k: SortKey
   sort: { key: SortKey; desc: boolean }
   onSort: (k: SortKey) => void
-  className?: string
 }) {
-  const on = sort.key === k
-  const Icon = !on ? ChevronsUpDown : sort.desc ? ArrowDown : ArrowUp
   return (
-    <th className={`px-5 py-3.5 text-left text-[14px] font-medium text-ink ${className}`} aria-sort={on ? (sort.desc ? 'descending' : 'ascending') : 'none'}>
-      <button type="button" onClick={() => onSort(k)} className="inline-flex items-center gap-1.5 hover:text-ink">
-        {label}
-        <Icon size={14} className={on ? 'text-ink' : 'text-muted'} />
-      </button>
-    </th>
+    <Th sort={sort.key === k ? (sort.desc ? 'desc' : 'asc') : null} onSort={() => onSort(k)}>
+      {label}
+    </Th>
   )
 }
 
@@ -165,91 +160,85 @@ export default function StaffManagement() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-border-card bg-white">
-            <table className="w-full min-w-[820px] border-collapse">
-              <thead>
-                <tr className="border-b border-border-card">
-                  <SortHead label="Name" k="name" sort={sort} onSort={onSort} />
-                  <SortHead label="Role" k="role" sort={sort} onSort={onSort} />
-                  <th className="px-5 py-3.5 text-left text-[14px] font-medium text-ink">Username</th>
-                  <th className="px-5 py-3.5 text-left text-[14px] font-medium text-ink">Shift</th>
-                  <SortHead label="Last sign-in" k="last" sort={sort} onSort={onSort} />
-                  <SortHead label="Status" k="status" sort={sort} onSort={onSort} />
-                  <th className="w-16 px-5 py-3.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((m) => {
-                  const self = m.id === selfId
-                  const counter = m.role === 'kiosk'
-                  return (
-                    <tr key={m.id} className="border-b border-border-card last:border-0 hover:bg-hover/40">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar name={m.full_name} />
-                          <div className="min-w-0">
-                            <p className="truncate text-[14px] font-medium text-ink">
-                              {m.full_name}
-                              {self && <span className="ml-2 text-[12px] font-normal text-muted">You</span>}
-                            </p>
-                            <p className="truncate text-[13px] text-slate">{m.email}</p>
-                          </div>
+          <Table minWidth={820}>
+            <Thead>
+              <Tr>
+                <SortHead label="Name" k="name" sort={sort} onSort={onSort} />
+                <SortHead label="Role" k="role" sort={sort} onSort={onSort} />
+                <Th>Username</Th>
+                <Th>Shift</Th>
+                <SortHead label="Last sign-in" k="last" sort={sort} onSort={onSort} />
+                <SortHead label="Status" k="status" sort={sort} onSort={onSort} />
+                <Th className="w-16" />
+              </Tr>
+            </Thead>
+            <Tbody>
+              {sorted.map((m) => {
+                const self = m.id === selfId
+                const counter = m.role === 'kiosk'
+                return (
+                  <Tr key={m.id}>
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={m.full_name} />
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-medium text-ink">
+                            {m.full_name}
+                            {self && <span className="ml-2 text-[12px] font-normal text-muted">You</span>}
+                          </p>
+                          <p className="truncate text-[13px] text-slate">{m.email}</p>
                         </div>
-                      </td>
-                      <td className="px-5 py-4 text-[14px] text-ink">{roleLabel(m.role)}</td>
-                      <td className="px-5 py-4 text-[13px] text-slate">
-                        <span className="break-all">{m.username}</span>
-                      </td>
-                      <td className="px-5 py-4 text-[14px] text-slate">{m.shift ?? <span className="text-muted">—</span>}</td>
-                      <td className="px-5 py-4 text-[14px] text-slate">{ago(m.last_login_at)}</td>
-                      <td className="px-5 py-4">
-                        <StatusPill status={m.status} />
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        {!counter && (
-                          <RowActionsMenu
-                            actions={[
-                              { label: 'Edit details and role', onClick: () => setDrawer(m) },
-                              m.status === 'active'
-                                ? {
-                                    label: 'Deactivate',
-                                    disabled: self,
-                                    onClick: () => setConfirm({ member: m, to: 'inactive' }),
-                                  }
-                                : { label: 'Activate', onClick: () => setConfirm({ member: m, to: 'active' }) },
-                            ]}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
+                      </div>
+                    </Td>
+                    <Td className="text-[14px] text-ink">{roleLabel(m.role)}</Td>
+                    <Td className="text-[13px] text-slate">
+                      <span className="break-all">{m.username}</span>
+                    </Td>
+                    <Td className="text-[14px] text-slate">{m.shift ?? <span className="text-muted">—</span>}</Td>
+                    <Td className="text-[14px] text-slate">{ago(m.last_login_at)}</Td>
+                    <Td>
+                      <StatusPill status={m.status} />
+                    </Td>
+                    <Td align="right">
+                      {!counter && (
+                        <RowActionsMenu
+                          actions={[
+                            { label: 'Edit details and role', onClick: () => setDrawer(m) },
+                            m.status === 'active'
+                              ? {
+                                  label: 'Deactivate',
+                                  disabled: self,
+                                  onClick: () => setConfirm({ member: m, to: 'inactive' }),
+                                }
+                              : { label: 'Activate', onClick: () => setConfirm({ member: m, to: 'active' }) },
+                          ]}
+                        />
+                      )}
+                    </Td>
+                  </Tr>
+                )
+              })}
 
-                {isLoading &&
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={i} className="border-b border-border-card last:border-0">
-                      <td colSpan={7} className="px-5 py-4">
-                        <div className="h-9 animate-pulse rounded-lg bg-surface-muted" />
-                      </td>
-                    </tr>
-                  ))}
-                {isError && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-[14px] text-negative">
-                      Could not load staff. Only an admin can see this list.
-                    </td>
-                  </tr>
-                )}
-                {!isLoading && !isError && sorted.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-[14px] text-muted">
-                      {query ? `No one matches “${query}”.` : 'No staff yet.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              {isLoading &&
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Tr key={i}>
+                    <Td colSpan={7}>
+                      <div className="h-9 animate-pulse rounded-lg bg-surface-muted" />
+                    </Td>
+                  </Tr>
+                ))}
+              {isError && (
+                <TableMessage colSpan={7} tone="negative">
+                    Could not load staff. Only an admin can see this list.
+                  </TableMessage>
+              )}
+              {!isLoading && !isError && sorted.length === 0 && (
+                <TableMessage colSpan={7}>
+                    {query ? `No one matches “${query}”.` : 'No staff yet.'}
+                  </TableMessage>
+              )}
+            </Tbody>
+          </Table>
         </>
       )}
 
@@ -258,18 +247,25 @@ export default function StaffManagement() {
           {[...ROLE_ORDER, 'kiosk' as const].map((r) => {
             const meta = ROLE_META[r]
             return (
-              <section key={r} className="rounded-xl border border-border-card bg-white p-5">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-display text-[17px] text-ink">{meta.label}</h3>
-                  {!meta.available && r !== 'kiosk' && (
-                    <span className="rounded-full border border-border-soft px-2 py-px text-[11px] text-muted">Soon</span>
-                  )}
-                  <span className="flex-1" />
+              <Card
+                key={r}
+                title={
+                  <span className="flex items-center gap-2">
+                    {meta.label}
+                    {!meta.available && r !== 'kiosk' && (
+                      <span className="rounded-full border border-border-soft px-2 py-px text-[11px] font-normal text-muted">
+                        Soon
+                      </span>
+                    )}
+                  </span>
+                }
+                action={
                   <span className="text-[13px] text-slate">
                     {counts[r] ?? 0} {(counts[r] ?? 0) === 1 ? 'person' : 'people'}
                   </span>
-                </div>
-                <p className="mt-1 text-[14px] text-slate">{meta.summary}</p>
+                }
+              >
+                <p className="text-[14px] text-slate">{meta.summary}</p>
                 <ul className="mt-4 flex flex-col gap-2 text-[14px] text-ink">
                   {meta.can.map((c) => (
                     <li key={c} className="flex gap-2.5">
@@ -279,7 +275,7 @@ export default function StaffManagement() {
                   ))}
                 </ul>
                 <p className="mt-4 border-t border-border-card pt-3 text-[13px] text-slate">{meta.cannot}</p>
-              </section>
+              </Card>
             )
           })}
         </div>

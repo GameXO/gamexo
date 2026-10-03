@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Smartphone, Wallet } from 'lucide-react'
+import { Banknote, CreditCard, Smartphone, Wallet } from '../ui/icons'
 import { PAYMENT_METHODS } from '../data/booking'
 import * as db from '../lib/db'
 import { SettingsPanel } from '../settings/SettingsPanel'

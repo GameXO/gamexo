@@ -1,3 +1,4 @@
+import { BarChart } from '../ui/icons'
 import {
   ResponsiveContainer,
   LineChart,
@@ -7,11 +8,11 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
+import Card from '../ui/Card'
 import { useRevenueTrend } from '../api/hooks'
 import { formatINRCompact, lastNMonthLabels, monthsAgoStart } from '../dashboard/insights'
 import { asset } from '../lib/asset'
 
-const chartHistogram = asset('dashboard/chart-histogram.svg')
 const legendDotRevenue = asset('dashboard/legend-dot-c.svg')
 const legendDotBookings = asset('dashboard/legend-dot-d.svg')
 
@@ -50,29 +51,26 @@ export default function RevenueTrendChart() {
   const hasData = data.some((d) => d.revenue > 0 || d.bookings > 0)
 
   return (
-    <div className="flex w-full shrink-0 flex-col items-center gap-6 overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex flex-1 items-center gap-2.5">
-          <img src={chartHistogram} alt="" className="size-5" />
-          <p className="text-sm font-medium text-ink">Revenue Trends</p>
-        </div>
-        <div className="flex items-center gap-[22px]">
-          <div className="flex items-center gap-1.5">
-            <img src={legendDotRevenue} alt="" className="size-3" />
-            <span className="text-xs font-medium tracking-[-0.24px] text-muted">
-              Revenue
-            </span>
+    <Card
+      icon={<BarChart size={18} className="text-slate" />}
+      title="Revenue Trends"
+      action={
+        <div className="flex items-center gap-x-6">
+          <div className="flex items-center gap-[22px]">
+            <div className="flex items-center gap-1.5">
+              <img src={legendDotRevenue} alt="" className="size-3" />
+              <span className="text-xs font-medium tracking-[-0.24px] text-muted">Revenue</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <img src={legendDotBookings} alt="" className="size-3" />
+              <span className="text-xs font-medium tracking-[-0.24px] text-muted">Bookings</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <img src={legendDotBookings} alt="" className="size-3" />
-            <span className="text-xs font-medium tracking-[-0.24px] text-muted">
-              Bookings
-            </span>
-          </div>
+          <span className="shrink-0 text-xs font-medium text-slate">Last 12 months</span>
         </div>
-        <span className="shrink-0 text-xs font-medium text-slate">Last 12 months</span>
-      </div>
-
+      }
+      className="w-full shrink-0"
+    >
       {!hasData ? (
         <div className="flex h-[257px] w-full items-center justify-center text-sm text-muted">
           {trend.isPending ? 'Loading…' : 'No revenue recorded yet.'}
@@ -127,6 +125,6 @@ export default function RevenueTrendChart() {
           </ResponsiveContainer>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

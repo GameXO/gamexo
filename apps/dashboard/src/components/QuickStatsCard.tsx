@@ -1,9 +1,9 @@
+import { CreditCard } from '../ui/icons'
 import { useMemo } from 'react'
+import Card from '../ui/Card'
 import { useBookingsInRange, useKpis } from '../api/hooks'
 import { channelOf, formatINRCompact, type DashboardRange } from '../dashboard/insights'
-import { asset } from '../lib/asset'
 
-const cardIcon = asset('dashboard/card-icon.svg')
 
 /** Counter activity over the selected period, read straight off its raw
  *  bookings — no invented "memberships renewed" or "equipment issued" figures
@@ -27,14 +27,13 @@ export default function QuickStatsCard({ range }: { range: DashboardRange }) {
   }, [bookings.data, kpis.data])
 
   return (
-    <div className="flex h-full flex-[1_0_0] flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full items-center gap-6">
-        <div className="flex flex-1 items-center gap-2.5">
-          <img src={cardIcon} alt="" className="size-5" />
-          <p className="text-sm font-medium text-ink">Quick Stats</p>
-        </div>
-        <span className="text-xs font-medium text-slate">{range.label}</span>
-      </div>
+    <Card
+      icon={<CreditCard size={18} className="text-slate" />}
+      title="Quick Stats"
+      action={<span className="text-xs font-medium text-slate">{range.label}</span>}
+      className="h-full flex-[1_0_0] self-stretch"
+      bodyClassName="flex flex-col items-start gap-6"
+    >
 
       <div className="grid w-full flex-1 grid-cols-2 gap-3 text-ink">
         {stats.map((stat) => (
@@ -47,6 +46,6 @@ export default function QuickStatsCard({ range }: { range: DashboardRange }) {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

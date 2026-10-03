@@ -8,7 +8,7 @@
  * status; a person cannot demote or deactivate themselves, and the server says so.
  */
 import { useState } from 'react'
-import { Check, Copy, Loader2, RefreshCw } from 'lucide-react'
+import { Check, Copy, Loader2, RefreshCw } from '../../ui/icons'
 import Drawer from '../../ui/Drawer'
 import { ApiError, type StaffRole, type StaffStatus } from '../../api/client'
 import { useCreateStaff, useUpdateStaff, type StaffOut } from '../../api/hooks'

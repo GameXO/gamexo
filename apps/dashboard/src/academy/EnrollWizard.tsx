@@ -18,7 +18,7 @@
  *   that *would* fit, not as a red toast that leaves staff stuck.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, Loader2, X } from '../ui/icons'
 import {
   DURATION_LABEL,
   PLAN_DURATIONS,

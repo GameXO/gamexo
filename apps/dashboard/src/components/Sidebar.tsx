@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, LogOut, Search, Zap } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, LogOut, Search, Zap, type IconComponent } from '../ui/icons'
 import {
   helpItem,
   isManageView,
@@ -27,19 +27,17 @@ export const OPEN_SEARCH_EVENT = 'gamexo:open-search'
 const ROW =
   'flex h-10 w-full items-center gap-3 rounded-lg px-2.5 text-left text-[14px] tracking-[-0.01em] text-ink transition-colors'
 
-/** One row of the list. A destination, or — with `onOpen` — a door to a panel. */
+/** One row of the list: a destination. */
 function NavRow({
   label,
-  icon,
+  icon: Icon,
   active,
   onClick,
-  hasPanel,
 }: {
   label: string
-  icon?: string
+  icon?: IconComponent
   active: boolean
   onClick: () => void
-  hasPanel?: boolean
 }) {
   return (
     <button
@@ -48,16 +46,99 @@ function NavRow({
       aria-current={active ? 'page' : undefined}
       className={`${ROW} ${active ? 'bg-hover font-medium' : 'hover:bg-hover/70'}`}
     >
-      {icon && (
-        <img src={icon} alt="" className={`size-[19px] shrink-0 transition-opacity ${active ? 'opacity-100' : 'opacity-55'}`} />
-      )}
+      {Icon && <Icon size={20} className={`shrink-0 transition-colors ${active ? 'text-ink' : 'text-slate'}`} />}
       <span className="flex-1 truncate">{label}</span>
-      {hasPanel && <ChevronRight size={16} className="shrink-0 text-muted" />}
     </button>
   )
 }
 
-type Panel = 'manage' | 'settings' | null
+/** A child of an expanded group: text only, hung off the group's guide line. */
+function SubRow({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`flex h-9 w-full items-center rounded-lg px-3 text-left text-[14px] tracking-[-0.01em] ${
+        active ? 'bg-hover font-medium text-ink' : 'text-slate hover:bg-hover/70 hover:text-ink'
+      }`}
+    >
+      <span className="truncate">{label}</span>
+    </button>
+  )
+}
+
+/**
+ * A row that opens in place. The children slide out beneath it (a grid row easing from
+ * 0fr to 1fr, so the height does not have to be measured) and the chevron turns with
+ * them. While closed the children are `inert`, so they cannot be tabbed to or read out.
+ */
+function NavGroup({
+  label,
+  icon: Icon,
+  open,
+  hasActive,
+  onToggle,
+  groupRef,
+  children,
+}: {
+  label: string
+  icon: IconComponent
+  open: boolean
+  hasActive: boolean
+  onToggle: () => void
+  groupRef: (el: HTMLDivElement | null) => void
+  children: ReactNode
+}) {
+  return (
+    <div ref={groupRef}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`${ROW} ${hasActive && !open ? 'bg-hover font-medium' : 'hover:bg-hover/70'}`}
+      >
+        <Icon size={20} className={`shrink-0 transition-colors ${hasActive || open ? 'text-ink' : 'text-slate'}`} />
+        <span className="flex-1 truncate">{label}</span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-muted transition-transform duration-300 ease-[var(--ease-spring)] ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <div
+        inert={!open}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-spring)] ${
+          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="ml-[19px] mt-0.5 flex flex-col gap-0.5 border-l border-border-soft pl-2">{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type Group = 'manage' | 'settings'
+
+/** Glide `nav` so `el` sits at its top, tracking the group while it is still growing. */
+function pushToTop(nav: HTMLElement, el: HTMLElement) {
+  const offset = () => el.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop - 12
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    nav.scrollTop = offset()
+    return
+  }
+  const from = nav.scrollTop
+  const t0 = performance.now()
+  const duration = 320
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / duration)
+    const eased = 1 - Math.pow(1 - p, 3)
+    nav.scrollTop = from + (offset() - from) * eased
+    if (p < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
 
 export default function Sidebar({
   open,
@@ -88,16 +169,40 @@ export default function Sidebar({
   )
   const settingsList = useMemo(() => SETTINGS_NAV.flatMap((g) => g.items), [])
 
-  // Only Manage and Settings have anything to open. The panel follows where you are —
-  // landing on a manage or settings screen by any route (the header search, a button
-  // inside a page) shows its panel, and landing anywhere else shows the main list —
-  // and Back closes it without leaving the page.
-  const panelFor = (v: View): Panel => (isManageView(v) ? 'manage' : v === 'settings' && isAdmin ? 'settings' : null)
-  const [panel, setPanel] = useState<Panel>(() => panelFor(view))
+  // Manage and Settings open in place. Landing on one of their screens by any route
+  // (the header search, a button inside a page) opens its group too; opening a group
+  // glides it to the top of the list so its children are in view without scrolling.
+  const groupFor = (v: View): Group | null =>
+    isManageView(v) ? 'manage' : v === 'settings' || v === 'helpCenter' ? 'settings' : null
+  const [openGroups, setOpenGroups] = useState<Group[]>(() => {
+    const g = groupFor(view)
+    return g ? [g] : []
+  })
+  const navRef = useRef<HTMLElement>(null)
+  const groupEls = useRef<Record<Group, HTMLDivElement | null>>({ manage: null, settings: null })
+
+  const reveal = useCallback((g: Group) => {
+    // Next frame, so the group has begun to open before it is chased.
+    requestAnimationFrame(() => {
+      const nav = navRef.current
+      const el = groupEls.current[g]
+      if (nav && el) pushToTop(nav, el)
+    })
+  }, [])
+
+  const toggleGroup = (g: Group) => {
+    const opening = !openGroups.includes(g)
+    setOpenGroups((cur) => (opening ? [...cur, g] : cur.filter((x) => x !== g)))
+    if (opening) reveal(g)
+  }
+
   useEffect(() => {
-    setPanel(panelFor(view))
+    const g = groupFor(view)
+    if (!g || openGroups.includes(g)) return
+    setOpenGroups((cur) => [...cur, g])
+    reveal(g)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, isAdmin])
+  }, [view])
 
   useEffect(() => {
     if (!identity.isOps) return
@@ -158,7 +263,7 @@ export default function Sidebar({
           />
         </div>
 
-        <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3">
+        <nav ref={navRef} aria-label="Main" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3">
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
@@ -169,93 +274,82 @@ export default function Sidebar({
             <kbd className="font-sans text-[12px] text-muted">Ctrl K</kbd>
           </button>
 
-          {panel === null ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onNavigate('booking')}
-                className="mb-1 flex h-10 w-full shrink-0 items-center gap-3 rounded-lg bg-lime px-2.5 text-left text-[14px] font-medium text-lime-ink hover:brightness-95"
-              >
-                <Zap size={17} className="shrink-0" />
-                <span className="flex-1">New Booking</span>
-              </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('booking')}
+            className="mb-1 flex h-10 w-full shrink-0 items-center gap-3 rounded-lg bg-lime px-2.5 text-left text-[14px] font-medium text-lime-ink hover:brightness-95"
+          >
+            <Zap size={17} className="shrink-0" />
+            <span className="flex-1">New Booking</span>
+          </button>
 
-              <div className="flex flex-col gap-0.5">
-                {primaryItems.map((item: NavItem) =>
-                  item.submenu ? (
-                    <NavRow
-                      key={item.label}
-                      label={item.label}
-                      icon={item.icon}
-                      hasPanel
-                      active={isManageView(view)}
-                      onClick={() => {
-                        setPanel('manage')
-                        onNavigate('manageCourts')
-                      }}
-                    />
-                  ) : (
-                    <NavRow
-                      key={item.label}
-                      label={item.label}
-                      icon={item.icon}
-                      active={item.view === view}
-                      onClick={() => item.view && onNavigate(item.view)}
-                    />
-                  ),
-                )}
-              </div>
-
-              <div className="mt-auto flex flex-col gap-0.5 border-t border-border-soft pt-3">
-                <NavRow
-                  label={helpItem.label}
-                  icon={helpItem.icon}
-                  active={view === helpItem.view}
-                  onClick={() => helpItem.view && onNavigate(helpItem.view)}
-                />
-                <NavRow
-                  label={settingsItem.label}
-                  icon={settingsItem.icon}
-                  active={view === 'settings'}
-                  // Anyone but an admin has no sections to open — a plain link.
-                  hasPanel={isAdmin}
-                  onClick={() => {
-                    if (isAdmin) setPanel('settings')
-                    onNavigate('settings')
+          <div className="flex flex-col gap-0.5">
+            {primaryItems.map((item: NavItem) =>
+              item.submenu ? (
+                <NavGroup
+                  key={item.label}
+                  label={item.label}
+                  icon={item.icon}
+                  open={openGroups.includes('manage')}
+                  hasActive={isManageView(view)}
+                  onToggle={() => toggleGroup('manage')}
+                  groupRef={(el) => {
+                    groupEls.current.manage = el
                   }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => setPanel(null)}
-                className={`${ROW} mb-1 font-medium hover:bg-hover/70`}
-              >
-                <ChevronLeft size={18} className="shrink-0 text-slate" />
-                <span>{panel === 'manage' ? 'Manage' : 'Settings'}</span>
-              </button>
-
-              {panel === 'manage'
-                ? manageList.map((item) => (
-                    <NavRow
-                      key={item.view}
-                      label={item.label}
-                      active={item.view === view}
-                      onClick={() => onNavigate(item.view)}
-                    />
-                  ))
-                : settingsList.map((item) => (
-                    <NavRow
-                      key={item.id}
-                      label={item.label}
-                      active={view === 'settings' && item.id === section}
-                      onClick={() => onNavigate('settings', item.id)}
+                >
+                  {manageList.map((child) => (
+                    <SubRow
+                      key={child.view}
+                      label={child.label}
+                      active={child.view === view}
+                      onClick={() => onNavigate(child.view)}
                     />
                   ))}
-            </div>
-          )}
+                </NavGroup>
+              ) : (
+                <NavRow
+                  key={item.label}
+                  label={item.label}
+                  icon={item.icon}
+                  active={item.view === view}
+                  onClick={() => item.view && onNavigate(item.view)}
+                />
+              ),
+            )}
+
+            {/* Settings follows the other destinations, as the last of them. Help Center
+                is one of its rows, listed like the rest, for admin and non-admin alike. */}
+            <NavGroup
+              label={settingsItem.label}
+              icon={settingsItem.icon}
+              open={openGroups.includes('settings')}
+              hasActive={view === 'settings' || view === 'helpCenter'}
+              onToggle={() => toggleGroup('settings')}
+              groupRef={(el) => {
+                groupEls.current.settings = el
+              }}
+            >
+              {isAdmin ? (
+                settingsList.map((item) => (
+                  <SubRow
+                    key={item.id}
+                    label={item.label}
+                    active={view === 'settings' && item.id === section}
+                    onClick={() => onNavigate('settings', item.id)}
+                  />
+                ))
+              ) : (
+                // Nothing to configure without admin rights, but the page still
+                // shows who you are signed in as.
+                <SubRow label="Account" active={view === 'settings'} onClick={() => onNavigate('settings')} />
+              )}
+              <SubRow
+                label={helpItem.label}
+                active={view === helpItem.view}
+                onClick={() => helpItem.view && onNavigate(helpItem.view)}
+              />
+            </NavGroup>
+          </div>
         </nav>
 
         <div className="relative shrink-0 border-t border-border-soft p-3">

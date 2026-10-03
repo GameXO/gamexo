@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { IconComponent } from '../ui/icons'
 
 export default function Tile({
   label,
@@ -8,7 +8,7 @@ export default function Tile({
 }: {
   label: string
   value: string
-  icon: LucideIcon
+  icon: IconComponent
   alert?: boolean
 }) {
   return (

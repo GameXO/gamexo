@@ -8,7 +8,7 @@
  * upload behind, which is harmless, rather than a half-saved record.
  */
 import { useRef, useState } from 'react'
-import { ImagePlus, Loader2, Plus, X } from 'lucide-react'
+import { ImagePlus, Loader2, Plus, X } from '../ui/icons'
 import { ApiError } from '../api/client'
 import { useUploadImage } from '../api/hooks'
 

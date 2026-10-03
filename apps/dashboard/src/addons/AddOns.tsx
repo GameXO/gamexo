@@ -12,8 +12,8 @@ import {
   Shield,
   Shirt,
   X,
-  type LucideIcon,
-} from 'lucide-react'
+  type IconComponent,
+} from '../ui/icons'
 import {
   EQUIPMENT,
   equipmentCategories,
@@ -25,7 +25,7 @@ import {
 import * as db from '../lib/db'
 import CheckoutSheet from './CheckoutSheet'
 
-const ICONS: Record<string, LucideIcon> = {
+const ICONS: Record<string, IconComponent> = {
   shoes: Footprints,
   football: CircleDot,
   bib: Shirt,

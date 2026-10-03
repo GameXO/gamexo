@@ -113,6 +113,18 @@ async def test_overlapping_booking_on_the_same_court_is_rejected(
     assert "conflicting_booking_id" in clash.json()["error"]["details"]
 
 
+async def test_a_booking_may_run_at_most_six_hours(
+    client: AsyncClient, tenant_a: TenantFixture
+) -> None:
+    ctx = await setup_academy(client, tenant_a)
+
+    six = await book(client, ctx, court=ctx["court_1"], starts_at=at(2, 6), minutes=360)
+    assert six.status_code == 201, six.text
+
+    seven = await book(client, ctx, court=ctx["court_2"], starts_at=at(2, 6), minutes=420)
+    assert seven.status_code == 422
+
+
 async def test_a_booking_that_straddles_an_existing_one_is_rejected(
     client: AsyncClient, tenant_a: TenantFixture
 ) -> None:

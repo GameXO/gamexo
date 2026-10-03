@@ -1,5 +1,6 @@
 import type { Trend } from '../dashboard/insights'
 import { asset } from '../lib/asset'
+import Card from '../ui/Card'
 
 const dotSeparator = asset('dashboard/dot-separator.svg')
 
@@ -13,22 +14,15 @@ export default function StatCard({
   trend: Trend
 }) {
   return (
-    <div className="flex items-center overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-6">
-        <p className="text-sm font-medium leading-[1.5] text-slate">{label}</p>
-        <p className="text-[27px] font-semibold leading-[1.2] tracking-[0.28px] text-ink">
-          {value}
-        </p>
-        <div className="flex items-center gap-2 text-sm leading-[1.5]">
-          <span
-            className={`font-medium ${trend.sentiment === 'up' ? 'text-positive' : 'text-negative'}`}
-          >
-            {trend.value}
-          </span>
-          <img src={dotSeparator} alt="" className="size-1" />
-          <span className="font-medium text-slate">{trend.caption}</span>
-        </div>
+    <Card title={label} bodyClassName="flex flex-col items-start gap-5">
+      <p className="text-[27px] font-semibold leading-[1.2] tracking-[0.28px] text-ink">{value}</p>
+      <div className="flex items-center gap-2 text-sm leading-[1.5]">
+        <span className={`font-medium ${trend.sentiment === 'up' ? 'text-positive' : 'text-negative'}`}>
+          {trend.value}
+        </span>
+        <img src={dotSeparator} alt="" className="size-1" />
+        <span className="font-medium text-slate">{trend.caption}</span>
       </div>
-    </div>
+    </Card>
   )
 }

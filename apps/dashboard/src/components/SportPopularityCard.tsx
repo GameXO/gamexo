@@ -1,9 +1,9 @@
+import { Tag } from '../ui/icons'
 import { useMemo } from 'react'
+import Card from '../ui/Card'
 import { useBookingsInRange, useSports } from '../api/hooks'
 import { formatINRCompact, revenueBySport, type DashboardRange } from '../dashboard/insights'
-import { asset } from '../lib/asset'
 
-const discountTag = asset('dashboard/discount-tag.svg')
 
 /** Revenue by sport over the selected period — summed straight off each
  *  booking's own `total`, not a booking-count proxy for it. */
@@ -22,14 +22,13 @@ export default function SportPopularityCard({ range }: { range: DashboardRange }
   const loading = bookings.isPending || sports.isPending
 
   return (
-    <div className="flex h-full flex-[1_0_0] flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full items-center gap-6">
-        <div className="flex flex-1 items-center gap-2.5">
-          <img src={discountTag} alt="" className="size-5" />
-          <p className="text-sm font-medium text-ink">Revenue by Sport</p>
-        </div>
-        <span className="text-xs font-medium text-slate">{range.label}</span>
-      </div>
+    <Card
+      icon={<Tag size={18} className="text-slate" />}
+      title="Revenue by Sport"
+      action={<span className="text-xs font-medium text-slate">{range.label}</span>}
+      className="h-full flex-[1_0_0] self-stretch"
+      bodyClassName="flex flex-col items-start gap-6"
+    >
 
       {loading ? (
         <p className="text-sm text-muted">Loading…</p>
@@ -56,6 +55,6 @@ export default function SportPopularityCard({ range }: { range: DashboardRange }
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

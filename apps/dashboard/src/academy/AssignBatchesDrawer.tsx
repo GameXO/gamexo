@@ -7,7 +7,7 @@
  * with it; classes already taught stay credited to whoever taught them.
  */
 import { useMemo, useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError } from '../api/client'
 import { useAssignBatches, useBatches, useCoaches } from '../api/hooks'

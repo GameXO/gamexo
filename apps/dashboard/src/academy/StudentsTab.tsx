@@ -11,7 +11,8 @@
  * the previous result while the next loads, so changing a filter never blanks the page.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Loader2, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2, Search, X } from '../ui/icons'
+import { Table, TableMessage, Tbody, Td, Th, Thead, Tr } from '../ui/Table'
 import type { RosterQuery } from '../api/client'
 import {
   SKILL_LEVELS,
@@ -289,71 +290,61 @@ export default function StudentsTab({
         </p>
       )}
 
-      {/* `shrink-0` is load-bearing: this is a child of a scrolling flex column and
-          `overflow-hidden` would otherwise let it collapse to its border. */}
-      <div className="shrink-0 overflow-x-auto rounded-xl border border-border-card bg-white">
-        <table className="w-full min-w-[920px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border-card text-xs uppercase tracking-wide text-muted">
-              {SORTABLE.slice(0, 1).map((c) => (
-                <SortHeader key={c.key} col={c} filters={filters} onSort={sortBy} />
-              ))}
-              <th className="px-4 py-3 font-medium">Sport & level</th>
-              <th className="px-4 py-3 font-medium">Batch & coach</th>
-              {SORTABLE.slice(1).map((c) => (
-                <SortHeader key={c.key} col={c} filters={filters} onSort={sortBy} />
-              ))}
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <StudentTableRow key={row.id} row={row} sportName={sportName} onOpen={onOpen} />
+      <Table minWidth={920}>
+        <Thead>
+          <Tr>
+            {SORTABLE.slice(0, 1).map((c) => (
+              <SortHeader key={c.key} col={c} filters={filters} onSort={sortBy} />
             ))}
+            <Th>Sport & level</Th>
+            <Th>Batch & coach</Th>
+            {SORTABLE.slice(1).map((c) => (
+              <SortHeader key={c.key} col={c} filters={filters} onSort={sortBy} />
+            ))}
+            <Th>Status</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {rows.map((row) => (
+            <StudentTableRow key={row.id} row={row} sportName={sportName} onOpen={onOpen} />
+          ))}
 
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted">
-                  Loading students…
-                </td>
-              </tr>
-            )}
-            {isError && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-negative">
-                  Could not load students.
-                </td>
-              </tr>
-            )}
-            {!isLoading && !isError && rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center">
-                  {activeFilterCount > 0 ? (
-                    <>
-                      <p className="text-sm font-medium text-ink">No students match these filters</p>
-                      <button type="button" onClick={clear} className="mt-2 text-sm text-slate underline">
-                        Clear filters
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium text-ink">No students enrolled yet</p>
-                      <p className="mt-1 text-sm text-slate">Enrol your first student to see them here.</p>
-                      <button
-                        type="button"
-                        onClick={onEnrol}
-                        className="mt-3 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white"
-                      >
-                        Enrol student
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          {isLoading && (
+            <TableMessage colSpan={7}>
+                Loading students…
+              </TableMessage>
+          )}
+          {isError && (
+            <TableMessage colSpan={7} tone="negative">
+                Could not load students.
+              </TableMessage>
+          )}
+          {!isLoading && !isError && rows.length === 0 && (
+            <TableMessage colSpan={7}>
+                {activeFilterCount > 0 ? (
+                  <>
+                    <p className="text-sm font-medium text-ink">No students match these filters</p>
+                    <button type="button" onClick={clear} className="mt-2 text-sm text-slate underline">
+                      Clear filters
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-ink">No students enrolled yet</p>
+                    <p className="mt-1 text-sm text-slate">Enrol your first student to see them here.</p>
+                    <button
+                      type="button"
+                      onClick={onEnrol}
+                      className="mt-3 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white"
+                    >
+                      Enrol student
+                    </button>
+                  </>
+                )}
+              </TableMessage>
+          )}
+        </Tbody>
+      </Table>
 
       {pages > 1 && (
         <div className="flex items-center justify-between text-sm text-slate">
@@ -394,21 +385,13 @@ function SortHeader({
   onSort: (key: NonNullable<RosterQuery['sort']>) => void
 }) {
   const active = (filters.sort ?? 'name') === col.key
-  const Arrow = filters.desc ? ArrowDown : ArrowUp
   return (
-    <th
-      className="px-4 py-3 font-medium"
-      aria-sort={active ? (filters.desc ? 'descending' : 'ascending') : 'none'}
+    <Th
+      sort={active ? (filters.desc ? 'desc' : 'asc') : null}
+      onSort={() => onSort(col.key)}
     >
-      <button
-        type="button"
-        onClick={() => onSort(col.key)}
-        className={`inline-flex items-center gap-1 uppercase tracking-wide ${active ? 'text-ink' : 'hover:text-ink'}`}
-      >
-        {col.label}
-        {active && <Arrow size={12} />}
-      </button>
-    </th>
+      {col.label}
+    </Th>
   )
 }
 
@@ -427,18 +410,8 @@ function StudentTableRow({
   const hiddenFlags = row.flags.length - shownFlags.length
 
   return (
-    <tr
-      onClick={() => onOpen(row.id)}
-      // The row is the target, so it also has to answer the keyboard.
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return
-        e.preventDefault()
-        onOpen(row.id)
-      }}
-      className="cursor-pointer border-b border-border-card last:border-0 transition-colors hover:bg-surface-muted/70 focus:bg-surface-muted/70 focus:outline-none"
-    >
-      <td className="px-4 py-3">
+    <Tr onClick={() => onOpen(row.id)}>
+      <Td>
         <div className="flex items-center gap-3">
           <Avatar name={row.name} initials={row.avatar_initials} photoUrl={row.photo_url} />
           <div className="min-w-0">
@@ -463,9 +436,9 @@ function StudentTableRow({
             )}
           </div>
         </div>
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         {row.sport_id ? (
           <>
             <p className="text-ink">{sportName(row.sport_id)}</p>
@@ -474,14 +447,14 @@ function StudentTableRow({
         ) : (
           <span className="text-xs text-muted">Not enrolled</span>
         )}
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         <p className="text-ink">{row.batch_name ?? '—'}</p>
         {row.coach_name && <p className="text-xs text-muted">{row.coach_name}</p>}
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         {row.attendance_pct === null ? (
           <span className="text-xs text-muted">No sessions yet</span>
         ) : (
@@ -493,9 +466,9 @@ function StudentTableRow({
             <p className="mt-0.5 text-[11px] text-muted">last 30 days</p>
           </div>
         )}
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         {Number(row.rating) > 0 ? (
           <span className="font-medium text-ink">
             {Number(row.rating).toFixed(1)}
@@ -504,9 +477,9 @@ function StudentTableRow({
         ) : (
           <span className="text-xs text-muted">Not rated</span>
         )}
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         {row.fee_status === 'none' ? (
           <span className="text-xs text-muted">No plan</span>
         ) : (
@@ -528,13 +501,13 @@ function StudentTableRow({
             </p>
           </>
         )}
-      </td>
+      </Td>
 
-      <td className="px-4 py-3">
+      <Td>
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_CHIP[row.status] ?? ''}`}>
           {row.status}
         </span>
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   )
 }

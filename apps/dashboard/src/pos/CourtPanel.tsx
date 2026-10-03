@@ -10,7 +10,7 @@ import {
   Clock,
   FileText,
   ArrowLeft,
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   balanceOf,
   courtById,

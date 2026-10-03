@@ -6,7 +6,7 @@
  * feedback tends to arrive at the front desk, not in a manager's inbox.
  */
 import { useEffect, useState } from 'react'
-import { Check, Loader2, Star } from 'lucide-react'
+import { Check, Loader2, Star } from '../ui/icons'
 import Drawer from '../ui/Drawer'
 import { ApiError } from '../api/client'
 import { toISO } from '../data/booking'

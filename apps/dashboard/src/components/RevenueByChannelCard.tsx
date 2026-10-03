@@ -1,4 +1,6 @@
+import { Store } from '../ui/icons'
 import { useMemo } from 'react'
+import Card from '../ui/Card'
 import { useBookingsInRange } from '../api/hooks'
 import {
   formatINRCompact,
@@ -6,9 +8,7 @@ import {
   type ChannelKey,
   type DashboardRange,
 } from '../dashboard/insights'
-import { asset } from '../lib/asset'
 
-const storeManagement = asset('dashboard/store-management.svg')
 
 const CHANNEL_GRADIENT: Record<ChannelKey, string> = {
   walkin: 'linear-gradient(to right, #336b4c, #07ad52)',
@@ -28,14 +28,13 @@ export default function RevenueByChannelCard({ range }: { range: DashboardRange 
   const max = Math.max(1, ...rows.map((r) => r.revenue))
 
   return (
-    <div className="flex h-full flex-1 flex-col items-start gap-8 self-stretch overflow-hidden rounded-xl border border-border-card bg-surface p-5 shadow-card sm:p-6">
-      <div className="flex w-full items-center gap-6">
-        <div className="flex flex-1 items-center gap-2.5">
-          <img src={storeManagement} alt="" className="size-5" />
-          <p className="text-sm font-medium text-ink">Revenue by Booking Type</p>
-        </div>
-        <span className="text-xs font-medium text-slate">{range.label}</span>
-      </div>
+    <Card
+      icon={<Store size={18} className="text-slate" />}
+      title="Revenue by Booking Type"
+      action={<span className="text-xs font-medium text-slate">{range.label}</span>}
+      className="h-full flex-1 self-stretch"
+      bodyClassName="flex flex-col items-start gap-6"
+    >
 
       {bookings.isPending ? (
         <p className="text-sm text-muted">Loading…</p>
@@ -60,6 +59,6 @@ export default function RevenueByChannelCard({ range }: { range: DashboardRange 
           <p className="w-full text-right text-xs text-muted">{formatINRCompact(total)} total</p>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

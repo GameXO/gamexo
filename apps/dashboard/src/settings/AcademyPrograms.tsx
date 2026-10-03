@@ -15,7 +15,7 @@
  *   the UI says which is which rather than making them look alike.
  */
 import { useState } from 'react'
-import { Check, Loader2, Pencil, Plus, X } from 'lucide-react'
+import { Check, Loader2, Pencil, Plus, X } from '../ui/icons'
 import {
   AGE_BANDS,
   DEFAULT_AGE_BOUNDS,
